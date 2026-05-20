@@ -1,4 +1,4 @@
-# spammer
+# saas-api-mocks
 
 Wire-compatible, self-hosted replicas of **Slack / Discord / GitHub / Gmail**.
 
@@ -11,8 +11,8 @@ through wire-accurate REST APIs and signed webhooks.
 Use it to develop and test an ingestion pipeline against a controllable,
 reproducible fake world instead of live third-party APIs.
 
-> The repo directory is `spammer/`; the installed Python package is `spammers/`
-> (plural). This is the same convention as `requests` / `Pillow` and is intentional.
+> The installed Python package is `spammers/` (plural), which differs from the
+> repo name. This is the same convention as `requests` / `Pillow` and is intentional.
 
 ---
 
@@ -34,7 +34,7 @@ once — it builds the virtualenv, installs dependencies, verifies Postgres, and
 caches the database connection in `.env` so you never have to export anything.
 
 ```bash
-git clone <this-repo> && cd spammer
+git clone <this-repo> && cd saas-api-mocks
 
 ./dev.sh setup        # venv + deps + database (run once)
 ./dev.sh test         # run the test suite (optional sanity check)
@@ -219,7 +219,7 @@ temporary database (`SPAMMERS_TEST_DB_URL`), independent of your `prepare` data.
 ## Layout
 
 ```
-spammer/
+saas-api-mocks/
 ├── dev.sh                        # setup + task runner (start here)
 ├── README.md
 ├── pyproject.toml

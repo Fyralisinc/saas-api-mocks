@@ -1,4 +1,4 @@
-# spammer — Architecture & Design
+# saas-api-mocks — Architecture & Design
 
 Self-hosted, drop-in replicas of **Slack**, **Discord**, **GitHub**, and **Gmail**
 that a data-ingestion product can point at without changing its ingestion code.
@@ -384,12 +384,12 @@ on `(channel_pk, ts)`.
 
 ## 10. Repository layout
 
-The installed package is `spammers/` (plural) inside the `spammer/` repo —
+The installed package is `spammers/` (plural), which differs from the repo name —
 intentional, same convention as `requests` / `Pillow`. Directories marked
 *planned* arrive with later providers.
 
 ```
-spammer/                          # repo root
+saas-api-mocks/                   # repo root
 ├── dev.sh                        # setup + task runner (start here)
 ├── README.md
 ├── ARCHITECTURE.md               ← this file
@@ -418,7 +418,7 @@ spammer/                          # repo root
 ## 11. Verification strategy
 
 The test suite encodes **real Slack's documented behavior** as the baseline and
-asserts the mock matches it — so "passes on the spammer ⇒ behaves like the real
+asserts the mock matches it — so "passes on the mock ⇒ behaves like the real
 service." It is fully offline and deterministic (golden fixtures + a hand-built
 seed dataset); no live account is required.
 

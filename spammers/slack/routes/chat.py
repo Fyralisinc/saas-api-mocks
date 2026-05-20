@@ -17,12 +17,6 @@ from spammers.slack.routes.conversations import _find_channel
 from spammers.slack.state import state
 
 
-def _bot_id(workspace: dict) -> str:
-    """Real Slack bot ids use a ``B`` prefix, distinct from the bot's ``U`` user id."""
-    uid = workspace["bot_user_id"]
-    return "B" + uid[1:] if uid.startswith("U") else uid
-
-
 router = APIRouter()
 
 
@@ -90,7 +84,7 @@ async def post_message(request: Request):
             "text": text,
             "ts": now_ts,
             "username": "Fyralis",
-            "bot_id": _bot_id(ws),
+            "bot_id": ws["bot_id"],
             "team": ws["team_id"],
         },
     })

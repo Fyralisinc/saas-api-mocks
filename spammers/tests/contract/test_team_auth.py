@@ -24,4 +24,6 @@ async def test_auth_test(client, auth_header):
     assert body["team_id"] == TEAM_ID
     assert body["user_id"] == BOT_USER_ID
     assert body["url"] == f"https://{TEAM_DOMAIN}.slack.com/"
-    assert "bot_id" in body
+    # Real Slack: bot_id is a B-prefixed id, distinct from the bot's U… user id.
+    assert body["bot_id"].startswith("B")
+    assert body["bot_id"] != body["user_id"]

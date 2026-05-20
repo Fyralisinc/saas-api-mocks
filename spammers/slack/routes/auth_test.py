@@ -28,5 +28,5 @@ async def auth_test(request: Request):
         "user": "fyralis-bot",
         "team_id": ws["team_id"],
         "user_id": ws["bot_user_id"],
-        "bot_id": ws["bot_user_id"],
+        "bot_id": ws["bot_id"],
     })

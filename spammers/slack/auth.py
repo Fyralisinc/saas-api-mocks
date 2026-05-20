@@ -50,7 +50,16 @@ async def resolve_workspace(request: Request) -> Optional[dict]:
             "FROM app_slack.workspaces WHERE run_id = $1 AND bot_token = $2",
             st.run_id, token,
         )
-    return dict(row) if row else None
+    if row is None:
+        return None
+    ws = dict(row)
+    ws["bot_id"] = _bot_id(ws["bot_user_id"])
+    return ws
+
+
+def _bot_id(bot_user_id: str) -> str:
+    """Real Slack bot ids use a ``B`` prefix, distinct from the bot's ``U`` user id."""
+    return "B" + bot_user_id[1:] if bot_user_id.startswith("U") else bot_user_id
 
 
 def _extract_token(request: Request) -> Optional[str]:

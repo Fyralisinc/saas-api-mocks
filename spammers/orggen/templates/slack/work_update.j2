@@ -1,0 +1,27 @@
+{%- set v = persona.voice_signature -%}
+{%- set casual = v.get("formality") == "casual" -%}
+{%- if event_kind == "pr_announce" -%}
+{%- if casual -%}
+opened {{ pr_link }} — {{ pr_title }}. would love a look 👀
+{%- else -%}
+PR up for review: {{ pr_link }} ({{ pr_title }}).
+{%- endif -%}
+{%- elif event_kind == "pr_merged" -%}
+{%- if casual -%}
+shipped {{ pr_link }} 🚢
+{%- else -%}
+Merged {{ pr_link }} into main.
+{%- endif -%}
+{%- elif event_kind == "incident_open" -%}
+🚨 incident: {{ incident_summary }}. starting triage in {{ channel }}.
+{%- elif event_kind == "incident_resolved" -%}
+incident resolved. RCA to follow in thread.
+{%- elif event_kind == "ask" -%}
+{%- if casual -%}
+quick q — {{ question }}
+{%- else -%}
+Question for the team: {{ question }}
+{%- endif -%}
+{%- else -%}
+{{ default_text }}
+{%- endif -%}

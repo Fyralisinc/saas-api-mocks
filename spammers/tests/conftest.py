@@ -1,0 +1,254 @@
+"""Shared fixtures for the Slack-mock fidelity suite.
+
+The mock is DB-backed (asyncpg → SPAMMERS_DB_URL). These fixtures:
+
+  1. Point the mock at a dedicated, auto-created test DB.
+  2. Apply the migration and insert a small, *hand-built deterministic*
+     dataset (one workspace, three users, four channels, a threaded
+     conversation in #general). We deliberately do NOT use
+     ``orggen.compile_run`` to seed: it is non-deterministic and currently
+     crashes on most seeds (see ``tests/behavior/test_compile_flow.py``),
+     and precise contract assertions need exact, known ts/counts.
+  3. Wire the Slack ``state`` singleton to that pool + run, then expose an
+     in-process ASGI client (httpx ASGITransport — note it does NOT run
+     FastAPI lifespan events, so we set state ourselves).
+
+Test DB URL precedence: ``SPAMMERS_TEST_DB_URL`` env, else the documented
+default with the db name swapped to ``spammers_test``.
+"""
+from __future__ import annotations
+
+import os
+from datetime import datetime, timezone
+from uuid import UUID, uuid4
+
+import pytest
+import pytest_asyncio
+from httpx import ASGITransport, AsyncClient
+
+
+# --------------------------------------------------------------------------
+# Known, deterministic identifiers — assertions reference these directly.
+# --------------------------------------------------------------------------
+TEAM_ID = "T0FIDELITY"
+TEAM_NAME = "Fidelity Test Co"
+TEAM_DOMAIN = "fidelity-test"
+APP_ID = "A0APP00001"
+BOT_USER_ID = "U0BOTUSER0"
+BOT_TOKEN = "xoxb-0000000000-1111111111-fidelitytoken00000000000"
+CLIENT_ID = "111111111.222222222"
+CLIENT_SECRET = "fidelity-client-secret"
+SIGNING_SECRET = "abcdef0123456789abcdef0123456789"
+
+USER_ALICE = "U0ALICE001"
+USER_BOB = "U0BOB00002"
+USER_CAROL = "U0CAROL003"
+
+CH_GENERAL = "C0GENERAL0"
+CH_RANDOM = "C0RANDOM01"
+CH_PRIVATE = "C0PRIVATE0"
+CH_ARCHIVED = "C0ARCHIVE0"
+
+# #general message timeline (epoch base, microsecond precision in ts).
+_BASE = 1768000000
+TS_M1 = f"{_BASE + 100}.000100"          # root, alice
+TS_M2 = f"{_BASE + 200}.000100"          # root, bob
+TS_PARENT = f"{_BASE + 300}.000100"      # thread parent, alice (reply_count=2)
+TS_R1 = f"{_BASE + 310}.000100"          # reply, bob
+TS_R2 = f"{_BASE + 320}.000100"          # reply, carol
+GENERAL_ROOT_TS = [TS_M1, TS_M2, TS_PARENT]      # what history should return
+GENERAL_ROOT_TS_DESC = [TS_PARENT, TS_M2, TS_M1]  # newest-first order
+
+VIRTUAL_NOW = datetime.fromtimestamp(_BASE + 1_000_000, tz=timezone.utc)
+
+
+def test_db_url() -> str:
+    explicit = os.environ.get("SPAMMERS_TEST_DB_URL")
+    if explicit:
+        return explicit
+    base = os.environ.get(
+        "SPAMMERS_DB_URL", "postgresql://postgres:postgres@localhost:5432/mock_orgs"
+    )
+    head, _ = base.rsplit("/", 1)
+    return f"{head}/spammers_test"
+
+
+# Make every module that reads SPAMMERS_DB_URL (db.py, state.py) hit the test DB.
+os.environ["SPAMMERS_DB_URL"] = test_db_url()
+
+
+_SCHEMAS = ["timeline", "app_slack", "app_discord", "app_github", "app_gmail", "oauth", "org"]
+
+
+async def _reset_schemas(pool) -> None:
+    for s in _SCHEMAS:
+        await pool.execute(f"DROP SCHEMA IF EXISTS {s} CASCADE")
+
+
+async def _seed(pool) -> UUID:
+    """Insert the deterministic fixture dataset. Returns the run_id."""
+    run_id = uuid4()
+    ws_pk = uuid4()
+    team_pk = uuid4()
+    await pool.execute(
+        """
+        INSERT INTO org.runs (id, size, runtime, seed, fyralis_tenant_id,
+                              fyralis_base_url, virtual_now, mode, speed_multiplier)
+        VALUES ($1, 'small', 'few_months', 1, $2, 'http://localhost:8000', $3, 'frozen', 1.0)
+        """,
+        run_id, uuid4(), VIRTUAL_NOW,
+    )
+    await pool.execute(
+        "INSERT INTO org.teams (id, run_id, name) VALUES ($1, $2, 'Engineering')",
+        team_pk, run_id,
+    )
+
+    people = [
+        ("alice", "Alice Anderson", "alice@fidelity-test.com", USER_ALICE),
+        ("bob", "Bob Brown", "bob@fidelity-test.com", USER_BOB),
+        ("carol", "Carol Clark", "carol@fidelity-test.com", USER_CAROL),
+    ]
+    person_pks: dict[str, UUID] = {}
+    for handle, full_name, email, _slack_id in people:
+        pid = uuid4()
+        person_pks[handle] = pid
+        await pool.execute(
+            """
+            INSERT INTO org.people (id, run_id, handle, full_name, email, role, level,
+                                    team_id, timezone, started_at)
+            VALUES ($1, $2, $3, $4, $5, 'engineer', 'mid', $6, 'America/Los_Angeles', $7)
+            """,
+            pid, run_id, handle, full_name, email, team_pk, VIRTUAL_NOW,
+        )
+
+    await pool.execute(
+        """
+        INSERT INTO app_slack.workspaces
+            (id, run_id, team_id, team_name, team_domain, signing_secret,
+             client_id, client_secret, bot_token, bot_user_id, app_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        """,
+        ws_pk, run_id, TEAM_ID, TEAM_NAME, TEAM_DOMAIN, SIGNING_SECRET,
+        CLIENT_ID, CLIENT_SECRET, BOT_TOKEN, BOT_USER_ID, APP_ID,
+    )
+
+    user_pks: dict[str, UUID] = {}
+    for handle, full_name, _email, slack_id in people:
+        upk = uuid4()
+        user_pks[slack_id] = upk
+        await pool.execute(
+            """
+            INSERT INTO app_slack.users (id, workspace_id, person_id, slack_user_id, profile)
+            VALUES ($1, $2, $3, $4, $5::jsonb)
+            """,
+            upk, ws_pk, person_pks[handle], slack_id, '{"title": "Engineer"}',
+        )
+
+    channels = [
+        (CH_GENERAL, "general", False, False, True),
+        (CH_RANDOM, "random", False, False, False),
+        (CH_PRIVATE, "secret-plans", True, False, False),
+        (CH_ARCHIVED, "old-stuff", False, True, False),
+    ]
+    chan_pks: dict[str, UUID] = {}
+    for cid, name, is_private, is_archived, is_general in channels:
+        cpk = uuid4()
+        chan_pks[cid] = cpk
+        await pool.execute(
+            """
+            INSERT INTO app_slack.channels
+                (id, workspace_id, channel_id, name, is_private, is_archived,
+                 is_general, topic, purpose, creator_user_id, created_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            """,
+            cpk, ws_pk, cid, name, is_private, is_archived, is_general,
+            f"{name} topic", f"{name} purpose", USER_ALICE, VIRTUAL_NOW,
+        )
+
+    # #general membership: alice, bob, carol
+    for slack_id in (USER_ALICE, USER_BOB, USER_CAROL):
+        await pool.execute(
+            "INSERT INTO app_slack.channel_membership (channel_pk, user_pk, joined_at) "
+            "VALUES ($1, $2, $3)",
+            chan_pks[CH_GENERAL], user_pks[slack_id], VIRTUAL_NOW,
+        )
+
+    # #general messages: two roots, a thread parent (reply_count=2), two replies.
+    msgs = [
+        (TS_M1, None, USER_ALICE, "first message", 0),
+        (TS_M2, None, USER_BOB, "second message", 0),
+        (TS_PARENT, None, USER_ALICE, "thread parent", 2),
+        (TS_R1, TS_PARENT, USER_BOB, "reply one", 0),
+        (TS_R2, TS_PARENT, USER_CAROL, "reply two", 0),
+    ]
+    for ts, thread_ts, user_slack, text, reply_count in msgs:
+        await pool.execute(
+            """
+            INSERT INTO app_slack.messages
+                (id, channel_pk, user_pk, ts, thread_ts, text, reply_count)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            """,
+            uuid4(), chan_pks[CH_GENERAL], user_pks[user_slack], ts, thread_ts,
+            text, reply_count,
+        )
+
+    return run_id
+
+
+@pytest_asyncio.fixture(scope="session", loop_scope="session")
+async def pool():
+    from spammers.common.db import apply_migrations, create_pool, ensure_database_exists
+
+    await ensure_database_exists()
+    p = await create_pool()
+    await _reset_schemas(p)
+    await apply_migrations(p)
+    yield p
+    await _reset_schemas(p)
+    await p.close()
+
+
+@pytest_asyncio.fixture(scope="session", loop_scope="session")
+async def run_id(pool) -> UUID:
+    return await _seed(pool)
+
+
+@pytest_asyncio.fixture(loop_scope="session")
+async def client(pool, run_id):
+    """In-process ASGI client with the Slack state singleton wired up.
+
+    ASGITransport does not run FastAPI lifespan, so we set state directly and
+    reset the rate limiter each test (in-process buckets would otherwise leak).
+    """
+    from spammers.common.rate_limit import RateLimiter
+    from spammers.slack import state as slack_state
+    from spammers.slack.app import create_app
+
+    slack_state._STATE = slack_state.SlackMockState(
+        pool=pool, run_id=run_id, rate_limiter=RateLimiter()
+    )
+    transport = ASGITransport(app=create_app())
+    async with AsyncClient(transport=transport, base_url="http://mock") as c:
+        yield c
+    slack_state._STATE = None
+
+
+@pytest.fixture
+def auth_header() -> dict[str, str]:
+    return {"Authorization": f"Bearer {BOT_TOKEN}"}
+
+
+@pytest.fixture
+def reset_rate_limit():
+    """Clear the in-process rate-limit buckets — simulates a fresh time window.
+
+    Needed for tests that deliberately make several sequential calls to a
+    low-tier method (e.g. conversations.history is Tier 1: ~1/min, no burst).
+    """
+    from spammers.common.rate_limit import RateLimiter
+    from spammers.slack import state as slack_state
+
+    def _reset() -> None:
+        slack_state.state().rate_limiter = RateLimiter()
+
+    return _reset

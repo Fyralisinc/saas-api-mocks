@@ -1,0 +1,27 @@
+{
+  "token": "verification-token-mock",
+  "team_id": "T0FIDELITY",
+  "api_app_id": "A0APP00001",
+  "event": {
+    "type": "message",
+    "channel": "C0GENERAL0",
+    "user": "U0ALICE001",
+    "text": "golden",
+    "ts": "1768000000.000000",
+    "event_ts": "1768000000.000000",
+    "team": "T0FIDELITY"
+  },
+  "type": "event_callback",
+  "event_id": "Ev0000000000",
+  "event_time": 1768000000,
+  "authorizations": [
+    {
+      "enterprise_id": null,
+      "team_id": "T0FIDELITY",
+      "user_id": "U0BOTUSER0",
+      "is_bot": true,
+      "is_enterprise_install": false
+    }
+  ],
+  "is_ext_shared_channel": false
+}

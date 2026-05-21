@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 import secrets
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Sequence
 from uuid import UUID, uuid4
 
@@ -21,6 +21,7 @@ from spammers.common.ids import (
     github_app_id,
     github_installation_id,
     github_repo_id,
+    github_sha,
     github_user_id,
     github_webhook_secret,
     slack_app_id,
@@ -85,8 +86,11 @@ async def compile_run(pool: asyncpg.Pool, run_id: UUID) -> dict:
                 conn, run_id, spec, rng.sub("slack_setup"), people, projects,
             )
 
-            # GitHub app + installation + repositories (no timeline yet — Slice 2)
+            # GitHub app + installation + repositories, then projected content.
             github_repos = await _create_github_app(conn, run_id, projects, virtual_now)
+            github_counts = await _generate_github_content(
+                conn, run_id, github_repos, people, rng.sub("github"), virtual_now, spec,
+            )
 
             # Timeline events + Slack message projections
             await _insert_timeline_events(conn, run_id, slack_events, virtual_now)
@@ -101,14 +105,16 @@ async def compile_run(pool: asyncpg.Pool, run_id: UUID) -> dict:
 
     log.info("orggen_done", run_id=str(run_id),
              people=len(people), projects=len(projects),
-             slack_events=len(slack_events), github_repos=github_repos)
+             slack_events=len(slack_events), github_repos=len(github_repos),
+             github_prs=github_counts["pull_requests"])
 
     return {
         "people": len(people),
         "teams": len(team_names),
         "projects": len(projects),
         "slack_events": len(slack_events),
-        "github_repos": github_repos,
+        "github_repos": len(github_repos),
+        **{f"github_{k}": v for k, v in github_counts.items()},
     }
 
 
@@ -295,8 +301,11 @@ async def _insert_timeline_events(conn, run_id: UUID, events: Sequence[TimelineE
 
 async def _create_github_app(
     conn, run_id: UUID, projects: Sequence[Project], virtual_now: datetime,
-) -> int:
-    """Seed one GitHub App + installation + the repositories from projects."""
+) -> list[dict]:
+    """Seed one GitHub App + installation + the repositories from projects.
+
+    Returns the repository records (pk id, owner, name, full_name) for content gen.
+    """
     # Unique repos across projects (project.repos holds "owner/name" strings).
     seen: dict[str, tuple[str, str]] = {}
     for proj in projects:
@@ -339,11 +348,13 @@ async def _create_github_app(
         github_user_id(), virtual_now,
     )
 
-    rows = [
-        (uuid4(), installation_pk, github_repo_id(), owner, name, False, "main",
-         f"The {name} service.", virtual_now)
-        for (owner, name) in seen.values()
-    ]
+    records: list[dict] = []
+    rows = []
+    for owner, name in seen.values():
+        repo_pk = uuid4()
+        rows.append((repo_pk, installation_pk, github_repo_id(), owner, name, False, "main",
+                     f"The {name} service.", virtual_now))
+        records.append({"id": repo_pk, "owner": owner, "name": name, "full_name": f"{owner}/{name}"})
     await conn.executemany(
         """
         INSERT INTO app_github.repositories
@@ -353,7 +364,194 @@ async def _create_github_app(
         """,
         rows,
     )
-    return len(rows)
+    return records
+
+
+_PR_TITLES = [
+    "Fix flaky retry in {svc}", "Add pagination to {svc} list endpoint",
+    "Bump dependencies for {svc}", "Refactor {svc} config loading",
+    "Handle 429s in {svc} client", "Improve {svc} error messages",
+    "Cache {svc} lookups", "Tighten {svc} input validation",
+]
+_ISSUE_TITLES = [
+    "{svc}: intermittent timeouts under load", "{svc} returns stale data after deploy",
+    "Document the {svc} setup steps", "{svc} logs are too noisy",
+    "Add metrics for {svc}", "{svc} crashes on empty payload",
+]
+_COMMIT_MSGS = [
+    "fix: guard against nil response", "chore: bump deps", "refactor: extract helper",
+    "feat: add retry budget", "test: cover edge case", "docs: update README",
+    "perf: avoid extra allocation", "fix: off-by-one in cursor",
+]
+_REVIEW_STATES = ["approved", "approved", "commented", "changes_requested"]
+_CHECK_NAMES = ["build", "test", "lint"]
+_CHECK_CONCLUSIONS = ["success", "success", "success", "failure", "neutral"]
+
+
+async def _generate_github_content(
+    conn, run_id: UUID, repos: Sequence[dict], people: Sequence[Person],
+    rng: RunRandom, virtual_now: datetime, spec: ProfileSpec,
+) -> dict:
+    """Generate PRs / issues / commits / reviews / comments / check-runs per repo,
+    projecting them into app_github.* and emitting a timeline.events row for each."""
+    plist = list(people)
+    earliest = virtual_now - spec.duration
+    span = max(1.0, (virtual_now - earliest).total_seconds())
+    counts = {"pull_requests": 0, "issues": 0, "commits": 0,
+              "reviews": 0, "issue_comments": 0, "check_runs": 0}
+
+    def when() -> datetime:
+        return earliest + timedelta(seconds=rng.uniform(0, span))
+
+    async def event(virtual_ts: datetime, etype: str, actor_id, payload: dict) -> UUID:
+        eid = uuid4()
+        await conn.execute(
+            """
+            INSERT INTO timeline.events (id, run_id, virtual_ts, type, actor_id, payload, is_historical)
+            VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7)
+            """,
+            eid, run_id, virtual_ts, etype, actor_id, json.dumps(payload), virtual_ts <= virtual_now,
+        )
+        return eid
+
+    for repo in repos:
+        repo_pk, full = repo["id"], repo["full_name"]
+        number = 0
+
+        # Commits
+        shas: list[str] = []
+        prev: list[str] = []
+        for _ in range(rng.randint(4, 9)):
+            author = rng.choice(plist)
+            sha = github_sha()
+            committed = when()
+            adds, dels = rng.randint(1, 200), rng.randint(0, 80)
+            await conn.execute(
+                """
+                INSERT INTO app_github.commits
+                    (id, repo_pk, sha, message, author_login, author_email, committed_at,
+                     parents, additions, deletions)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10)
+                """,
+                uuid4(), repo_pk, sha, rng.choice(_COMMIT_MSGS), author.handle, author.email,
+                committed, json.dumps(prev[-1:]), adds, dels,
+            )
+            shas.append(sha)
+            prev = [sha]
+            counts["commits"] += 1
+
+        # Pull requests (+ reviews + check-runs)
+        for _ in range(rng.randint(2, 5)):
+            number += 1
+            author = rng.choice(plist)
+            created = when()
+            closed = merged = None
+            state = "open"
+            if rng.bool_with_prob(0.6):
+                state = "closed"
+                closed = created + timedelta(hours=rng.randint(2, 240))
+                if closed > virtual_now:
+                    closed = virtual_now
+                if rng.bool_with_prob(0.7):
+                    merged = closed
+            head_sha = rng.choice(shas) if shas else github_sha()
+            base_sha = rng.choice(shas) if shas else github_sha()
+            svc = repo["name"]
+            pr_pk = uuid4()
+            ev = await event(created, "github.pull_request", author.id,
+                             {"action": "opened", "repo": full, "number": number})
+            await conn.execute(
+                """
+                INSERT INTO app_github.pull_requests
+                    (id, repo_pk, number, title, body, state, merged, user_login, head_ref,
+                     head_sha, base_ref, base_sha, additions, deletions, changed_files, labels,
+                     created_at, updated_at, merged_at, closed_at, timeline_event_id)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'main',$11,$12,$13,$14,$15::jsonb,$16,$17,$18,$19,$20)
+                """,
+                pr_pk, repo_pk, number, _PR_TITLES[number % len(_PR_TITLES)].format(svc=svc),
+                f"This PR updates {svc}.", state, merged is not None, author.handle,
+                f"feature/{svc}-{number}", head_sha, base_sha,
+                rng.randint(1, 300), rng.randint(0, 120), rng.randint(1, 12),
+                json.dumps(rng.sample(["bug", "enhancement", "chore", "deps"], k=rng.randint(0, 2))),
+                created, closed or created, merged, closed, ev,
+            )
+            counts["pull_requests"] += 1
+
+            for _ in range(rng.randint(0, 2)):
+                reviewer = rng.choice(plist)
+                rstate = rng.choice(_REVIEW_STATES)
+                submitted = created + timedelta(hours=rng.randint(1, 48))
+                rev_ev = await event(submitted, "github.pull_request_review", reviewer.id,
+                                     {"action": "submitted", "repo": full, "number": number, "state": rstate})
+                await conn.execute(
+                    """
+                    INSERT INTO app_github.reviews (id, pr_pk, user_login, state, body, submitted_at, timeline_event_id)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7)
+                    """,
+                    uuid4(), pr_pk, reviewer.handle, rstate, "LGTM" if rstate == "approved" else "Some comments.",
+                    submitted, rev_ev,
+                )
+                counts["reviews"] += 1
+
+            for _ in range(rng.randint(1, 2)):
+                concl = rng.choice(_CHECK_CONCLUSIONS)
+                started = created + timedelta(minutes=rng.randint(1, 30))
+                cr_ev = await event(started, "github.check_run", author.id,
+                                    {"action": "completed", "repo": full, "head_sha": head_sha, "conclusion": concl})
+                await conn.execute(
+                    """
+                    INSERT INTO app_github.check_runs
+                        (id, repo_pk, name, head_sha, status, conclusion, started_at, completed_at, timeline_event_id)
+                    VALUES ($1, $2, $3, $4, 'completed', $5, $6, $7, $8)
+                    """,
+                    uuid4(), repo_pk, rng.choice(_CHECK_NAMES), head_sha, concl,
+                    started, started + timedelta(minutes=rng.randint(1, 15)), cr_ev,
+                )
+                counts["check_runs"] += 1
+
+        # Issues (+ comments)
+        for _ in range(rng.randint(1, 4)):
+            number += 1
+            author = rng.choice(plist)
+            created = when()
+            state = "open"
+            closed = None
+            if rng.bool_with_prob(0.5):
+                state = "closed"
+                closed = min(virtual_now, created + timedelta(hours=rng.randint(2, 300)))
+            svc = repo["name"]
+            ev = await event(created, "github.issues", author.id,
+                             {"action": "opened", "repo": full, "number": number})
+            await conn.execute(
+                """
+                INSERT INTO app_github.issues
+                    (id, repo_pk, number, title, body, state, user_login, assignees, labels,
+                     created_at, updated_at, closed_at, timeline_event_id)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb,$10,$11,$12,$13)
+                """,
+                uuid4(), repo_pk, number, _ISSUE_TITLES[number % len(_ISSUE_TITLES)].format(svc=svc),
+                f"Observed in {svc}.", state, author.handle,
+                json.dumps([]), json.dumps(rng.sample(["bug", "question", "wontfix"], k=rng.randint(0, 1))),
+                created, closed or created, closed, ev,
+            )
+            counts["issues"] += 1
+
+            for _ in range(rng.randint(0, 3)):
+                commenter = rng.choice(plist)
+                cwhen = created + timedelta(hours=rng.randint(1, 72))
+                c_ev = await event(cwhen, "github.issue_comment", commenter.id,
+                                   {"action": "created", "repo": full, "issue_number": number})
+                await conn.execute(
+                    """
+                    INSERT INTO app_github.issue_comments
+                        (id, repo_pk, issue_number, user_login, body, created_at, timeline_event_id)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7)
+                    """,
+                    uuid4(), repo_pk, number, commenter.handle, "Thanks for the report.", cwhen, c_ev,
+                )
+                counts["issue_comments"] += 1
+
+    return counts
 
 
 def _bump_ts(ts: str) -> str:

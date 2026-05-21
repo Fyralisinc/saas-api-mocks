@@ -28,6 +28,12 @@ ACCOUNT_LOGIN = "acme"
 ACCOUNT_ID = 9001
 REPOS = [("acme", "core", 101), ("acme", "billing", 102), ("acme", "web", 103)]
 
+# Known content seeded on acme/core (PR and issue numbers share one sequence).
+SHA1 = "a1" * 20
+PR_OPEN = 1
+PR_MERGED = 2
+ISSUE_NUM = 3
+
 _PRIVATE_PEM, _PUBLIC_PEM = generate_rsa_keypair()
 
 
@@ -72,7 +78,10 @@ async def gh_run(pool) -> UUID:
         """,
         inst_pk, app_pk, INSTALLATION_ID, ACCOUNT_LOGIN, ACCOUNT_ID,
     )
+    repo_pks: dict[str, UUID] = {}
     for owner, name, repo_id in REPOS:
+        repo_pk = uuid4()
+        repo_pks[name] = repo_pk
         await pool.execute(
             """
             INSERT INTO app_github.repositories
@@ -80,8 +89,70 @@ async def gh_run(pool) -> UUID:
                  description, created_at)
             VALUES ($1, $2, $3, $4, $5, FALSE, 'main', $6, now())
             """,
-            uuid4(), inst_pk, repo_id, owner, name, f"The {name} service.",
+            repo_pk, inst_pk, repo_id, owner, name, f"The {name} service.",
         )
+
+    # Known content on acme/core for deterministic contract assertions.
+    core = repo_pks["core"]
+    await pool.execute(
+        """
+        INSERT INTO app_github.commits
+            (id, repo_pk, sha, message, author_login, author_email, committed_at, additions, deletions)
+        VALUES ($1, $2, $3, 'fix: guard nil', 'alice', 'alice@acme.test', now(), 10, 2)
+        """,
+        uuid4(), core, SHA1,
+    )
+    pr_merged_pk = uuid4()
+    await pool.execute(
+        """
+        INSERT INTO app_github.pull_requests
+            (id, repo_pk, number, title, body, state, merged, user_login, head_ref, head_sha,
+             base_sha, additions, deletions, changed_files, created_at, updated_at, merged_at, closed_at)
+        VALUES ($1, $2, $3, 'Add retry budget', 'body', 'closed', TRUE, 'bob', 'feature/retry',
+                $4, $5, 40, 5, 3, now(), now(), now(), now())
+        """,
+        pr_merged_pk, core, PR_MERGED, SHA1, SHA1,
+    )
+    await pool.execute(
+        """
+        INSERT INTO app_github.pull_requests
+            (id, repo_pk, number, title, body, state, merged, user_login, head_ref, head_sha,
+             base_sha, created_at, updated_at)
+        VALUES ($1, $2, $3, 'WIP cache layer', 'body', 'open', FALSE, 'alice', 'feature/cache',
+                $4, $5, now(), now())
+        """,
+        uuid4(), core, PR_OPEN, SHA1, SHA1,
+    )
+    await pool.execute(
+        """
+        INSERT INTO app_github.reviews (id, pr_pk, user_login, state, body, submitted_at)
+        VALUES ($1, $2, 'alice', 'approved', 'LGTM', now())
+        """,
+        uuid4(), pr_merged_pk,
+    )
+    await pool.execute(
+        """
+        INSERT INTO app_github.issues
+            (id, repo_pk, number, title, body, state, user_login, created_at, updated_at)
+        VALUES ($1, $2, $3, 'Timeouts under load', 'body', 'open', 'carol', now(), now())
+        """,
+        uuid4(), core, ISSUE_NUM,
+    )
+    await pool.execute(
+        """
+        INSERT INTO app_github.issue_comments (id, repo_pk, issue_number, user_login, body, created_at)
+        VALUES ($1, $2, $3, 'bob', 'Looking into it.', now())
+        """,
+        uuid4(), core, ISSUE_NUM,
+    )
+    await pool.execute(
+        """
+        INSERT INTO app_github.check_runs
+            (id, repo_pk, name, head_sha, status, conclusion, started_at, completed_at)
+        VALUES ($1, $2, 'build', $3, 'completed', 'success', now(), now())
+        """,
+        uuid4(), core, SHA1,
+    )
     return run_id
 
 

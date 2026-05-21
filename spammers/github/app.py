@@ -15,6 +15,7 @@ from spammers.github.routes import (
     app_api as _app_api,
     install as _install,
     installation as _installation,
+    repo_content as _repo_content,
     repos as _repos,
 )
 
@@ -31,6 +32,7 @@ def create_app() -> FastAPI:
     app.include_router(_install.router)
     app.include_router(_app_api.router)
     app.include_router(_installation.router)
+    app.include_router(_repo_content.router)
     app.include_router(_repos.router)
 
     @app.get("/_health")

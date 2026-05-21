@@ -47,3 +47,19 @@ async def test_prepare_compiles_cleanly(pool, seed):
         rid,
     )
     assert repos > 0
+
+    # And content was generated + projected (PRs, issues, commits).
+    prs = await pool.fetchval(
+        "SELECT count(*) FROM app_github.pull_requests pr "
+        "JOIN app_github.repositories r ON r.id = pr.repo_pk "
+        "JOIN app_github.installations i ON i.id = r.installation_pk "
+        "JOIN app_github.apps a ON a.id = i.app_pk WHERE a.run_id = $1",
+        rid,
+    )
+    assert prs > 0
+    # Generated PRs/reviews are backed by timeline events (for webhook emission later).
+    gh_events = await pool.fetchval(
+        "SELECT count(*) FROM timeline.events WHERE run_id = $1 AND type LIKE 'github.%'",
+        rid,
+    )
+    assert gh_events > 0

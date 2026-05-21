@@ -1,8 +1,9 @@
 """End-to-end OrgGen flow — what `spammer prepare` actually runs.
 
-`prepare` creates a run and calls compile_run() to generate the org + project
-the historical timeline into app_slack.messages. This must succeed for the
-documented quickstart (`--seed=42`) to work at all.
+`prepare` creates a run and calls compile_run() to generate the org, project
+the historical timeline into app_slack.messages, and seed the GitHub app +
+installation + repositories. This must succeed for the documented quickstart
+(`--seed=42`) to work at all.
 """
 from __future__ import annotations
 
@@ -36,3 +37,13 @@ async def test_prepare_compiles_cleanly(pool, seed):
         rid,
     )
     assert n > 0
+
+    # GitHub app + installation + repositories were seeded too.
+    repos = await pool.fetchval(
+        "SELECT count(*) FROM app_github.repositories r "
+        "JOIN app_github.installations i ON i.id = r.installation_pk "
+        "JOIN app_github.apps a ON a.id = i.app_pk "
+        "WHERE a.run_id = $1",
+        rid,
+    )
+    assert repos > 0

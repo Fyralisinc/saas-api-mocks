@@ -9,6 +9,7 @@ Idempotent on the run_id: clears and regenerates.
 from __future__ import annotations
 
 import json
+import secrets
 from datetime import datetime, timezone
 from typing import Sequence
 from uuid import UUID, uuid4
@@ -17,6 +18,11 @@ import asyncpg
 import structlog
 
 from spammers.common.ids import (
+    github_app_id,
+    github_installation_id,
+    github_repo_id,
+    github_user_id,
+    github_webhook_secret,
     slack_app_id,
     slack_bot_token,
     slack_channel_id,
@@ -27,6 +33,7 @@ from spammers.common.ids import (
     slack_ts,
     slack_user_id,
 )
+from spammers.common.signing import generate_rsa_keypair
 from spammers.orggen.personas import Person, generate_people
 from spammers.orggen.profiles import ProfileSpec
 from spammers.orggen.projects import Project, generate_projects
@@ -78,6 +85,9 @@ async def compile_run(pool: asyncpg.Pool, run_id: UUID) -> dict:
                 conn, run_id, spec, rng.sub("slack_setup"), people, projects,
             )
 
+            # GitHub app + installation + repositories (no timeline yet — Slice 2)
+            github_repos = await _create_github_app(conn, run_id, projects, virtual_now)
+
             # Timeline events + Slack message projections
             await _insert_timeline_events(conn, run_id, slack_events, virtual_now)
             await _project_slack_messages(
@@ -91,13 +101,14 @@ async def compile_run(pool: asyncpg.Pool, run_id: UUID) -> dict:
 
     log.info("orggen_done", run_id=str(run_id),
              people=len(people), projects=len(projects),
-             slack_events=len(slack_events))
+             slack_events=len(slack_events), github_repos=github_repos)
 
     return {
         "people": len(people),
         "teams": len(team_names),
         "projects": len(projects),
         "slack_events": len(slack_events),
+        "github_repos": github_repos,
     }
 
 
@@ -108,6 +119,7 @@ async def _clear_existing(conn, run_id: UUID) -> None:
     await conn.execute(
         "DELETE FROM app_slack.workspaces WHERE run_id = $1", run_id,
     )
+    await conn.execute("DELETE FROM app_github.apps WHERE run_id = $1", run_id)
     await conn.execute("DELETE FROM org.projects WHERE run_id = $1", run_id)
     await conn.execute("DELETE FROM org.people WHERE run_id = $1", run_id)
     await conn.execute("DELETE FROM org.teams WHERE run_id = $1", run_id)
@@ -279,6 +291,69 @@ async def _insert_timeline_events(conn, run_id: UUID, events: Sequence[TimelineE
         """,
         rows,
     )
+
+
+async def _create_github_app(
+    conn, run_id: UUID, projects: Sequence[Project], virtual_now: datetime,
+) -> int:
+    """Seed one GitHub App + installation + the repositories from projects."""
+    # Unique repos across projects (project.repos holds "owner/name" strings).
+    seen: dict[str, tuple[str, str]] = {}
+    for proj in projects:
+        for full in proj.repos:
+            if "/" in full and full not in seen:
+                owner, name = full.split("/", 1)
+                seen[full] = (owner, name)
+    if not seen:
+        seen["acme/core"] = ("acme", "core")
+
+    account_login = next(iter(seen.values()))[0]
+    app_id = github_app_id()
+    private_pem, public_pem = generate_rsa_keypair()
+    app_pk = uuid4()
+    await conn.execute(
+        """
+        INSERT INTO app_github.apps
+            (id, run_id, app_id, slug, name, client_id, client_secret, webhook_secret,
+             private_key, public_key, permissions, events)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12::jsonb)
+        """,
+        app_pk, run_id, app_id, f"{account_login}-ingest", f"{account_login.title()} Ingest",
+        "Iv1." + secrets.token_hex(8), secrets.token_hex(20), github_webhook_secret(),
+        private_pem, public_pem,
+        json.dumps({"contents": "read", "metadata": "read", "issues": "read",
+                    "pull_requests": "read", "checks": "read"}),
+        json.dumps(["push", "pull_request", "issues", "issue_comment",
+                    "pull_request_review", "check_run"]),
+    )
+
+    installation_pk = uuid4()
+    await conn.execute(
+        """
+        INSERT INTO app_github.installations
+            (id, app_pk, installation_id, account_login, account_type, account_id,
+             repository_selection, created_at)
+        VALUES ($1, $2, $3, $4, 'Organization', $5, 'all', $6)
+        """,
+        installation_pk, app_pk, github_installation_id(), account_login,
+        github_user_id(), virtual_now,
+    )
+
+    rows = [
+        (uuid4(), installation_pk, github_repo_id(), owner, name, False, "main",
+         f"The {name} service.", virtual_now)
+        for (owner, name) in seen.values()
+    ]
+    await conn.executemany(
+        """
+        INSERT INTO app_github.repositories
+            (id, installation_pk, repo_id, owner, name, private, default_branch,
+             description, created_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        """,
+        rows,
+    )
+    return len(rows)
 
 
 def _bump_ts(ts: str) -> str:

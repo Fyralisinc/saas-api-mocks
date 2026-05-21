@@ -80,6 +80,28 @@ def github_verify(secret: Union[str, bytes], header: str, body: Union[str, bytes
     return hmac.compare_digest(expected, header or "")
 
 
+def generate_rsa_keypair(key_size: int = 2048) -> tuple[str, str]:
+    """Return ``(private_pem, public_pem)`` for a GitHub App.
+
+    The consumer signs App JWTs with the private key (RS256); the mock verifies
+    them with the public key.
+    """
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+
+    key = rsa.generate_private_key(public_exponent=65537, key_size=key_size)
+    private_pem = key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption(),
+    ).decode()
+    public_pem = key.public_key().public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    ).decode()
+    return private_pem, public_pem
+
+
 # ---------- Discord (Ed25519) ----------
 
 def discord_sign(

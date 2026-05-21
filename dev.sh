@@ -132,8 +132,16 @@ cmd_prepare() {
 
 cmd_serve() {
     require_setup; load_env
-    echo "Slack mock on http://localhost:$PORT  (health: /_health)"
-    exec "$PY" -m spammers.slack run --port "$PORT"
+    local provider="${1:-slack}"
+    local default_port
+    case "$provider" in
+        slack)  default_port=7001 ;;
+        github) default_port=7003 ;;
+        *) c_red "unknown provider: $provider (use slack|github)"; exit 1 ;;
+    esac
+    local port="${PORT:-$default_port}"
+    echo "$provider mock on http://localhost:$port  (health: /_health)"
+    exec "$PY" -m "spammers.$provider" run --port "$port"
 }
 
 cmd_stop() {
@@ -167,7 +175,7 @@ dev.sh — setup + task runner for the spammer mocks
   ./dev.sh setup              Build everything (venv, deps, Postgres, .env). Run once.
   ./dev.sh test [pytest args] Run the Slack fidelity suite
   ./dev.sh prepare            Seed a synthetic org + historical timeline
-  ./dev.sh serve              Start the Slack mock (port \$PORT, default 7001)
+  ./dev.sh serve [slack|github]  Start a mock (slack:7001, github:7003; \$PORT overrides)
   ./dev.sh stop               Stop the mock (frees port \$PORT, default 7001)
   ./dev.sh token              Print a bot token for curl-ing the mock
   ./dev.sh status             Show run + clock + counts

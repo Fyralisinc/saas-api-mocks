@@ -198,20 +198,34 @@ integer `Retry-After`):
 **Error catalog**: `invalid_auth`, `channel_not_found`, `user_not_found`,
 `message_not_found`, `ratelimited`, `invalid_client_id`, `invalid_code`.
 
-### 5.2 discord-mock (:7002 HTTP + WS) — planned
+### 5.2 discord-mock (:7002 HTTP + WS) — implemented
 
-**Install**: `GET /oauth2/authorize`, `POST /api/v10/oauth2/token`.
-**REST**: `users/@me`, `guilds/{id}`, `guilds/{id}/members/{user}`,
-`channels/{id}`, `channels/{id}/messages`, command registration, interaction
-callbacks/followups.
-**Interactions webhook**: Ed25519-signed POSTs to the consumer (ping / command /
-component).
-**Gateway (WebSocket)**: full opcode handshake — HELLO(10), IDENTIFY(2),
-HEARTBEAT(1)/ACK(11), dispatch(0) of `READY`, `GUILD_CREATE`, `MESSAGE_CREATE`,
-etc.; RESUME(6) from a per-session ring buffer; RECONNECT(7) / invalid-session(9)
-on demand.
-**Rate limits**: per-route buckets with `X-RateLimit-*` headers; global 50/sec;
-`429 {"message":"You are being rate limited.","retry_after":…,"global":…}`.
+**Install**: `GET /oauth2/authorize` (auto-approves, redirects with `code` +
+`guild_id`) and `POST /api/v10/oauth2/token` (records `oauth.installs`).
+**REST** (`Authorization: Bot <token>`): `users/@me` & `users/{id}`,
+`guilds/{id}` (+ `/channels`, `/members/{user}`), `channels/{id}` (+ `/messages`
+read with `before`/`after`/`around` snowflake paging, plus create/edit/delete),
+global + guild application-command registration, and interaction
+callback/followup endpoints. Real Discord object shapes; `Content-Type:
+application/json; charset=utf-8`; `{code,message}` error bodies.
+**Gateway (WebSocket, `/gateway`)**: full opcode handshake — HELLO(10),
+IDENTIFY(2) (token + intents validated; closes 4004/4013/4014), READY(0,s=1) with
+`resume_gateway_url` + unavailable guilds, then GUILD_CREATE(0) per guild;
+HEARTBEAT(1)/ACK(11) with a heartbeat-timeout monitor (4009); MESSAGE_CREATE(0)
+fan-out; RESUME(6) replays a per-session ring buffer with original seq numbers
+then RESUMED, INVALID_SESSION(9) when unresumable; close codes 4001/4002/4003.
+**Intents gating**: no `GUILD_MESSAGES` → no MESSAGE_CREATE; `GUILD_MESSAGES`
+without `MESSAGE_CONTENT` → content/embeds/attachments stripped. **No historical
+replay**: a bot connecting after the clock advanced receives only new messages.
+Live dispatch is owned by the mock process (an in-process `GatewayDispatcher`
+drains `discord.message` events and pushes to connected bots), since the Gateway
+sockets aren't reachable from the Director.
+**Interactions webhook**: live `discord.interaction` events are Ed25519-signed
+(`X-Signature-Ed25519` / `X-Signature-Timestamp` over `ts+body`) and POSTed to
+the consumer by the Director (ping / command / component).
+**Rate limits**: per-route token buckets with `X-RateLimit-*` headers; `429
+{"message":"You are being rate limited.","retry_after":…,"global":false}` +
+`Retry-After`. (Per-route only; a strict global 50/sec is not yet modeled.)
 
 ### 5.3 github-mock (:7003) — implemented
 

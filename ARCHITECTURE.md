@@ -91,7 +91,7 @@ the real services.*
    ┌─────────────┬───────────────┬───────────────┬───────────────┐
 slack-mock   discord-mock     github-mock     gmail-mock
 :7001        :7002 (+WS)      :7003           :7004
-(implemented)  (planned)        (planned)        (planned)
+(implemented)  (planned)      (implemented)    (planned)
    │
    └──── signed webhooks ────►  consumer  /webhooks/{provider}
 ```
@@ -213,19 +213,31 @@ on demand.
 **Rate limits**: per-route buckets with `X-RateLimit-*` headers; global 50/sec;
 `429 {"message":"You are being rate limited.","retry_after":…,"global":…}`.
 
-### 5.3 github-mock (:7003) — planned
+### 5.3 github-mock (:7003) — implemented
 
-**Install**: `GET /apps/{slug}/installations/new`, redirect to the consumer's
-callback with `installation_id`.
-**App API** (validates inbound App-JWT RS256): mint installation tokens
-(`ghs_…`), `GET /app`, `/app/installations`, `/app/installations/{id}`.
-**REST** (`Authorization: Bearer ghs_…`): `installation/repositories` (paginated
-via `Link` header), `repos/{owner}/{repo}`, PR/issue reads.
-**Webhooks** (HMAC-SHA256, `X-Hub-Signature-256`): `pull_request`, `push`,
-`issues`, `issue_comment`, `pull_request_review`, `check_run`, `installation`,
-`installation_repositories`, `ping`.
-**Rate limits**: 5000/hr per installation; **403** (not 429) on exhaustion with
-`X-RateLimit-*` headers; secondary "abuse" limit 403 + `Retry-After`.
+**Install**: `GET /apps/{slug}/installations/new` — auto-approves and redirects to
+the consumer's callback with `installation_id` + `setup_action`.
+**App API** (validates the inbound App-JWT, RS256, against the App's public key —
+`algorithms=["RS256"]` blocks the alg-confusion forgery): `GET /app`,
+`/app/installations[/{id}]`, and `POST /app/installations/{id}/access_tokens`
+which mints a `ghs_…` installation token (201) recorded in `oauth.installs`.
+**REST** (`Authorization: Bearer ghs_…` or `token ghs_…`): `installation/repositories`
+and `repos/{owner}/{repo}`, plus repo content — `pulls` (+`/reviews`), `issues`
+(+`/comments`, and **PRs appear in the issues list** with a `pull_request` key,
+like real GitHub), `commits` (+`/check-runs`), list & get. `per_page`/`page` with
+`Link` headers.
+**Standard headers on every response**: `ETag` (with `If-None-Match` → **304**
+that does **not** count against the rate limit), `X-GitHub-Media-Type`,
+`X-GitHub-Api-Version`, `X-GitHub-Request-Id`.
+**Webhooks** (HMAC-SHA256, `X-Hub-Signature-256`, plus `X-GitHub-Event` /
+`X-GitHub-Delivery` / `X-GitHub-Hook-Installation-Target-*`): `pull_request`,
+`issues`, `pull_request_review`, `issue_comment`, `check_run`. Historical events
+are pull-only; live events (`inject --provider=github`) are signed + POSTed and
+projected for subsequent reads.
+**Rate limits**: 5000/hr per installation as a fixed hourly window —
+`X-RateLimit-Limit/Remaining/Used/Reset/Resource`, **403** with the documented
+body on exhaustion. (Secondary "abuse" limits + `Retry-After` and
+`Last-Modified`/`If-Modified-Since` are not yet modeled.)
 
 ### 5.4 gmail-mock (:7004) — planned
 
@@ -403,7 +415,10 @@ saas-api-mocks/                   # repo root
     ├── slack/                    # implemented mock
     │   ├── app.py, auth.py, ratelimit.py, state.py, events.py, responses.py
     │   └── routes/               # oauth, chat, users, conversations, team, auth_test
-    ├── discord/ · github/ · gmail/   # planned
+    ├── github/                   # implemented mock
+    │   ├── app.py, auth.py, jwt_verify.py, ratelimit.py, state.py, webhooks.py, dto.py, responses.py
+    │   └── routes/               # install, app_api, installation, repos, repo_content
+    ├── discord/ · gmail/         # planned
     ├── db/migrations/            # 0001_init.sql (all four providers' schema)
     └── tests/
         ├── conftest.py           # deterministic DB fixture + ASGI client
@@ -433,8 +448,12 @@ seed dataset); no live account is required.
 
 Run with `./dev.sh test` (creates and tears down its own temporary database).
 
-As the other providers land, each gets the same three layers, plus an OrgGen
-determinism layer (same seed ⇒ byte-identical timeline).
+Both implemented providers carry this suite. The GitHub layer additionally
+asserts the standard response headers, `ETag`/`If-None-Match` → `304` (and that a
+304 doesn't consume quota), the fixed-window `X-RateLimit-*` values, the
+issues-includes-PRs rule, and App-JWT forgery rejection. As the remaining
+providers land, each gets the same layers, plus an OrgGen determinism layer
+(same seed ⇒ byte-identical timeline).
 
 ---
 
@@ -461,8 +480,8 @@ determinism layer (same seed ⇒ byte-identical timeline).
 | OrgGen v1 | small × few_months end-to-end; Slack timeline; Jinja templates | ✅ done |
 | slack-mock | OAuth + Web API + Events + tiered rate limits + install walk | ✅ done |
 | Slack test suite | contract + behavior + fidelity layers | ✅ done |
-| github-mock | App install + App-JWT validate + REST + signed webhooks | ⏳ next |
-| discord-mock | OAuth + REST + interactions + Gateway WS (the hardest) | ⏳ planned |
+| github-mock | App install + App-JWT validate + REST reads + signed webhooks + fidelity audit | ✅ done |
+| discord-mock | OAuth + REST + interactions + Gateway WS (the hardest) | ⏳ next |
 | gmail-mock | DwD `/token` + Gmail/Directory REST + Pub/Sub OIDC push | ⏳ planned |
 | Cross-app refs | weave references across providers in OrgGen | ⏳ planned |
 | Profiles fill-out | medium + large dials; load characterization | ⏳ planned |

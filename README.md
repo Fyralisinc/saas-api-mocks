@@ -85,7 +85,7 @@ Example: `SEED=7 ./dev.sh prepare`, or `PORT=7002 ./dev.sh serve`.
 | Provider | Status |
 |---|---|
 | **Slack** | ✅ Implemented — OAuth, Web API, signed Events webhooks, tiered rate limits. |
-| **GitHub** | 🚧 Planned — App install + JWT, REST, signed webhooks. |
+| **GitHub** | ✅ Implemented — App install + JWT, installation tokens, REST reads, signed webhooks, fidelity-audited. |
 | **Discord** | 🚧 Planned — REST + interactions + Gateway WebSocket. |
 | **Gmail** | 🚧 Planned — domain-wide delegation, REST, Pub/Sub push. |
 
@@ -141,12 +141,57 @@ FYRALIS_API_TOKEN=<your consumer's bearer> \
 ./dev.sh stop          # or Ctrl-C if running in the foreground
 ```
 
-### GitHub / Discord / Gmail
+### GitHub
+
+After `./dev.sh prepare`, start the mock and call it exactly as you would real
+GitHub. Authentication is two-legged, just like the real App API: sign a short
+App JWT with the App's private key, exchange it for an installation token, then
+use that for REST calls.
+
+```bash
+./dev.sh serve github                # http://localhost:7003
+```
+
+```bash
+# 1. App JWT (RS256, iss = app id) → installation token (ghs_…)
+#    (the App's private key lives in app_github.apps.private_key)
+# 2. REST reads with the installation token:
+curl -s -H "Authorization: Bearer ghs_…" \
+  "http://localhost:7003/installation/repositories" | python3 -m json.tool
+
+curl -s -H "Authorization: Bearer ghs_…" \
+  "http://localhost:7003/repos/acme/core/pulls?state=all" | python3 -m json.tool
+```
+
+Implemented surface: `/apps/{slug}/installations/new` (install page), `/app`,
+`/app/installations[/{id}]`, `POST /app/installations/{id}/access_tokens`
+(mints `ghs_…`), `/installation/repositories`, `/repos/{owner}/{repo}`, and the
+content reads `/pulls`, `/issues`, `/commits`, `/pulls/{n}/reviews`,
+`/issues/{n}/comments`, `/commits/{ref}/check-runs`. Every response carries
+GitHub's real headers — `ETag` (with `If-None-Match` → `304`),
+`X-RateLimit-*` (5000/hr fixed window), `X-GitHub-Media-Type`,
+`X-GitHub-Request-Id` — and objects/error shapes match real GitHub.
+
+**Send live events** (signed webhooks to your consumer's `/webhooks/github`):
+
+```bash
+./dev.sh inject --provider=github --kind=pull_request   # or --kind=issues
+./dev.sh emit                                           # drains + POSTs signed events
+```
+
+Webhooks are signed with `X-Hub-Signature-256` (HMAC-SHA256) and carry
+`X-GitHub-Event` / `X-GitHub-Delivery` / `X-GitHub-Hook-Installation-Target-*`.
+
+The mock serves the install page at `/apps/{slug}/installations/new` (auto-approves
+and redirects to your consumer's callback with `installation_id`). The automated
+Director `install` walk is currently Slack-only.
+
+### Discord / Gmail
 
 Not implemented yet. The database schema and shared infrastructure (signing,
-rate limiting, pagination, webhook delivery, OrgGen) already support all four;
-each provider needs its API surface built out. When they land, each will get a
-`serve`-style entry point and a section here describing how to drive it.
+rate limiting, pagination, webhook delivery, OrgGen) already support them; each
+needs its API surface built out, after which it gets a `serve` target and a
+section here.
 
 ---
 
@@ -156,12 +201,18 @@ The mocks are additive: your consumer keeps its real-service URLs by default and
 only redirects when you set the override env vars. For Slack:
 
 ```bash
+# Slack
 export SLACK_API_BASE_URL=http://localhost:7001/api
 export SLACK_OAUTH_BASE_URL=http://localhost:7001
+
+# GitHub
+export GITHUB_API_BASE_URL=http://localhost:7003
+export GITHUB_APP_INSTALL_BASE_URL=http://localhost:7003
 ```
 
-Restart your consumer so the new environment takes effect, then run
-`./dev.sh install --provider=slack` to complete the OAuth handshake.
+Restart your consumer so the new environment takes effect. For Slack, run
+`./dev.sh install --provider=slack` to complete the OAuth handshake; for GitHub,
+point your consumer's install flow at the mock's install page.
 
 ---
 
@@ -228,7 +279,8 @@ saas-api-mocks/
     ├── orggen/                   # synthetic org + timeline generator
     ├── director/                 # CLI: prepare / install / emit / inject / jump / status / reset
     ├── slack/                    # Slack mock: routes/, app, events, state, auth, ratelimit
-    ├── discord/ · github/ · gmail/   # planned
+    ├── github/                   # GitHub mock: routes/, app, auth, jwt_verify, webhooks, dto, ratelimit
+    ├── discord/ · gmail/         # planned
     ├── db/migrations/            # schema (all four providers)
     └── tests/                    # contract / behavior / fidelity suites
 ```

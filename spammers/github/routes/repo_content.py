@@ -20,6 +20,7 @@ from spammers.github.dto import (
     commit_dto,
     issue_comment_dto,
     issue_dto,
+    pr_as_issue_dto,
     pull_request_dto,
     review_dto,
 )
@@ -38,7 +39,7 @@ async def _ctx(request: Request, owner: str, repo: str):
     inst = await resolve_installation(request)
     if inst is None:
         return None, {}, JSONResponse(github_error("Bad credentials", documentation_url=_DOCS), status_code=401)
-    headers, rl = await ratelimit_check(inst["installation_id"])
+    headers, rl = await ratelimit_check(request, inst["installation_id"])
     if rl is not None:
         return None, headers, rl
     row = await state().pool.fetchrow(
@@ -131,25 +132,36 @@ async def list_issues(
     state_: str = Query("open", alias="state"),
     per_page: int = Query(30, ge=1, le=100), page: int = Query(1, ge=1),
 ):
-    # NOTE: real GitHub also returns PRs here; this slice returns issues only.
+    # On real GitHub, pull requests ARE issues and appear in this list too
+    # (each PR carries a ``pull_request`` key). We merge issues + PRs, ordered
+    # by number descending, like GitHub's default sort.
     repo_row, headers, err = await _ctx(request, owner, repo)
     if err:
         return err
     full = repo_row["full_name"]
-    where = "i.repo_pk = $1"
-    args: list = [repo_row["id"]]
-    if state_ in ("open", "closed"):
-        where += " AND i.state = $2"
-        args.append(state_)
-    rows = await state().pool.fetch(
+    state_filter = state_ if state_ in ("open", "closed") else None
+
+    pool = state().pool
+    issue_where = "i.repo_pk = $1" + (" AND i.state = $2" if state_filter else "")
+    issue_args = [repo_row["id"]] + ([state_filter] if state_filter else [])
+    issue_rows = await pool.fetch(
         f"""
         SELECT i.*, (SELECT count(*) FROM app_github.issue_comments c
                       WHERE c.repo_pk = i.repo_pk AND c.issue_number = i.number) AS comment_count
-          FROM app_github.issues i WHERE {where} ORDER BY i.number DESC
+          FROM app_github.issues i WHERE {issue_where}
         """,
-        *args,
+        *issue_args,
     )
-    dtos = [issue_dto(dict(r), full, comments=r["comment_count"]) for r in rows]
+    pr_where = "repo_pk = $1" + (" AND state = $2" if state_filter else "")
+    pr_rows = await pool.fetch(
+        f"SELECT * FROM app_github.pull_requests WHERE {pr_where}", *issue_args
+    )
+
+    combined = [(r["number"], issue_dto(dict(r), full, comments=r["comment_count"])) for r in issue_rows]
+    combined += [(r["number"], pr_as_issue_dto(dict(r), full)) for r in pr_rows]
+    combined.sort(key=lambda t: t[0], reverse=True)
+    dtos = [d for _, d in combined]
+
     page_rows, out = _paginate(dtos, per_page, page, f"/repos/{full}/issues", headers)
     return JSONResponse(page_rows, headers=out)
 
@@ -223,7 +235,10 @@ async def get_commit(request: Request, owner: str, repo: str, sha: str):
 
 
 @router.get("/repos/{owner}/{repo}/commits/{ref}/check-runs")
-async def list_check_runs(request: Request, owner: str, repo: str, ref: str):
+async def list_check_runs(
+    request: Request, owner: str, repo: str, ref: str,
+    per_page: int = Query(30, ge=1, le=100), page: int = Query(1, ge=1),
+):
     repo_row, headers, err = await _ctx(request, owner, repo)
     if err:
         return err
@@ -231,5 +246,10 @@ async def list_check_runs(request: Request, owner: str, repo: str, ref: str):
         "SELECT * FROM app_github.check_runs WHERE repo_pk = $1 AND head_sha = $2 ORDER BY started_at",
         repo_row["id"], ref,
     )
-    body = {"total_count": len(rows), "check_runs": [check_run_dto(dict(r)) for r in rows]}
-    return JSONResponse(body, headers=headers)
+    dtos = [check_run_dto(dict(r)) for r in rows]
+    page_rows, out = _paginate(
+        dtos, per_page, page, f"/repos/{repo_row['full_name']}/commits/{ref}/check-runs", headers
+    )
+    # total_count is the full count; check_runs holds the current page.
+    body = {"total_count": len(rows), "check_runs": page_rows}
+    return JSONResponse(body, headers=out)

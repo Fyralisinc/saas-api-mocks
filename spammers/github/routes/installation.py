@@ -29,7 +29,7 @@ async def installation_repositories(
     if inst is None:
         return JSONResponse(github_error("Bad credentials", documentation_url=_DOCS), status_code=401)
 
-    rl_headers, rl = await ratelimit_check(inst["installation_id"])
+    rl_headers, rl = await ratelimit_check(request, inst["installation_id"])
     if rl is not None:
         return rl
 

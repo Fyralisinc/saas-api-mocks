@@ -1,10 +1,19 @@
-"""Response-object builders matching GitHub's REST shapes."""
+"""Response-object builders matching GitHub's REST shapes.
+
+These aim to be indistinguishable from real GitHub for the fields a REST client
+reads: ids/node_ids, the nested ``user`` objects, link URLs, and per-resource
+metadata. Values that the mock doesn't model are returned with GitHub's documented
+defaults (e.g. ``mergeable_state: "unknown"``, counts of 0) rather than omitted.
+"""
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 from datetime import datetime, timezone
 from uuid import UUID
+
+_API = "https://api.github.com"
 
 
 def iso(dt: datetime | None) -> str | None:
@@ -24,14 +33,30 @@ def _num_id(pk: UUID) -> int:
     return pk.int % 9_000_000_000 + 1_000_000_000
 
 
-def _user(login: str) -> dict:
-    return {"login": login, "type": "User", "site_admin": False}
+def _login_id(login: str) -> int:
+    """Stable numeric user id derived from a login."""
+    return int(hashlib.sha1(login.encode()).hexdigest()[:8], 16)
 
 
 def _jsonb(value) -> list:
     if value is None:
         return []
     return value if isinstance(value, list) else json.loads(value)
+
+
+def user_dto(login: str) -> dict:
+    uid = _login_id(login)
+    return {
+        "login": login,
+        "id": uid,
+        "node_id": _node_id("User", uid),
+        "avatar_url": f"https://avatars.githubusercontent.com/u/{uid}?v=4",
+        "gravatar_id": "",
+        "url": f"{_API}/users/{login}",
+        "html_url": f"https://github.com/{login}",
+        "type": "User",
+        "site_admin": False,
+    }
 
 
 def app_dto(app: dict) -> dict:
@@ -41,111 +66,203 @@ def app_dto(app: dict) -> dict:
         "node_id": _node_id("Integration", app["app_id"]),
         "name": app["name"],
         "client_id": app["client_id"],
-        "owner": {"login": app["slug"], "type": "Organization"},
+        "owner": user_dto(app["slug"]),
         "description": "",
         "external_url": "",
         "html_url": f"https://github.com/apps/{app['slug']}",
+        "created_at": iso(datetime(2024, 1, 1, tzinfo=timezone.utc)),
+        "updated_at": iso(datetime(2024, 1, 1, tzinfo=timezone.utc)),
         "permissions": app["permissions"] if isinstance(app["permissions"], dict) else {},
         "events": app["events"] if isinstance(app["events"], list) else [],
     }
 
 
 def installation_dto(inst: dict, app_id: int) -> dict:
+    account = {**user_dto(inst["account_login"]), "type": inst["account_type"]}
     return {
         "id": inst["installation_id"],
-        "account": {
-            "login": inst["account_login"],
-            "id": inst["account_id"],
-            "type": inst["account_type"],
-        },
+        "account": account,
         "repository_selection": inst["repository_selection"],
+        "access_tokens_url": f"{_API}/app/installations/{inst['installation_id']}/access_tokens",
+        "repositories_url": f"{_API}/installation/repositories",
+        "html_url": f"https://github.com/organizations/{inst['account_login']}/settings/installations/{inst['installation_id']}",
         "app_id": app_id,
+        "app_slug": "",
         "target_id": inst["account_id"],
         "target_type": inst["account_type"],
         "permissions": {"contents": "read", "metadata": "read", "pull_requests": "read", "issues": "read"},
         "events": ["push", "pull_request", "issues", "issue_comment", "pull_request_review", "check_run"],
         "created_at": iso(inst.get("created_at")),
+        "updated_at": iso(inst.get("created_at")),
+        "suspended_at": None,
     }
 
 
 def repo_dto(repo: dict) -> dict:
-    full_name = f"{repo['owner']}/{repo['name']}"
+    full = f"{repo['owner']}/{repo['name']}"
+    rid = repo["repo_id"]
     return {
-        "id": repo["repo_id"],
-        "node_id": _node_id("Repository", repo["repo_id"]),
+        "id": rid,
+        "node_id": _node_id("Repository", rid),
         "name": repo["name"],
-        "full_name": full_name,
+        "full_name": full,
         "private": repo["private"],
-        "owner": {"login": repo["owner"], "type": "Organization"},
-        "html_url": f"https://github.com/{full_name}",
+        "owner": {**user_dto(repo["owner"]), "type": "Organization"},
+        "html_url": f"https://github.com/{full}",
         "description": repo.get("description"),
         "fork": False,
-        "url": f"https://api.github.com/repos/{full_name}",
+        "url": f"{_API}/repos/{full}",
+        "archive_url": f"{_API}/repos/{full}/{{archive_format}}{{/ref}}",
+        "commits_url": f"{_API}/repos/{full}/commits{{/sha}}",
+        "contents_url": f"{_API}/repos/{full}/contents/{{+path}}",
+        "issues_url": f"{_API}/repos/{full}/issues{{/number}}",
+        "pulls_url": f"{_API}/repos/{full}/pulls{{/number}}",
+        "language": None,
+        "fork_count": 0,
+        "forks": 0,
+        "stargazers_count": 0,
+        "watchers_count": 0,
+        "open_issues_count": 0,
         "default_branch": repo["default_branch"],
+        "visibility": "private" if repo["private"] else "public",
+        "archived": False,
+        "disabled": False,
         "created_at": iso(repo.get("created_at")),
         "updated_at": iso(repo.get("created_at")),
         "pushed_at": iso(repo.get("created_at")),
     }
 
 
+def _ref(full_name: str, login: str, branch: str, sha: str) -> dict:
+    owner = full_name.split("/", 1)[0]
+    return {
+        "label": f"{owner}:{branch}",
+        "ref": branch,
+        "sha": sha,
+        "user": user_dto(login),
+        "repo": {"id": 0, "name": full_name.split("/", 1)[1], "full_name": full_name,
+                 "private": False, "owner": user_dto(owner)},
+    }
+
+
 def pull_request_dto(pr: dict, full_name: str) -> dict:
+    num = pr["number"]
     return {
         "id": _num_id(pr["id"]),
-        "node_id": _node_id("PullRequest", pr["number"]),
-        "number": pr["number"],
+        "node_id": _node_id("PullRequest", num),
+        "number": num,
         "state": pr["state"],
+        "locked": False,
         "title": pr["title"],
         "body": pr["body"],
         "draft": False,
-        "user": _user(pr["user_login"]),
-        "head": {"ref": pr["head_ref"], "sha": pr["head_sha"]},
-        "base": {"ref": pr["base_ref"], "sha": pr["base_sha"]},
+        "user": user_dto(pr["user_login"]),
+        "url": f"{_API}/repos/{full_name}/pulls/{num}",
+        "html_url": f"https://github.com/{full_name}/pull/{num}",
+        "issue_url": f"{_API}/repos/{full_name}/issues/{num}",
+        "comments_url": f"{_API}/repos/{full_name}/issues/{num}/comments",
+        "review_comments_url": f"{_API}/repos/{full_name}/pulls/{num}/comments",
+        "commits_url": f"{_API}/repos/{full_name}/pulls/{num}/commits",
+        "head": _ref(full_name, pr["user_login"], pr["head_ref"], pr["head_sha"]),
+        "base": _ref(full_name, pr["user_login"], pr["base_ref"], pr["base_sha"]),
         "merged": pr["merged"],
         "merged_at": iso(pr.get("merged_at")),
+        "merge_commit_sha": pr["head_sha"] if pr["merged"] else None,
+        "mergeable": None,
+        "mergeable_state": "unknown",
+        "merged_by": user_dto(pr["user_login"]) if pr["merged"] else None,
+        "comments": 0,
+        "review_comments": 0,
+        "commits": 1,
         "additions": pr["additions"],
         "deletions": pr["deletions"],
         "changed_files": pr["changed_files"],
+        "author_association": "MEMBER",
+        "assignees": [],
+        "requested_reviewers": [user_dto(login) for login in _jsonb(pr.get("requested_reviewers"))],
         "labels": [{"name": n} for n in _jsonb(pr.get("labels"))],
-        "requested_reviewers": [_user(login) for login in _jsonb(pr.get("requested_reviewers"))],
-        "html_url": f"https://github.com/{full_name}/pull/{pr['number']}",
+        "milestone": None,
         "created_at": iso(pr.get("created_at")),
         "updated_at": iso(pr.get("updated_at")),
         "closed_at": iso(pr.get("closed_at")),
     }
 
 
-def issue_dto(issue: dict, full_name: str, comments: int = 0) -> dict:
-    return {
+def issue_dto(issue: dict, full_name: str, comments: int = 0, *, pull_request: dict | None = None) -> dict:
+    num = issue["number"]
+    dto = {
         "id": _num_id(issue["id"]),
-        "node_id": _node_id("Issue", issue["number"]),
-        "number": issue["number"],
+        "node_id": _node_id("Issue", num),
+        "number": num,
         "state": issue["state"],
+        "locked": False,
         "title": issue["title"],
         "body": issue["body"],
-        "user": _user(issue["user_login"]),
-        "assignees": [_user(login) for login in _jsonb(issue.get("assignees"))],
+        "user": user_dto(issue["user_login"]),
+        "url": f"{_API}/repos/{full_name}/issues/{num}",
+        "repository_url": f"{_API}/repos/{full_name}",
+        "comments_url": f"{_API}/repos/{full_name}/issues/{num}/comments",
+        "html_url": f"https://github.com/{full_name}/issues/{num}",
+        "assignee": None,
+        "assignees": [user_dto(login) for login in _jsonb(issue.get("assignees"))],
         "labels": [{"name": n} for n in _jsonb(issue.get("labels"))],
+        "milestone": None,
         "comments": comments,
-        "html_url": f"https://github.com/{full_name}/issues/{issue['number']}",
+        "author_association": "MEMBER",
         "created_at": iso(issue.get("created_at")),
         "updated_at": iso(issue.get("updated_at")),
         "closed_at": iso(issue.get("closed_at")),
     }
+    if pull_request is not None:
+        dto["pull_request"] = pull_request
+    return dto
+
+
+def pr_as_issue_dto(pr: dict, full_name: str) -> dict:
+    """A PR as it appears in the issues list (GitHub returns PRs there too)."""
+    num = pr["number"]
+    link = {
+        "url": f"{_API}/repos/{full_name}/pulls/{num}",
+        "html_url": f"https://github.com/{full_name}/pull/{num}",
+        "diff_url": f"https://github.com/{full_name}/pull/{num}.diff",
+        "patch_url": f"https://github.com/{full_name}/pull/{num}.patch",
+        "merged_at": iso(pr.get("merged_at")),
+    }
+    issue_shaped = {
+        "id": pr["id"],
+        "number": num,
+        "state": pr["state"],
+        "title": pr["title"],
+        "body": pr["body"],
+        "user_login": pr["user_login"],
+        "assignees": "[]",
+        "labels": pr.get("labels"),
+        "created_at": pr.get("created_at"),
+        "updated_at": pr.get("updated_at"),
+        "closed_at": pr.get("closed_at"),
+    }
+    return issue_dto(issue_shaped, full_name, comments=0, pull_request=link)
 
 
 def commit_dto(c: dict, full_name: str) -> dict:
+    sha = c["sha"]
+    when = iso(c.get("committed_at"))
     return {
-        "sha": c["sha"],
+        "sha": sha,
         "node_id": _node_id("Commit", _num_id(c["id"])),
-        "html_url": f"https://github.com/{full_name}/commit/{c['sha']}",
+        "url": f"{_API}/repos/{full_name}/commits/{sha}",
+        "html_url": f"https://github.com/{full_name}/commit/{sha}",
+        "comments_url": f"{_API}/repos/{full_name}/commits/{sha}/comments",
         "commit": {
             "message": c["message"],
-            "author": {"name": c["author_login"], "email": c["author_email"], "date": iso(c.get("committed_at"))},
-            "committer": {"name": c["author_login"], "email": c["author_email"], "date": iso(c.get("committed_at"))},
+            "author": {"name": c["author_login"], "email": c["author_email"], "date": when},
+            "committer": {"name": c["author_login"], "email": c["author_email"], "date": when},
+            "comment_count": 0,
+            "tree": {"sha": sha, "url": f"{_API}/repos/{full_name}/git/trees/{sha}"},
         },
-        "author": _user(c["author_login"]),
-        "committer": _user(c["author_login"]),
-        "parents": [{"sha": sha} for sha in _jsonb(c.get("parents"))],
+        "author": user_dto(c["author_login"]),
+        "committer": user_dto(c["author_login"]),
+        "parents": [{"sha": s, "url": f"{_API}/repos/{full_name}/commits/{s}"} for s in _jsonb(c.get("parents"))],
         "stats": {"additions": c["additions"], "deletions": c["deletions"], "total": c["additions"] + c["deletions"]},
     }
 
@@ -153,31 +270,48 @@ def commit_dto(c: dict, full_name: str) -> dict:
 def review_dto(r: dict) -> dict:
     return {
         "id": _num_id(r["id"]),
-        "user": _user(r["user_login"]),
+        "node_id": _node_id("PullRequestReview", _num_id(r["id"])),
+        "user": user_dto(r["user_login"]),
         "body": r["body"],
-        "state": r["state"].upper(),       # GitHub returns APPROVED / CHANGES_REQUESTED / ...
+        "state": r["state"].upper(),       # APPROVED / CHANGES_REQUESTED / COMMENTED / DISMISSED
+        "author_association": "MEMBER",
         "submitted_at": iso(r.get("submitted_at")),
+        "commit_id": None,
     }
 
 
 def issue_comment_dto(c: dict, full_name: str) -> dict:
+    cid = _num_id(c["id"])
     return {
-        "id": _num_id(c["id"]),
-        "user": _user(c["user_login"]),
+        "id": cid,
+        "node_id": _node_id("IssueComment", cid),
+        "user": user_dto(c["user_login"]),
         "body": c["body"],
-        "html_url": f"https://github.com/{full_name}/issues/{c['issue_number']}#issuecomment-{_num_id(c['id'])}",
+        "url": f"{_API}/repos/{full_name}/issues/comments/{cid}",
+        "html_url": f"https://github.com/{full_name}/issues/{c['issue_number']}#issuecomment-{cid}",
+        "issue_url": f"{_API}/repos/{full_name}/issues/{c['issue_number']}",
+        "author_association": "MEMBER",
         "created_at": iso(c.get("created_at")),
         "updated_at": iso(c.get("created_at")),
     }
 
 
 def check_run_dto(cr: dict) -> dict:
+    cid = _num_id(cr["id"])
     return {
-        "id": _num_id(cr["id"]),
-        "name": cr["name"],
+        "id": cid,
+        "node_id": _node_id("CheckRun", cid),
         "head_sha": cr["head_sha"],
+        "external_id": "",
+        "url": f"{_API}/repos/checks/check-runs/{cid}",
+        "html_url": f"https://github.com/checks/{cid}",
+        "details_url": "",
         "status": cr["status"],
         "conclusion": cr.get("conclusion"),
         "started_at": iso(cr.get("started_at")),
         "completed_at": iso(cr.get("completed_at")),
+        "name": cr["name"],
+        "check_suite": {"id": cid},
+        "output": {"title": None, "summary": None, "text": None, "annotations_count": 0},
+        "pull_requests": [],
     }

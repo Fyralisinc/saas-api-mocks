@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 from uuid import UUID
 
@@ -17,6 +17,9 @@ class GitHubMockState:
     pool: asyncpg.Pool
     run_id: UUID
     rate_limiter: RateLimiter
+    # Fixed hourly rate-limit windows, keyed by installation id:
+    # {installation_id: {"reset": epoch_seconds, "used": int}}
+    windows: dict = field(default_factory=dict)
 
 
 _STATE: Optional[GitHubMockState] = None

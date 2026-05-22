@@ -104,6 +104,21 @@ def generate_rsa_keypair(key_size: int = 2048) -> tuple[str, str]:
 
 # ---------- Discord (Ed25519) ----------
 
+def generate_ed25519_keypair() -> tuple[str, str]:
+    """Return ``(private_key_hex, public_key_hex)`` for a Discord application.
+
+    The mock signs interaction webhooks with the private key; the consumer
+    verifies ``X-Signature-Ed25519`` against the public key (the value a real
+    app copies from the Developer Portal).
+    """
+    if SigningKey is None:  # pragma: no cover — pynacl is in pyproject
+        raise RuntimeError("pynacl not installed")
+    sk = SigningKey.generate()
+    private_hex = bytes(sk).hex()
+    public_hex = bytes(sk.verify_key).hex()
+    return private_hex, public_hex
+
+
 def discord_sign(
     private_key_hex: str,
     ts: Union[str, int],

@@ -56,6 +56,13 @@ async def gh_run(pool) -> UUID:
         """,
         run_id, uuid4(),
     )
+    await pool.execute(
+        """
+        INSERT INTO org.people (id, run_id, handle, full_name, email, role, level, timezone, started_at)
+        VALUES ($1, $2, 'octocat', 'Octo Cat', 'octo@acme.test', 'engineer', 'senior', 'UTC', now())
+        """,
+        uuid4(), run_id,
+    )
     app_pk = uuid4()
     await pool.execute(
         """

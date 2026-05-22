@@ -28,7 +28,7 @@ from spammers.director.installer import install_slack
 from spammers.director.orchestrator import EmissionLoop
 from spammers.director.runs import create_run, get_run, latest_run
 from spammers.orggen.compile import compile_run
-from spammers.orggen.live import LiveEventGenerator, inject_slack_message
+from spammers.orggen.live import LiveEventGenerator, inject_github_event, inject_slack_message
 
 
 log = structlog.get_logger("spammers.director.cli")
@@ -106,6 +106,7 @@ async def _cmd_emit(args: argparse.Namespace) -> int:
     run = await get_run(pool, rid)
     fyralis_base = run["fyralis_base_url"]
     slack_events_url = args.slack_events_url or f"{fyralis_base}/webhooks/slack"
+    github_events_url = args.github_events_url or f"{fyralis_base}/webhooks/github"
 
     # set live mode at requested speed
     await set_mode(pool, rid, mode="live", speed_multiplier=args.speed)
@@ -116,9 +117,10 @@ async def _cmd_emit(args: argparse.Namespace) -> int:
     ticker = LiveClockTicker(pool, rid, tick_s=1.0)
     ticker.start()
 
-    loop = EmissionLoop(pool, rid, slack_events_url=slack_events_url)
+    loop = EmissionLoop(pool, rid, slack_events_url=slack_events_url,
+                        github_events_url=github_events_url)
     loop.start()
-    _eprint(f"emitting → {slack_events_url} (Ctrl-C to stop)")
+    _eprint(f"emitting → slack:{slack_events_url} github:{github_events_url} (Ctrl-C to stop)")
 
     live_gen: LiveEventGenerator | None = None
     if args.live_rate > 0:
@@ -148,10 +150,15 @@ async def _cmd_inject(args: argparse.Namespace) -> int:
     if rid is None:
         _eprint("error: no run found")
         return 2
-    event_id = await inject_slack_message(
-        pool, rid,
-        handle=args.handle, channel=args.channel, text=args.text,
-    )
+    if args.provider == "github":
+        event_id = await inject_github_event(
+            pool, rid, kind=args.kind, repo=args.repo, handle=args.handle, title=args.text,
+        )
+    else:
+        event_id = await inject_slack_message(
+            pool, rid,
+            handle=args.handle, channel=args.channel, text=args.text,
+        )
     _eprint(f"injected event {event_id}")
     print(str(event_id))
     await pool.close()
@@ -265,15 +272,21 @@ def main() -> None:
     p_emit.add_argument("--speed", type=float, default=1.0)
     p_emit.add_argument("--slack-events-url", default=None,
                         help="defaults to {fyralis_base}/webhooks/slack")
+    p_emit.add_argument("--github-events-url", default=None,
+                        help="defaults to {fyralis_base}/webhooks/github")
     p_emit.add_argument("--live-rate", type=float, default=0.0,
                         help="msgs/minute to generate live (default 0 = none)")
     p_emit.set_defaults(func=_cmd_emit)
 
-    p_inj = sub.add_parser("inject", help="inject a one-off live slack message")
+    p_inj = sub.add_parser("inject", help="inject a one-off live event")
     p_inj.add_argument("--run-id", default=None)
+    p_inj.add_argument("--provider", choices=["slack", "github"], default="slack")
     p_inj.add_argument("--handle", default=None, help="org.people.handle (default: random)")
-    p_inj.add_argument("--channel", default="#general")
-    p_inj.add_argument("--text", default=None)
+    p_inj.add_argument("--channel", default="#general", help="slack channel")
+    p_inj.add_argument("--kind", choices=["pull_request", "issues"], default="pull_request",
+                       help="github event kind")
+    p_inj.add_argument("--repo", default=None, help="github repo name (default: first)")
+    p_inj.add_argument("--text", default=None, help="slack text / github title")
     p_inj.set_defaults(func=_cmd_inject)
 
     p_jump = sub.add_parser("jump", help="advance virtual time")

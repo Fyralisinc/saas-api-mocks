@@ -21,6 +21,7 @@ import asyncpg
 import structlog
 
 from spammers.common.clock import get_clock
+from spammers.github import webhooks as github_webhooks
 from spammers.slack import events as slack_events
 
 
@@ -34,12 +35,14 @@ class EmissionLoop:
         run_id: UUID,
         *,
         slack_events_url: Optional[str] = None,
+        github_events_url: Optional[str] = None,
         poll_interval_s: float = 0.5,
         batch_size: int = 20,
     ) -> None:
         self._pool = pool
         self._run_id = run_id
         self._slack_events_url = slack_events_url
+        self._github_events_url = github_events_url
         self._poll_interval_s = poll_interval_s
         self._batch_size = batch_size
         self._stop = asyncio.Event()
@@ -62,12 +65,20 @@ class EmissionLoop:
         )
         for row in rows:
             try:
-                if row["type"] == "slack.message" and self._slack_events_url:
+                etype = row["type"]
+                if etype == "slack.message" and self._slack_events_url:
                     await slack_events.emit_message(
                         self._pool,
                         run_id=self._run_id,
                         event_id=row["id"],
                         fyralis_events_url=self._slack_events_url,
+                    )
+                elif etype.startswith("github.") and self._github_events_url:
+                    await github_webhooks.emit_event(
+                        self._pool,
+                        run_id=self._run_id,
+                        event_id=row["id"],
+                        github_events_url=self._github_events_url,
                     )
                 else:
                     # No emitter registered — mark as emitted to skip

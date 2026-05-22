@@ -112,8 +112,8 @@ SLACK_TIER_CONFIG: Dict[str, Tuple[float, float]] = {
     "users.list":        (10.0, 20.0 / 60.0),     # Tier 2 (~20/min)
     "conversations.info":   (50.0, 50.0 / 60.0),  # Tier 3 (~50/min)
     "conversations.list":   (10.0, 20.0 / 60.0),  # Tier 2 (~20/min)
-    "conversations.history": (1.0, 1.0 / 60.0),   # Tier 1 (~1/min) — non-Marketplace (May 2025)
-    "conversations.replies": (1.0, 1.0 / 60.0),   # Tier 1 (~1/min) — non-Marketplace (May 2025)
+    "conversations.history": (50.0, 50.0 / 60.0),  # Tier 3 (~50/min) — Marketplace/internal app
+    "conversations.replies": (50.0, 50.0 / 60.0),  # Tier 3 (~50/min) — Marketplace/internal app
     "conversations.members": (100.0, 100.0 / 60.0),  # Tier 4 (~100/min)
     "team.info":         (10.0, 50.0 / 60.0),     # Tier 3 (~50/min)
     "auth.test":         (100.0, 100.0 / 60.0),   # Tier 4 (~100/min)

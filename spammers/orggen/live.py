@@ -176,6 +176,110 @@ async def inject_slack_message(
     return event_id
 
 
+async def inject_discord_message(
+    pool: asyncpg.Pool,
+    run_id: UUID,
+    *,
+    handle: Optional[str] = None,
+    channel: Optional[str] = None,
+    text: Optional[str] = None,
+    at_virtual: Optional[datetime] = None,
+) -> UUID:
+    """Append one ``discord.message`` event (not-historical) to the timeline.
+
+    The Discord mock's GatewayDispatcher picks it up, projects it into
+    ``app_discord.messages``, and pushes a ``MESSAGE_CREATE`` to connected bots.
+    Defaults: random person, ``general`` channel, virtual_now + 1s.
+    """
+    if handle is None:
+        row = await pool.fetchrow(
+            "SELECT id, handle FROM org.people WHERE run_id = $1 ORDER BY random() LIMIT 1",
+            run_id,
+        )
+    else:
+        row = await pool.fetchrow(
+            "SELECT id, handle FROM org.people WHERE run_id = $1 AND handle = $2",
+            run_id, handle,
+        )
+    if row is None:
+        raise LookupError("no people in this run; did you forget `prepare`?")
+    actor_id = row["id"]
+
+    clock = await get_clock(pool, run_id)
+    when = at_virtual or (clock.virtual_now + timedelta(seconds=1))
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+
+    if text is None:
+        text = f"[live] hello from {row['handle']} @ {when.isoformat()}"
+    if channel is None:
+        channel = "general"
+
+    event_id = uuid4()
+    await pool.execute(
+        """
+        INSERT INTO timeline.events
+            (id, run_id, virtual_ts, type, actor_id, payload, cross_refs, is_historical)
+        VALUES ($1, $2, $3, 'discord.message', $4, $5::jsonb, '{}'::jsonb, FALSE)
+        """,
+        event_id, run_id, when, actor_id,
+        json.dumps({"channel": channel.lstrip("#"), "text": text, "kind": "live"}),
+    )
+    return event_id
+
+
+async def inject_discord_interaction(
+    pool: asyncpg.Pool,
+    run_id: UUID,
+    *,
+    handle: Optional[str] = None,
+    command: str = "ping",
+    interaction_type: int = 2,
+    channel: Optional[str] = None,
+    at_virtual: Optional[datetime] = None,
+) -> UUID:
+    """Append one ``discord.interaction`` event (not-historical).
+
+    The Director emits this as an Ed25519-signed POST to the consumer's
+    interactions endpoint. ``interaction_type``: 1=PING, 2=APPLICATION_COMMAND,
+    3=MESSAGE_COMPONENT.
+    """
+    if handle is None:
+        row = await pool.fetchrow(
+            "SELECT id, handle FROM org.people WHERE run_id = $1 ORDER BY random() LIMIT 1",
+            run_id,
+        )
+    else:
+        row = await pool.fetchrow(
+            "SELECT id, handle FROM org.people WHERE run_id = $1 AND handle = $2",
+            run_id, handle,
+        )
+    if row is None:
+        raise LookupError("no people in this run; did you forget `prepare`?")
+
+    clock = await get_clock(pool, run_id)
+    when = at_virtual or (clock.virtual_now + timedelta(seconds=1))
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+
+    event_id = uuid4()
+    await pool.execute(
+        """
+        INSERT INTO timeline.events
+            (id, run_id, virtual_ts, type, actor_id, payload, cross_refs, is_historical)
+        VALUES ($1, $2, $3, 'discord.interaction', $4, $5::jsonb, '{}'::jsonb, FALSE)
+        """,
+        event_id, run_id, when, row["id"],
+        json.dumps({
+            "interaction_type": interaction_type,
+            "command": command,
+            "channel": (channel or "general").lstrip("#"),
+            "kind": "live",
+        }),
+    )
+    return event_id
+
+
 async def inject_github_event(
     pool: asyncpg.Pool,
     run_id: UUID,

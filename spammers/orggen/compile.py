@@ -18,6 +18,8 @@ import asyncpg
 import structlog
 
 from spammers.common.ids import (
+    discord_bot_token,
+    discord_snowflake,
     github_app_id,
     github_installation_id,
     github_repo_id,
@@ -34,12 +36,16 @@ from spammers.common.ids import (
     slack_ts,
     slack_user_id,
 )
-from spammers.common.signing import generate_rsa_keypair
+from spammers.common.signing import generate_ed25519_keypair, generate_rsa_keypair
 from spammers.orggen.personas import Person, generate_people
 from spammers.orggen.profiles import ProfileSpec
 from spammers.orggen.projects import Project, generate_projects
 from spammers.orggen.seed import RunRandom
-from spammers.orggen.timeline import TimelineEvent, compile_slack_events
+from spammers.orggen.timeline import (
+    TimelineEvent,
+    compile_discord_events,
+    compile_slack_events,
+)
 
 
 log = structlog.get_logger("spammers.orggen.compile")
@@ -70,8 +76,9 @@ async def compile_run(pool: asyncpg.Pool, run_id: UUID) -> dict:
     # 2. Projects
     projects = generate_projects(spec, rng, people, virtual_now=virtual_now)
 
-    # 3. Timeline (Slack only this turn; others follow when their mocks land)
+    # 3. Timeline — Slack + Discord message streams.
     slack_events = compile_slack_events(spec, rng, people, projects, virtual_now=virtual_now)
+    discord_events = compile_discord_events(spec, rng, people, projects, virtual_now=virtual_now)
 
     # 4. Persist everything in one transaction
     async with pool.acquire() as conn:
@@ -86,16 +93,25 @@ async def compile_run(pool: asyncpg.Pool, run_id: UUID) -> dict:
                 conn, run_id, spec, rng.sub("slack_setup"), people, projects,
             )
 
+            # Discord application + guild + channels + users
+            discord_chan_pks, discord_user_pks = await _create_discord_application(
+                conn, run_id, rng.sub("discord_setup"), people, projects,
+            )
+
             # GitHub app + installation + repositories, then projected content.
             github_repos = await _create_github_app(conn, run_id, projects, virtual_now)
             github_counts = await _generate_github_content(
                 conn, run_id, github_repos, people, rng.sub("github"), virtual_now, spec,
             )
 
-            # Timeline events + Slack message projections
+            # Timeline events + message projections (Slack + Discord)
             await _insert_timeline_events(conn, run_id, slack_events, virtual_now)
+            await _insert_timeline_events(conn, run_id, discord_events, virtual_now)
             await _project_slack_messages(
                 conn, slack_events, virtual_now, workspace_id, channel_ids, slack_user_pks, people,
+            )
+            await _project_discord_messages(
+                conn, discord_events, virtual_now, discord_chan_pks, discord_user_pks,
             )
 
             await conn.execute(
@@ -105,14 +121,15 @@ async def compile_run(pool: asyncpg.Pool, run_id: UUID) -> dict:
 
     log.info("orggen_done", run_id=str(run_id),
              people=len(people), projects=len(projects),
-             slack_events=len(slack_events), github_repos=len(github_repos),
-             github_prs=github_counts["pull_requests"])
+             slack_events=len(slack_events), discord_events=len(discord_events),
+             github_repos=len(github_repos), github_prs=github_counts["pull_requests"])
 
     return {
         "people": len(people),
         "teams": len(team_names),
         "projects": len(projects),
         "slack_events": len(slack_events),
+        "discord_events": len(discord_events),
         "github_repos": len(github_repos),
         **{f"github_{k}": v for k, v in github_counts.items()},
     }
@@ -125,6 +142,7 @@ async def _clear_existing(conn, run_id: UUID) -> None:
     await conn.execute(
         "DELETE FROM app_slack.workspaces WHERE run_id = $1", run_id,
     )
+    await conn.execute("DELETE FROM app_discord.applications WHERE run_id = $1", run_id)
     await conn.execute("DELETE FROM app_github.apps WHERE run_id = $1", run_id)
     await conn.execute("DELETE FROM org.projects WHERE run_id = $1", run_id)
     await conn.execute("DELETE FROM org.people WHERE run_id = $1", run_id)
@@ -609,6 +627,142 @@ async def _project_slack_messages(
             (id, channel_pk, user_pk, ts, thread_ts, subtype, text, blocks,
              attachments, reply_count, reactions, edited, is_hidden, timeline_event_id)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12, $13, $14)
+        """,
+        rows,
+    )
+
+
+# ---------------- Discord projection ----------------
+
+async def _create_discord_application(
+    conn,
+    run_id: UUID,
+    rng: RunRandom,
+    people: Sequence[Person],
+    projects: Sequence[Project],
+) -> tuple[dict[str, UUID], dict[UUID, UUID]]:
+    """Create the Discord application, guild, users, channels.
+
+    Returns (channel name→channel_pk, person_id→user_pk).
+    """
+    application_pk = uuid4()
+    application_id = discord_snowflake()
+    private_hex, public_hex = generate_ed25519_keypair()
+    await conn.execute(
+        """
+        INSERT INTO app_discord.applications
+            (id, run_id, application_id, client_id, client_secret, bot_token,
+             public_key, private_key)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        """,
+        application_pk, run_id, application_id, application_id,
+        secrets.token_hex(16), discord_bot_token(), public_hex, private_hex,
+    )
+
+    earliest = next((p.started_at for p in people), datetime.now(timezone.utc))
+
+    # Users — one per person (1:1 with org.people).
+    user_pks: dict[UUID, UUID] = {}
+    owner_discord_id: str | None = None
+    for person in people:
+        uid = uuid4()
+        discord_uid = discord_snowflake()
+        user_pks[person.id] = uid
+        if owner_discord_id is None:
+            owner_discord_id = discord_uid
+        await conn.execute(
+            """
+            INSERT INTO app_discord.users
+                (id, application_pk, person_id, discord_user_id, username,
+                 discriminator, is_bot)
+            VALUES ($1, $2, $3, $4, $5, '0', FALSE)
+            """,
+            uid, application_pk, person.id, discord_uid, person.handle,
+        )
+
+    # Guild
+    guild_pk = uuid4()
+    guild_id = discord_snowflake()
+    await conn.execute(
+        """
+        INSERT INTO app_discord.guilds
+            (id, application_pk, guild_id, name, owner_user_id, created_at)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        """,
+        guild_pk, application_pk, guild_id, "Spammer Org", owner_discord_id, earliest,
+    )
+
+    # Channels — #general + #off-topic + #dev + one per project channel.
+    channel_specs: list[tuple[str, str]] = [
+        ("general", "General discussion"),
+        ("off-topic", "Off-topic chatter"),
+        ("dev", "Engineering questions"),
+    ]
+    for proj in projects:
+        for chan in proj.discord_channels:
+            channel_specs.append((chan.lstrip("#"), proj.title))
+
+    seen: set[str] = set()
+    chan_pks: dict[str, UUID] = {}
+    for name, topic in channel_specs:
+        if name in seen:
+            continue
+        seen.add(name)
+        cid = uuid4()
+        chan_pks[name] = cid
+        await conn.execute(
+            """
+            INSERT INTO app_discord.channels
+                (id, guild_pk, channel_id, name, type, topic, created_at)
+            VALUES ($1, $2, $3, $4, 0, $5, $6)
+            """,
+            cid, guild_pk, discord_snowflake(), name, topic, earliest,
+        )
+
+    return chan_pks, user_pks
+
+
+async def _project_discord_messages(
+    conn,
+    events: Sequence[TimelineEvent],
+    virtual_now: datetime,
+    channel_pks: dict[str, UUID],
+    user_pks: dict[UUID, UUID],
+) -> None:
+    """Project historical ``discord.message`` events into app_discord.messages.
+
+    Live events (virtual_ts > virtual_now) are dispatched + projected later by
+    the mock's GatewayDispatcher. ``message_id`` is a snowflake derived from the
+    event's virtual_ts, made unique per channel (snowflakes are per-channel keys).
+    """
+    rows = []
+    used_ids: dict[UUID, set[str]] = {}
+    for e in events:
+        if e.type != "discord.message" or e.virtual_ts > virtual_now:
+            continue
+        chan_name = (e.payload.get("channel") or "").lstrip("#")
+        chan_pk = channel_pks.get(chan_name)
+        if chan_pk is None:
+            continue
+        user_pk = user_pks.get(e.actor_id)
+        message_id = discord_snowflake(e.virtual_ts)
+        seen = used_ids.setdefault(chan_pk, set())
+        while message_id in seen:
+            message_id = str(int(message_id) + 1)
+        seen.add(message_id)
+        rows.append((
+            uuid4(), chan_pk, message_id, user_pk, e.payload.get("text", "") or "",
+            0, e.virtual_ts, e.id,
+        ))
+
+    if not rows:
+        return
+    await conn.executemany(
+        """
+        INSERT INTO app_discord.messages
+            (id, channel_pk, message_id, author_user_pk, content, type,
+             created_at, timeline_event_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         """,
         rows,
     )

@@ -194,3 +194,97 @@ def compile_slack_events(
 
     events.sort(key=lambda e: e.virtual_ts)
     return events
+
+
+def compile_discord_events(
+    spec: ProfileSpec,
+    rng: RunRandom,
+    people: Sequence[Person],
+    projects: Sequence[Project],
+    *,
+    virtual_now: datetime,
+) -> list[TimelineEvent]:
+    """Generate Discord message events for the entire runtime.
+
+    Channels mirror what ``_create_discord_application`` seeds: ``general``,
+    ``off-topic``, ``dev``, plus one channel per project.
+    """
+    rng_d = rng.sub("discord")
+    earliest = virtual_now - spec.duration
+    discord_daily = max(1, int(spec.daily_events * spec.discord_share))
+    events: list[TimelineEvent] = []
+
+    cursor = earliest
+    day_idx = 0
+    while cursor < virtual_now:
+        dayofweek = cursor.weekday()
+        n_today = _daily_event_count(rng_d, discord_daily, dayofweek)
+        for i in range(n_today):
+            person = rng_d.choice(people)
+            active_projects = [
+                p for p in projects
+                if p.started_at <= cursor and (p.ended_at is None or p.ended_at >= cursor)
+            ]
+            project = (
+                rng_d.choice(active_projects)
+                if active_projects and rng_d.bool_with_prob(0.6) else None
+            )
+
+            local_when = _local_business_day(rng_d, cursor, person.timezone)
+            if local_when is None or local_when > virtual_now:
+                continue
+
+            kind = rng_d.weighted_pick([
+                ("banter", 0.35),
+                ("work_update", 0.45),
+                ("ask", 0.20),
+            ])
+
+            if kind == "banter":
+                text = render("slack/banter.j2", idx=i + day_idx)
+                channel = "off-topic"
+            elif kind == "work_update" and project is not None:
+                text = render(
+                    "slack/work_update.j2",
+                    persona=person,
+                    event_kind=rng_d.choice(["pr_announce", "pr_merged"]),
+                    pr_link=f"https://github.com/{project.repos[0]}/pull/{rng_d.randint(10, 999)}",
+                    pr_title=f"{project.slug}: {rng_d.choice(['polish', 'refactor', 'fix', 'speed up'])} {rng_d.choice(['edge case', 'hot path', 'config loader'])}",
+                    channel="",
+                    incident_summary="",
+                    question="",
+                    default_text="update soon",
+                )
+                channel = project.discord_channels[0].lstrip("#")
+            elif kind == "work_update":
+                text = "shipped a small fix"
+                channel = "general"
+            else:  # ask
+                text = render(
+                    "slack/work_update.j2",
+                    persona=person,
+                    event_kind="ask",
+                    pr_link="", pr_title="", channel="", incident_summary="",
+                    question=rng_d.choice([
+                        "anyone know why the gateway drops the resume?",
+                        "what's the intent bit for message content again?",
+                        "is there a runbook for the webhook retries?",
+                    ]),
+                    default_text="",
+                )
+                channel = "dev"
+
+            events.append(TimelineEvent(
+                id=uuid4(),
+                virtual_ts=local_when,
+                type="discord.message",
+                actor_id=person.id,
+                project_id=project.id if project else None,
+                payload={"channel": channel, "text": text, "kind": kind},
+                cross_refs={},
+            ))
+        cursor = cursor + timedelta(days=1)
+        day_idx += 1
+
+    events.sort(key=lambda e: e.virtual_ts)
+    return events

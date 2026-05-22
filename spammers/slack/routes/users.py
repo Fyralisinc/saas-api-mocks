@@ -4,10 +4,11 @@ from __future__ import annotations
 import json
 from typing import Optional
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Request
 
 from spammers.common.errors import slack_error
 from spammers.common.pagination import slack_paginate
+from spammers.slack.params import int_param, read_params, str_param
 from spammers.slack.responses import SlackJSONResponse as JSONResponse
 from spammers.slack.auth import resolve_workspace
 from spammers.slack.ratelimit import check as ratelimit_check
@@ -19,7 +20,7 @@ router = APIRouter()
 
 @router.post("/api/users.info")
 @router.get("/api/users.info")
-async def users_info(request: Request, user: Optional[str] = None):
+async def users_info(request: Request):
     ws = await resolve_workspace(request)
     if ws is None:
         return JSONResponse(slack_error("invalid_auth"))
@@ -27,10 +28,8 @@ async def users_info(request: Request, user: Optional[str] = None):
     if rl is not None:
         return rl
 
-    if user is None:
-        # try form body
-        form = await request.form() if request.method == "POST" else {}
-        user = form.get("user") if form else None
+    params = await read_params(request)
+    user = str_param(params, "user")
     if not user:
         return JSONResponse(slack_error("user_not_found"))
 
@@ -83,11 +82,7 @@ async def users_info(request: Request, user: Optional[str] = None):
 
 @router.post("/api/users.list")
 @router.get("/api/users.list")
-async def users_list(
-    request: Request,
-    cursor: Optional[str] = Query(None),
-    limit: int = Query(100, ge=1, le=1000),
-):
+async def users_list(request: Request):
     ws = await resolve_workspace(request)
     if ws is None:
         return JSONResponse(slack_error("invalid_auth"))
@@ -95,6 +90,9 @@ async def users_list(
     if rl is not None:
         return rl
 
+    params = await read_params(request)
+    cursor = str_param(params, "cursor")
+    limit = int_param(params, "limit", 100, lo=1, hi=1000)
     st = state()
     rows = await st.pool.fetch(
         """

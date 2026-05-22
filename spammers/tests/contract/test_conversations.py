@@ -33,13 +33,24 @@ async def test_info_by_name(client, auth_header):
     assert r.json()["channel"]["id"] == CH_GENERAL
 
 
-async def test_list_excludes_archived_by_default(client, auth_header):
+async def test_list_includes_archived_by_default(client, auth_header):
+    # Real Slack: exclude_archived defaults to false, so archived channels
+    # ARE returned unless the caller opts out.
     r = await client.get("/api/conversations.list", headers=auth_header)
     names = [c["name"] for c in r.json()["channels"]]
-    assert "old-stuff" not in names          # archived
+    assert "old-stuff" in names              # archived, but included by default
     assert "general" in names
     assert "secret-plans" in names           # private included by default types
     assert names == sorted(names)
+
+
+async def test_list_exclude_archived_opt_in(client, auth_header):
+    r = await client.get(
+        "/api/conversations.list", params={"exclude_archived": "true"}, headers=auth_header
+    )
+    names = [c["name"] for c in r.json()["channels"]]
+    assert "old-stuff" not in names          # archived, now excluded
+    assert "general" in names
 
 
 async def test_list_public_only(client, auth_header):

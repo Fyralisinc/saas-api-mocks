@@ -7,8 +7,6 @@ the documented tier for each method.
 """
 from __future__ import annotations
 
-import inspect
-
 import pytest
 
 from spammers.common.rate_limit import slack_tier_for
@@ -39,18 +37,21 @@ def test_chat_post_message_one_per_second():
     assert refill == 1.0
 
 
-# May 2025: conversations.history/.replies moved to Tier 1 (1/min, max 15
-# objects) for non-Marketplace apps. This is the policy the mock should match
-# if it emulates a non-Marketplace app.
+# This mock emulates a Marketplace / internal Slack app, so conversations.history
+# and conversations.replies are Tier 3 (~50/min) with the classic limit cap.
+# (Slack's May-2025 change drops these to Tier 1 / 15-object pages for
+# *non-Marketplace* apps — flip both here and in routes/conversations.py to
+# emulate that instead.)
 @pytest.mark.parametrize("method", ["conversations.history", "conversations.replies"])
-def test_history_replies_tier1_non_marketplace(method):
-    assert _rpm(method) == 1
+def test_history_replies_tier3(method):
+    assert _rpm(method) == 50
 
 
-def test_history_object_cap_is_15():
-    # Non-Marketplace cap: default & max `limit` should be 15.
-    from spammers.slack.routes.conversations import history
+def test_history_object_cap():
+    # Marketplace cap: default 100, max 1000. Arguments arrive via query OR
+    # body, so the cap lives in the shared param reader, not the signature.
+    from spammers.slack.params import int_param
 
-    param = inspect.signature(history).parameters["limit"]
-    default = getattr(param.default, "default", param.default)
-    assert default == 15
+    assert int_param({}, "limit", 100, lo=1, hi=1000) == 100          # default
+    assert int_param({"limit": "5000"}, "limit", 100, lo=1, hi=1000) == 1000  # max
+    assert int_param({"limit": "0"}, "limit", 100, lo=1, hi=1000) == 1        # min

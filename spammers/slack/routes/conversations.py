@@ -5,10 +5,11 @@ import json
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Request
 
 from spammers.common.errors import slack_error
 from spammers.common.pagination import slack_paginate
+from spammers.slack.params import bool_param, int_param, read_params, str_param
 from spammers.slack.responses import SlackJSONResponse as JSONResponse
 from spammers.slack.auth import resolve_workspace
 from spammers.slack.ratelimit import check as ratelimit_check
@@ -58,16 +59,15 @@ def _channel_dto(row: dict, team_id: str, num_members: int = 0) -> dict:
 
 @router.post("/api/conversations.info")
 @router.get("/api/conversations.info")
-async def info(request: Request, channel: str = ""):
+async def info(request: Request):
     ws = await resolve_workspace(request)
     if ws is None:
         return JSONResponse(slack_error("invalid_auth"))
     rl = await ratelimit_check("conversations.info", identity=ws["team_id"])
     if rl is not None:
         return rl
-    if not channel:
-        form = await request.form() if request.method == "POST" else {}
-        channel = form.get("channel", "") if form else ""
+    params = await read_params(request)
+    channel = str_param(params, "channel")
     if not channel:
         return JSONResponse(slack_error("channel_not_found"))
     row = await _find_channel(ws["id"], channel)
@@ -78,19 +78,18 @@ async def info(request: Request, channel: str = ""):
 
 @router.post("/api/conversations.list")
 @router.get("/api/conversations.list")
-async def conv_list(
-    request: Request,
-    cursor: Optional[str] = Query(None),
-    limit: int = Query(100, ge=1, le=1000),
-    types: str = Query("public_channel,private_channel"),
-    exclude_archived: bool = Query(True),
-):
+async def conv_list(request: Request):
     ws = await resolve_workspace(request)
     if ws is None:
         return JSONResponse(slack_error("invalid_auth"))
     rl = await ratelimit_check("conversations.list", identity=ws["team_id"])
     if rl is not None:
         return rl
+    params = await read_params(request)
+    cursor = str_param(params, "cursor")
+    limit = int_param(params, "limit", 100, lo=1, hi=1000)
+    types = params.get("types") or "public_channel,private_channel"
+    exclude_archived = bool_param(params, "exclude_archived", False)
     type_set = set(t.strip() for t in types.split(",") if t.strip())
     where = ["workspace_id = $1"]
     args: list = [ws["id"]]
@@ -117,21 +116,22 @@ async def conv_list(
 
 @router.post("/api/conversations.history")
 @router.get("/api/conversations.history")
-async def history(
-    request: Request,
-    channel: str,
-    cursor: Optional[str] = Query(None),
-    limit: int = Query(15, ge=1, le=15),
-    oldest: Optional[str] = Query(None),
-    latest: Optional[str] = Query(None),
-    inclusive: bool = Query(False),
-):
+async def history(request: Request):
     ws = await resolve_workspace(request)
     if ws is None:
         return JSONResponse(slack_error("invalid_auth"))
     rl = await ratelimit_check("conversations.history", identity=ws["team_id"])
     if rl is not None:
         return rl
+    params = await read_params(request)
+    channel = str_param(params, "channel")
+    cursor = str_param(params, "cursor")
+    limit = int_param(params, "limit", 100, lo=1, hi=1000)
+    oldest = str_param(params, "oldest")
+    latest = str_param(params, "latest")
+    inclusive = bool_param(params, "inclusive", False)
+    if not channel:
+        return JSONResponse(slack_error("channel_not_found"))
     chan = await _find_channel(ws["id"], channel)
     if chan is None:
         return JSONResponse(slack_error("channel_not_found"))
@@ -166,19 +166,22 @@ async def history(
 
 @router.post("/api/conversations.replies")
 @router.get("/api/conversations.replies")
-async def replies(
-    request: Request,
-    channel: str,
-    ts: str,
-    cursor: Optional[str] = Query(None),
-    limit: int = Query(15, ge=1, le=15),
-):
+async def replies(request: Request):
     ws = await resolve_workspace(request)
     if ws is None:
         return JSONResponse(slack_error("invalid_auth"))
     rl = await ratelimit_check("conversations.replies", identity=ws["team_id"])
     if rl is not None:
         return rl
+    params = await read_params(request)
+    channel = str_param(params, "channel")
+    ts = str_param(params, "ts")
+    cursor = str_param(params, "cursor")
+    limit = int_param(params, "limit", 100, lo=1, hi=1000)
+    if not channel:
+        return JSONResponse(slack_error("channel_not_found"))
+    if not ts:
+        return JSONResponse(slack_error("thread_not_found"))
     chan = await _find_channel(ws["id"], channel)
     if chan is None:
         return JSONResponse(slack_error("channel_not_found"))
@@ -203,18 +206,19 @@ async def replies(
 
 @router.post("/api/conversations.members")
 @router.get("/api/conversations.members")
-async def members(
-    request: Request,
-    channel: str,
-    cursor: Optional[str] = Query(None),
-    limit: int = Query(100, ge=1, le=1000),
-):
+async def members(request: Request):
     ws = await resolve_workspace(request)
     if ws is None:
         return JSONResponse(slack_error("invalid_auth"))
     rl = await ratelimit_check("conversations.members", identity=ws["team_id"])
     if rl is not None:
         return rl
+    params = await read_params(request)
+    channel = str_param(params, "channel")
+    cursor = str_param(params, "cursor")
+    limit = int_param(params, "limit", 100, lo=1, hi=1000)
+    if not channel:
+        return JSONResponse(slack_error("channel_not_found"))
     chan = await _find_channel(ws["id"], channel)
     if chan is None:
         return JSONResponse(slack_error("channel_not_found"))

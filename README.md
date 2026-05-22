@@ -86,7 +86,7 @@ Example: `SEED=7 ./dev.sh prepare`, or `PORT=7002 ./dev.sh serve`.
 |---|---|
 | **Slack** | ✅ Implemented — OAuth, Web API, signed Events webhooks, tiered rate limits. |
 | **GitHub** | ✅ Implemented — App install + JWT, installation tokens, REST reads, signed webhooks, fidelity-audited. |
-| **Discord** | 🚧 Planned — REST + interactions + Gateway WebSocket. |
+| **Discord** | ✅ Implemented — OAuth, REST, command registration, Ed25519-signed interactions, full Gateway WebSocket, fidelity-audited. |
 | **Gmail** | 🚧 Planned — domain-wide delegation, REST, Pub/Sub push. |
 
 ### Slack
@@ -186,10 +186,72 @@ The mock serves the install page at `/apps/{slug}/installations/new` (auto-appro
 and redirects to your consumer's callback with `installation_id`). The automated
 Director `install` walk is currently Slack-only.
 
-### Discord / Gmail
+### Discord
+
+After `./dev.sh prepare`, start the mock and talk to it exactly as you would real
+Discord — both the HTTP API and the realtime Gateway. Authenticate REST calls
+with `Authorization: Bot <token>`.
+
+```bash
+./dev.sh serve discord               # http://localhost:7002 (HTTP + WS)
+```
+
+**Read data** (the API a consumer's bot would call):
+
+```bash
+TOKEN=…  # app_discord.applications.bot_token for the run
+
+# the bot's own user, a guild's channels, a channel's recent messages
+curl -s -H "Authorization: Bot $TOKEN" \
+  "http://localhost:7002/api/v10/users/@me" | python3 -m json.tool
+
+curl -s -H "Authorization: Bot $TOKEN" \
+  "http://localhost:7002/api/v10/channels/<channel_id>/messages?limit=50" | python3 -m json.tool
+```
+
+Implemented surface: `oauth2/authorize` + `oauth2/token`, `users/@me` &
+`users/{id}`, `guilds/{id}` (+ `/channels`, `/members/{user}`), `channels/{id}`
+and its messages (snowflake `before`/`after`/`around` paging, plus create / edit
+/ delete), global + guild application-command registration, and interaction
+callback/followup endpoints. Responses use Discord's real object shapes,
+`Content-Type: application/json; charset=utf-8`, `{code, message}` error bodies,
+and per-route `X-RateLimit-*` token buckets with the documented `429`
+`{"message":"You are being rate limited.","retry_after":…,"global":false}`.
+
+**Connect a bot to the Gateway** (`GET /api/v10/gateway` returns the WS URL):
+
+```text
+HELLO(10) → IDENTIFY(2) → READY(0) + GUILD_CREATE(0) per guild
+HEARTBEAT(1) ⇄ HEARTBEAT_ACK(11);  RESUME(6) replays a per-session ring buffer
+```
+
+Intents are honored: without `GUILD_MESSAGES` the bot receives no
+`MESSAGE_CREATE`; with it but without `MESSAGE_CONTENT`, message content is
+stripped. A bot connecting after the clock advanced gets **no** historical flood
+— only new messages, like real Discord.
+
+**Send live events:**
+
+```bash
+# a live channel message — pushed as MESSAGE_CREATE to connected bots over the Gateway
+./dev.sh inject --provider=discord --channel=general --text="rolling out the pipeline"
+
+# a slash-command interaction — Ed25519-signed POST to your consumer's webhook
+./dev.sh inject --provider=discord --kind=interaction
+
+# advance the clock so the mock's dispatcher (Gateway) and the Director
+# (signed interactions) deliver queued live events
+./dev.sh emit
+```
+
+Live `discord.message` events are pushed over the Gateway by the mock itself;
+live `discord.interaction` events are Ed25519-signed (`X-Signature-Ed25519` /
+`X-Signature-Timestamp`) and POSTed to your consumer by the Director.
+
+### Gmail
 
 Not implemented yet. The database schema and shared infrastructure (signing,
-rate limiting, pagination, webhook delivery, OrgGen) already support them; each
+rate limiting, pagination, webhook delivery, OrgGen) already support it; it
 needs its API surface built out, after which it gets a `serve` target and a
 section here.
 
@@ -208,6 +270,11 @@ export SLACK_OAUTH_BASE_URL=http://localhost:7001
 # GitHub
 export GITHUB_API_BASE_URL=http://localhost:7003
 export GITHUB_APP_INSTALL_BASE_URL=http://localhost:7003
+
+# Discord
+export DISCORD_API_BASE_URL=http://localhost:7002/api/v10
+export DISCORD_OAUTH_BASE_URL=http://localhost:7002
+export DISCORD_GATEWAY_URL=ws://localhost:7002/gateway
 ```
 
 Restart your consumer so the new environment takes effect. For Slack, run
@@ -280,7 +347,8 @@ saas-api-mocks/
     ├── director/                 # CLI: prepare / install / emit / inject / jump / status / reset
     ├── slack/                    # Slack mock: routes/, app, events, state, auth, ratelimit
     ├── github/                   # GitHub mock: routes/, app, auth, jwt_verify, webhooks, dto, ratelimit
-    ├── discord/ · gmail/         # planned
+    ├── discord/                  # Discord mock: routes/, gateway/ (WS), app, dto, interactions_out, ratelimit
+    ├── gmail/                    # planned
     ├── db/migrations/            # schema (all four providers)
     └── tests/                    # contract / behavior / fidelity suites
 ```

@@ -16,10 +16,13 @@ from spammers.common.errors import github_error
 from spammers.common.pagination import github_link_header
 from spammers.github.auth import resolve_installation
 from spammers.github.dto import (
+    _jsonb,
+    branch_dto,
     check_run_dto,
     commit_dto,
     issue_comment_dto,
     issue_dto,
+    label_dto,
     pr_as_issue_dto,
     pull_request_dto,
     review_dto,
@@ -253,3 +256,52 @@ async def list_check_runs(
     # total_count is the full count; check_runs holds the current page.
     body = {"total_count": len(rows), "check_runs": page_rows}
     return JSONResponse(body, headers=out)
+
+
+# -------------------------------- branches --------------------------------
+
+@router.get("/repos/{owner}/{repo}/branches")
+async def list_branches(
+    request: Request, owner: str, repo: str,
+    per_page: int = Query(30, ge=1, le=100), page: int = Query(1, ge=1),
+):
+    repo_row, headers, err = await _ctx(request, owner, repo)
+    if err:
+        return err
+    full = repo_row["full_name"]
+    # The mock models a single branch per repo (its default); point it at HEAD.
+    head = await state().pool.fetchrow(
+        "SELECT sha FROM app_github.commits WHERE repo_pk = $1 ORDER BY committed_at DESC LIMIT 1",
+        repo_row["id"],
+    )
+    sha = head["sha"] if head else "0" * 40
+    branches = [branch_dto(repo_row["default_branch"], sha, full, protected=True)]
+    page_rows, out = _paginate(branches, per_page, page, f"/repos/{full}/branches", headers)
+    return JSONResponse(page_rows, headers=out)
+
+
+# --------------------------------- labels ---------------------------------
+
+@router.get("/repos/{owner}/{repo}/labels")
+async def list_labels(
+    request: Request, owner: str, repo: str,
+    per_page: int = Query(30, ge=1, le=100), page: int = Query(1, ge=1),
+):
+    repo_row, headers, err = await _ctx(request, owner, repo)
+    if err:
+        return err
+    full = repo_row["full_name"]
+    # GitHub has no labels table here; derive the repo's label set from the
+    # labels actually applied across its issues and pull requests.
+    rows = await state().pool.fetch(
+        """
+        SELECT labels FROM app_github.issues WHERE repo_pk = $1
+        UNION ALL
+        SELECT labels FROM app_github.pull_requests WHERE repo_pk = $1
+        """,
+        repo_row["id"],
+    )
+    names = sorted({n for r in rows for n in _jsonb(r["labels"])})
+    labels = [label_dto(n, full) for n in names]
+    page_rows, out = _paginate(labels, per_page, page, f"/repos/{full}/labels", headers)
+    return JSONResponse(page_rows, headers=out)

@@ -54,6 +54,15 @@ def user_dto(login: str) -> dict:
         "gravatar_id": "",
         "url": f"{_API}/users/{login}",
         "html_url": f"https://github.com/{login}",
+        "followers_url": f"{_API}/users/{login}/followers",
+        "following_url": f"{_API}/users/{login}/following{{/other_user}}",
+        "gists_url": f"{_API}/users/{login}/gists{{/gist_id}}",
+        "starred_url": f"{_API}/users/{login}/starred{{/owner}}{{/repo}}",
+        "subscriptions_url": f"{_API}/users/{login}/subscriptions",
+        "organizations_url": f"{_API}/users/{login}/orgs",
+        "repos_url": f"{_API}/users/{login}/repos",
+        "events_url": f"{_API}/users/{login}/events{{/privacy}}",
+        "received_events_url": f"{_API}/users/{login}/received_events",
         "type": "User",
         "site_admin": False,
     }
@@ -101,6 +110,7 @@ def installation_dto(inst: dict, app_id: int) -> dict:
 def repo_dto(repo: dict) -> dict:
     full = f"{repo['owner']}/{repo['name']}"
     rid = repo["repo_id"]
+    created = iso(repo.get("created_at"))
     return {
         "id": rid,
         "node_id": _node_id("Repository", rid),
@@ -112,24 +122,99 @@ def repo_dto(repo: dict) -> dict:
         "description": repo.get("description"),
         "fork": False,
         "url": f"{_API}/repos/{full}",
-        "archive_url": f"{_API}/repos/{full}/{{archive_format}}{{/ref}}",
+        # URL templates — GitHub returns the full set on every repository object.
+        "forks_url": f"{_API}/repos/{full}/forks",
+        "keys_url": f"{_API}/repos/{full}/keys{{/key_id}}",
+        "collaborators_url": f"{_API}/repos/{full}/collaborators{{/collaborator}}",
+        "teams_url": f"{_API}/repos/{full}/teams",
+        "hooks_url": f"{_API}/repos/{full}/hooks",
+        "issue_events_url": f"{_API}/repos/{full}/issues/events{{/number}}",
+        "events_url": f"{_API}/repos/{full}/events",
+        "assignees_url": f"{_API}/repos/{full}/assignees{{/user}}",
+        "branches_url": f"{_API}/repos/{full}/branches{{/branch}}",
+        "tags_url": f"{_API}/repos/{full}/tags",
+        "blobs_url": f"{_API}/repos/{full}/git/blobs{{/sha}}",
+        "git_tags_url": f"{_API}/repos/{full}/git/tags{{/sha}}",
+        "git_refs_url": f"{_API}/repos/{full}/git/refs{{/sha}}",
+        "trees_url": f"{_API}/repos/{full}/git/trees{{/sha}}",
+        "statuses_url": f"{_API}/repos/{full}/statuses/{{sha}}",
+        "languages_url": f"{_API}/repos/{full}/languages",
+        "stargazers_url": f"{_API}/repos/{full}/stargazers",
+        "contributors_url": f"{_API}/repos/{full}/contributors",
+        "subscribers_url": f"{_API}/repos/{full}/subscribers",
+        "subscription_url": f"{_API}/repos/{full}/subscription",
         "commits_url": f"{_API}/repos/{full}/commits{{/sha}}",
+        "git_commits_url": f"{_API}/repos/{full}/git/commits{{/sha}}",
+        "comments_url": f"{_API}/repos/{full}/comments{{/number}}",
+        "issue_comment_url": f"{_API}/repos/{full}/issues/comments{{/number}}",
         "contents_url": f"{_API}/repos/{full}/contents/{{+path}}",
+        "compare_url": f"{_API}/repos/{full}/compare/{{base}}...{{head}}",
+        "merges_url": f"{_API}/repos/{full}/merges",
+        "archive_url": f"{_API}/repos/{full}/{{archive_format}}{{/ref}}",
+        "downloads_url": f"{_API}/repos/{full}/downloads",
         "issues_url": f"{_API}/repos/{full}/issues{{/number}}",
         "pulls_url": f"{_API}/repos/{full}/pulls{{/number}}",
+        "milestones_url": f"{_API}/repos/{full}/milestones{{/number}}",
+        "notifications_url": f"{_API}/repos/{full}/notifications{{?since,all,participating}}",
+        "labels_url": f"{_API}/repos/{full}/labels{{/name}}",
+        "releases_url": f"{_API}/repos/{full}/releases{{/id}}",
+        "deployments_url": f"{_API}/repos/{full}/deployments",
+        "git_url": f"git://github.com/{full}.git",
+        "ssh_url": f"git@github.com:{full}.git",
+        "clone_url": f"https://github.com/{full}.git",
+        "svn_url": f"https://github.com/{full}",
+        "mirror_url": None,
+        "homepage": None,
         "language": None,
-        "fork_count": 0,
+        "forks_count": 0,
         "forks": 0,
         "stargazers_count": 0,
         "watchers_count": 0,
+        "watchers": 0,
+        "size": 0,
         "open_issues_count": 0,
+        "open_issues": 0,
         "default_branch": repo["default_branch"],
+        "has_issues": True,
+        "has_projects": True,
+        "has_downloads": True,
+        "has_wiki": True,
+        "has_pages": False,
+        "license": None,
         "visibility": "private" if repo["private"] else "public",
         "archived": False,
         "disabled": False,
-        "created_at": iso(repo.get("created_at")),
-        "updated_at": iso(repo.get("created_at")),
-        "pushed_at": iso(repo.get("created_at")),
+        "created_at": created,
+        "updated_at": created,
+        "pushed_at": created,
+    }
+
+
+# GitHub's built-in default labels (default: true on a fresh repo).
+_DEFAULT_LABELS = {
+    "bug", "documentation", "duplicate", "enhancement", "good first issue",
+    "help wanted", "invalid", "question", "wontfix",
+}
+
+
+def branch_dto(name: str, sha: str, full_name: str, *, protected: bool = False) -> dict:
+    return {
+        "name": name,
+        "commit": {"sha": sha, "url": f"{_API}/repos/{full_name}/commits/{sha}"},
+        "protected": protected,
+    }
+
+
+def label_dto(name: str, full_name: str) -> dict:
+    lid = _login_id(f"{full_name}#label#{name}")
+    return {
+        "id": lid,
+        "node_id": _node_id("Label", lid),
+        "url": f"{_API}/repos/{full_name}/labels/{name.replace(' ', '%20')}",
+        "name": name,
+        "description": None,
+        "color": hashlib.sha1(name.encode()).hexdigest()[:6],
+        "default": name in _DEFAULT_LABELS,
     }
 
 
@@ -202,6 +287,8 @@ def issue_dto(issue: dict, full_name: str, comments: int = 0, *, pull_request: d
         "url": f"{_API}/repos/{full_name}/issues/{num}",
         "repository_url": f"{_API}/repos/{full_name}",
         "comments_url": f"{_API}/repos/{full_name}/issues/{num}/comments",
+        "events_url": f"{_API}/repos/{full_name}/issues/{num}/events",
+        "labels_url": f"{_API}/repos/{full_name}/issues/{num}/labels{{/name}}",
         "html_url": f"https://github.com/{full_name}/issues/{num}",
         "assignee": None,
         "assignees": [user_dto(login) for login in _jsonb(issue.get("assignees"))],
@@ -254,6 +341,7 @@ def commit_dto(c: dict, full_name: str) -> dict:
         "html_url": f"https://github.com/{full_name}/commit/{sha}",
         "comments_url": f"{_API}/repos/{full_name}/commits/{sha}/comments",
         "commit": {
+            "url": f"{_API}/repos/{full_name}/git/commits/{sha}",
             "message": c["message"],
             "author": {"name": c["author_login"], "email": c["author_email"], "date": when},
             "committer": {"name": c["author_login"], "email": c["author_email"], "date": when},

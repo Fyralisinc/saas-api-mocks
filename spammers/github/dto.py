@@ -190,10 +190,26 @@ def repo_dto(repo: dict) -> dict:
     }
 
 
-# GitHub's built-in default labels (default: true on a fresh repo).
-_DEFAULT_LABELS = {
-    "bug", "documentation", "duplicate", "enhancement", "good first issue",
-    "help wanted", "invalid", "question", "wontfix",
+# GitHub's built-in default labels (default: true on a fresh repo), with the
+# canonical color + description GitHub ships them with.
+_DEFAULT_LABEL_META: dict[str, tuple[str, str]] = {
+    "bug":              ("d73a4a", "Something isn't working"),
+    "documentation":    ("0075ca", "Improvements or additions to documentation"),
+    "duplicate":        ("cfd3d7", "This issue or pull request already exists"),
+    "enhancement":      ("a2eeef", "New feature or request"),
+    "good first issue": ("7057ff", "Good for newcomers"),
+    "help wanted":      ("008672", "Extra attention is needed"),
+    "invalid":          ("e4e669", "This doesn't seem right"),
+    "question":         ("d876e3", "Further information is requested"),
+    "wontfix":          ("ffffff", "This will not be done"),
+}
+_DEFAULT_LABELS = frozenset(_DEFAULT_LABEL_META)
+
+# Descriptions for the synthetic org's custom labels (a real org describes its
+# labels; the embedded PR-label schema requires a non-null description).
+_CUSTOM_LABEL_DESCRIPTIONS: dict[str, str] = {
+    "chore": "Routine task or maintenance work",
+    "deps":  "Dependency updates",
 }
 
 
@@ -207,31 +223,49 @@ def branch_dto(name: str, sha: str, full_name: str, *, protected: bool = False) 
 
 def label_dto(name: str, full_name: str) -> dict:
     lid = _login_id(f"{full_name}#label#{name}")
+    meta = _DEFAULT_LABEL_META.get(name)
+    if meta is not None:
+        color, description = meta
+    else:
+        color = hashlib.sha1(name.encode()).hexdigest()[:6]
+        description = _CUSTOM_LABEL_DESCRIPTIONS.get(name)
     return {
         "id": lid,
         "node_id": _node_id("Label", lid),
         "url": f"{_API}/repos/{full_name}/labels/{name.replace(' ', '%20')}",
         "name": name,
-        "description": None,
-        "color": hashlib.sha1(name.encode()).hexdigest()[:6],
+        "description": description,
+        "color": color,
         "default": name in _DEFAULT_LABELS,
     }
 
 
-def _ref(full_name: str, login: str, branch: str, sha: str) -> dict:
+def _ref(full_name: str, login: str, branch: str, sha: str, repo_obj: dict | None = None) -> dict:
     owner = full_name.split("/", 1)[0]
     return {
         "label": f"{owner}:{branch}",
         "ref": branch,
         "sha": sha,
         "user": user_dto(login),
-        "repo": {"id": 0, "name": full_name.split("/", 1)[1], "full_name": full_name,
-                 "private": False, "owner": user_dto(owner)},
+        # head.repo / base.repo are full repository objects on the real API.
+        "repo": repo_obj if repo_obj is not None else {
+            "id": 0, "name": full_name.split("/", 1)[1], "full_name": full_name,
+            "private": False, "owner": user_dto(owner),
+        },
     }
 
 
-def pull_request_dto(pr: dict, full_name: str) -> dict:
+def pull_request_dto(pr: dict, full_name: str, repo_row: dict | None = None) -> dict:
     num = pr["number"]
+    repo_obj = repo_dto(repo_row) if repo_row is not None else None
+    url = f"{_API}/repos/{full_name}/pulls/{num}"
+    html_url = f"https://github.com/{full_name}/pull/{num}"
+    issue_url = f"{_API}/repos/{full_name}/issues/{num}"
+    comments_url = f"{_API}/repos/{full_name}/issues/{num}/comments"
+    review_comments_url = f"{_API}/repos/{full_name}/pulls/{num}/comments"
+    review_comment_url = f"{_API}/repos/{full_name}/pulls/comments{{/number}}"
+    commits_url = f"{_API}/repos/{full_name}/pulls/{num}/commits"
+    statuses_url = f"{_API}/repos/{full_name}/statuses/{pr['head_sha']}"
     return {
         "id": _num_id(pr["id"]),
         "node_id": _node_id("PullRequest", num),
@@ -242,19 +276,34 @@ def pull_request_dto(pr: dict, full_name: str) -> dict:
         "body": pr["body"],
         "draft": False,
         "user": user_dto(pr["user_login"]),
-        "url": f"{_API}/repos/{full_name}/pulls/{num}",
-        "html_url": f"https://github.com/{full_name}/pull/{num}",
-        "issue_url": f"{_API}/repos/{full_name}/issues/{num}",
-        "comments_url": f"{_API}/repos/{full_name}/issues/{num}/comments",
-        "review_comments_url": f"{_API}/repos/{full_name}/pulls/{num}/comments",
-        "commits_url": f"{_API}/repos/{full_name}/pulls/{num}/commits",
-        "head": _ref(full_name, pr["user_login"], pr["head_ref"], pr["head_sha"]),
-        "base": _ref(full_name, pr["user_login"], pr["base_ref"], pr["base_sha"]),
+        "url": url,
+        "html_url": html_url,
+        "diff_url": f"{html_url}.diff",
+        "patch_url": f"{html_url}.patch",
+        "issue_url": issue_url,
+        "comments_url": comments_url,
+        "review_comments_url": review_comments_url,
+        "review_comment_url": review_comment_url,
+        "commits_url": commits_url,
+        "statuses_url": statuses_url,
+        "head": _ref(full_name, pr["user_login"], pr["head_ref"], pr["head_sha"], repo_obj),
+        "base": _ref(full_name, pr["user_login"], pr["base_ref"], pr["base_sha"], repo_obj),
+        "_links": {
+            "self": {"href": url},
+            "html": {"href": html_url},
+            "issue": {"href": issue_url},
+            "comments": {"href": comments_url},
+            "review_comments": {"href": review_comments_url},
+            "review_comment": {"href": review_comment_url},
+            "commits": {"href": commits_url},
+            "statuses": {"href": statuses_url},
+        },
         "merged": pr["merged"],
         "merged_at": iso(pr.get("merged_at")),
         "merge_commit_sha": pr["head_sha"] if pr["merged"] else None,
         "mergeable": None,
         "mergeable_state": "unknown",
+        "maintainer_can_modify": False,
         "merged_by": user_dto(pr["user_login"]) if pr["merged"] else None,
         "comments": 0,
         "review_comments": 0,
@@ -263,9 +312,11 @@ def pull_request_dto(pr: dict, full_name: str) -> dict:
         "deletions": pr["deletions"],
         "changed_files": pr["changed_files"],
         "author_association": "MEMBER",
+        "auto_merge": None,
+        "assignee": None,
         "assignees": [],
         "requested_reviewers": [user_dto(login) for login in _jsonb(pr.get("requested_reviewers"))],
-        "labels": [{"name": n} for n in _jsonb(pr.get("labels"))],
+        "labels": [label_dto(n, full_name) for n in _jsonb(pr.get("labels"))],
         "milestone": None,
         "created_at": iso(pr.get("created_at")),
         "updated_at": iso(pr.get("updated_at")),
@@ -292,7 +343,7 @@ def issue_dto(issue: dict, full_name: str, comments: int = 0, *, pull_request: d
         "html_url": f"https://github.com/{full_name}/issues/{num}",
         "assignee": None,
         "assignees": [user_dto(login) for login in _jsonb(issue.get("assignees"))],
-        "labels": [{"name": n} for n in _jsonb(issue.get("labels"))],
+        "labels": [label_dto(n, full_name) for n in _jsonb(issue.get("labels"))],
         "milestone": None,
         "comments": comments,
         "author_association": "MEMBER",

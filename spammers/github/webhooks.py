@@ -121,7 +121,7 @@ async def _build_payload(pool, etype: str, payload: dict, repo_row: dict, full: 
             repo_pk, payload["number"],
         )
         return {"action": action, "number": pr["number"],
-                "pull_request": pull_request_dto(dict(pr), full)}, pr["user_login"]
+                "pull_request": pull_request_dto(dict(pr), full, repo_row)}, pr["user_login"]
 
     if etype == "github.issues":
         issue = await pool.fetchrow(
@@ -140,7 +140,7 @@ async def _build_payload(pool, etype: str, payload: dict, repo_row: dict, full: 
             pr["id"],
         )
         return {"action": action, "review": review_dto(dict(rv)),
-                "pull_request": pull_request_dto(dict(pr), full)}, rv["user_login"]
+                "pull_request": pull_request_dto(dict(pr), full, repo_row)}, rv["user_login"]
 
     if etype == "github.issue_comment":
         comment = await pool.fetchrow(

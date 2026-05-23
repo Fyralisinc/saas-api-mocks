@@ -86,7 +86,7 @@ async def list_pulls(
     rows = await state().pool.fetch(
         f"SELECT * FROM app_github.pull_requests WHERE {where} ORDER BY number DESC", *args
     )
-    dtos = [pull_request_dto(dict(r), full) for r in rows]
+    dtos = [pull_request_dto(dict(r), full, repo_row) for r in rows]
     page_rows, out = _paginate(dtos, per_page, page, f"/repos/{full}/pulls", headers)
     return JSONResponse(page_rows, headers=out)
 
@@ -102,7 +102,7 @@ async def get_pull(request: Request, owner: str, repo: str, number: int):
     )
     if row is None:
         return JSONResponse(github_error("Not Found", documentation_url=_DOCS), status_code=404, headers=headers)
-    return JSONResponse(pull_request_dto(dict(row), repo_row["full_name"]), headers=headers)
+    return JSONResponse(pull_request_dto(dict(row), repo_row["full_name"], repo_row), headers=headers)
 
 
 @router.get("/repos/{owner}/{repo}/pulls/{number}/reviews")

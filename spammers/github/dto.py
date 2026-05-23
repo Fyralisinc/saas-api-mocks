@@ -406,6 +406,35 @@ def commit_dto(c: dict, full_name: str) -> dict:
     }
 
 
+def _actor_dto(login: str) -> dict:
+    """The slim actor object used inside Events API entries."""
+    uid = _login_id(login)
+    return {
+        "id": uid,
+        "login": login,
+        "display_login": login,
+        "gravatar_id": "",
+        "url": f"{_API}/users/{login}",
+        "avatar_url": f"https://avatars.githubusercontent.com/u/{uid}?v=4",
+    }
+
+
+def event_dto(
+    *, event_id: int, kind: str, actor_login: str, full_name: str,
+    repo_id: int, created_at, payload: dict,
+) -> dict:
+    """A repository Event (``GET /repos/{owner}/{repo}/events``)."""
+    return {
+        "id": str(event_id),
+        "type": kind,
+        "actor": _actor_dto(actor_login),
+        "repo": {"id": repo_id, "name": full_name, "url": f"{_API}/repos/{full_name}"},
+        "payload": payload,
+        "public": True,
+        "created_at": iso(created_at),
+    }
+
+
 def review_dto(r: dict) -> dict:
     return {
         "id": _num_id(r["id"]),

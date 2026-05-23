@@ -17,9 +17,11 @@ from spammers.common.pagination import github_link_header
 from spammers.github.auth import resolve_installation
 from spammers.github.dto import (
     _jsonb,
+    _login_id,
     branch_dto,
     check_run_dto,
     commit_dto,
+    event_dto,
     issue_comment_dto,
     issue_dto,
     label_dto,
@@ -57,6 +59,10 @@ async def _ctx(request: Request, owner: str, repo: str):
 
 
 def _paginate(rows: list, per_page: int, page: int, path: str, headers: dict) -> tuple[list, dict]:
+    # GitHub silently clamps per_page to [1, 100] and treats page < 1 as 1 —
+    # it does not 422 on out-of-range values.
+    per_page = max(1, min(per_page, 100))
+    page = max(1, page)
     total_pages = max(1, math.ceil(len(rows) / per_page))
     start = (page - 1) * per_page
     out = dict(headers)
@@ -72,7 +78,7 @@ def _paginate(rows: list, per_page: int, page: int, path: str, headers: dict) ->
 async def list_pulls(
     request: Request, owner: str, repo: str,
     state_: str = Query("open", alias="state"),
-    per_page: int = Query(30, ge=1, le=100), page: int = Query(1, ge=1),
+    per_page: int = Query(30), page: int = Query(1),
 ):
     repo_row, headers, err = await _ctx(request, owner, repo)
     if err:
@@ -108,7 +114,7 @@ async def get_pull(request: Request, owner: str, repo: str, number: int):
 @router.get("/repos/{owner}/{repo}/pulls/{number}/reviews")
 async def list_reviews(
     request: Request, owner: str, repo: str, number: int,
-    per_page: int = Query(30, ge=1, le=100), page: int = Query(1, ge=1),
+    per_page: int = Query(30), page: int = Query(1),
 ):
     repo_row, headers, err = await _ctx(request, owner, repo)
     if err:
@@ -133,7 +139,7 @@ async def list_reviews(
 async def list_issues(
     request: Request, owner: str, repo: str,
     state_: str = Query("open", alias="state"),
-    per_page: int = Query(30, ge=1, le=100), page: int = Query(1, ge=1),
+    per_page: int = Query(30), page: int = Query(1),
 ):
     # On real GitHub, pull requests ARE issues and appear in this list too
     # (each PR carries a ``pull_request`` key). We merge issues + PRs, ordered
@@ -169,6 +175,32 @@ async def list_issues(
     return JSONResponse(page_rows, headers=out)
 
 
+@router.get("/repos/{owner}/{repo}/issues/comments")
+async def list_repo_issue_comments(
+    request: Request, owner: str, repo: str,
+    sort: str = Query("created"), direction: str = Query("desc"),
+    since: Optional[str] = Query(None),
+    per_page: int = Query(30), page: int = Query(1),
+):
+    """Repo-wide issue-comments list (every issue's comments in one feed).
+
+    MUST be declared before ``/issues/{number}`` — FastAPI matches in
+    declaration order, so otherwise the literal ``comments`` segment gets
+    captured as ``{number}`` and 422s on int parsing.
+    """
+    repo_row, headers, err = await _ctx(request, owner, repo)
+    if err:
+        return err
+    order = "ASC" if direction.lower() == "asc" else "DESC"
+    rows = await state().pool.fetch(
+        f"SELECT * FROM app_github.issue_comments WHERE repo_pk = $1 ORDER BY created_at {order}",
+        repo_row["id"],
+    )
+    dtos = [issue_comment_dto(dict(r), repo_row["full_name"]) for r in rows]
+    page_rows, out = _paginate(dtos, per_page, page, f"/repos/{repo_row['full_name']}/issues/comments", headers)
+    return JSONResponse(page_rows, headers=out)
+
+
 @router.get("/repos/{owner}/{repo}/issues/{number}")
 async def get_issue(request: Request, owner: str, repo: str, number: int):
     repo_row, headers, err = await _ctx(request, owner, repo)
@@ -190,7 +222,7 @@ async def get_issue(request: Request, owner: str, repo: str, number: int):
 @router.get("/repos/{owner}/{repo}/issues/{number}/comments")
 async def list_issue_comments(
     request: Request, owner: str, repo: str, number: int,
-    per_page: int = Query(30, ge=1, le=100), page: int = Query(1, ge=1),
+    per_page: int = Query(30), page: int = Query(1),
 ):
     repo_row, headers, err = await _ctx(request, owner, repo)
     if err:
@@ -209,7 +241,7 @@ async def list_issue_comments(
 @router.get("/repos/{owner}/{repo}/commits")
 async def list_commits(
     request: Request, owner: str, repo: str,
-    per_page: int = Query(30, ge=1, le=100), page: int = Query(1, ge=1),
+    per_page: int = Query(30), page: int = Query(1),
 ):
     repo_row, headers, err = await _ctx(request, owner, repo)
     if err:
@@ -240,7 +272,7 @@ async def get_commit(request: Request, owner: str, repo: str, sha: str):
 @router.get("/repos/{owner}/{repo}/commits/{ref}/check-runs")
 async def list_check_runs(
     request: Request, owner: str, repo: str, ref: str,
-    per_page: int = Query(30, ge=1, le=100), page: int = Query(1, ge=1),
+    per_page: int = Query(30), page: int = Query(1),
 ):
     repo_row, headers, err = await _ctx(request, owner, repo)
     if err:
@@ -263,7 +295,7 @@ async def list_check_runs(
 @router.get("/repos/{owner}/{repo}/branches")
 async def list_branches(
     request: Request, owner: str, repo: str,
-    per_page: int = Query(30, ge=1, le=100), page: int = Query(1, ge=1),
+    per_page: int = Query(30), page: int = Query(1),
 ):
     repo_row, headers, err = await _ctx(request, owner, repo)
     if err:
@@ -285,7 +317,7 @@ async def list_branches(
 @router.get("/repos/{owner}/{repo}/labels")
 async def list_labels(
     request: Request, owner: str, repo: str,
-    per_page: int = Query(30, ge=1, le=100), page: int = Query(1, ge=1),
+    per_page: int = Query(30), page: int = Query(1),
 ):
     repo_row, headers, err = await _ctx(request, owner, repo)
     if err:
@@ -304,4 +336,64 @@ async def list_labels(
     names = sorted({n for r in rows for n in _jsonb(r["labels"])})
     labels = [label_dto(n, full) for n in names]
     page_rows, out = _paginate(labels, per_page, page, f"/repos/{full}/labels", headers)
+    return JSONResponse(page_rows, headers=out)
+
+
+def _evid(*parts) -> int:
+    return _login_id("#".join(str(p) for p in parts))
+
+
+@router.get("/repos/{owner}/{repo}/events")
+async def list_repo_events(
+    request: Request, owner: str, repo: str,
+    per_page: int = Query(30), page: int = Query(1),
+):
+    """The repository's recent activity feed, newest first — synthesized from
+    its pull requests, issues and pushes, the way real GitHub aggregates them."""
+    repo_row, headers, err = await _ctx(request, owner, repo)
+    if err:
+        return err
+    full = repo_row["full_name"]
+    rid = repo_row["repo_id"]
+    branch = repo_row["default_branch"]
+    pool = state().pool
+    events: list[tuple] = []
+
+    for pr in await pool.fetch("SELECT * FROM app_github.pull_requests WHERE repo_pk = $1", repo_row["id"]):
+        prd = dict(pr)
+        events.append((prd.get("created_at"), event_dto(
+            event_id=_evid(full, "pr", prd["number"]), kind="PullRequestEvent",
+            actor_login=prd["user_login"], full_name=full, repo_id=rid,
+            created_at=prd.get("created_at"),
+            payload={"action": "opened", "number": prd["number"],
+                     "pull_request": pull_request_dto(prd, full, repo_row)},
+        )))
+
+    for i in await pool.fetch("SELECT * FROM app_github.issues WHERE repo_pk = $1", repo_row["id"]):
+        idd = dict(i)
+        events.append((idd.get("created_at"), event_dto(
+            event_id=_evid(full, "issue", idd["number"]), kind="IssuesEvent",
+            actor_login=idd["user_login"], full_name=full, repo_id=rid,
+            created_at=idd.get("created_at"),
+            payload={"action": "opened", "issue": issue_dto(idd, full)},
+        )))
+
+    for c in await pool.fetch("SELECT * FROM app_github.commits WHERE repo_pk = $1", repo_row["id"]):
+        cd = dict(c)
+        sha = cd["sha"]
+        events.append((cd.get("committed_at"), event_dto(
+            event_id=_evid(full, "push", sha), kind="PushEvent",
+            actor_login=cd["author_login"], full_name=full, repo_id=rid,
+            created_at=cd.get("committed_at"),
+            payload={"push_id": _evid(full, "pushid", sha), "size": 1, "distinct_size": 1,
+                     "ref": f"refs/heads/{branch}", "head": sha, "before": "0" * 40,
+                     "commits": [{"sha": sha, "distinct": True, "message": cd["message"],
+                                  "author": {"email": cd["author_email"], "name": cd["author_login"]},
+                                  "url": f"{_API_BASE}/repos/{full}/commits/{sha}"}]},
+        )))
+
+    # Newest first; rows without a timestamp sort last.
+    events.sort(key=lambda t: t[0].timestamp() if t[0] is not None else 0.0, reverse=True)
+    dtos = [e for _, e in events]
+    page_rows, out = _paginate(dtos, per_page, page, f"/repos/{full}/events", headers)
     return JSONResponse(page_rows, headers=out)

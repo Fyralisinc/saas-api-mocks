@@ -23,9 +23,11 @@ def _is_snowflake(s) -> bool:
     return isinstance(s, str) and s.isdigit() and 15 <= len(s) <= 20
 
 
-async def test_content_type_charset(dc_client, auth_header):
+async def test_content_type_bare_application_json(dc_client, auth_header):
+    # Real Discord returns a bare `application/json` (no charset); discord.py's
+    # json_or_text exact-matches it, so a charset suffix breaks the stock client.
     r = await dc_client.get("/api/v10/users/@me", headers=auth_header)
-    assert r.headers["content-type"] == "application/json; charset=utf-8"
+    assert r.headers["content-type"] == "application/json"
 
 
 async def test_ratelimit_headers_present(dc_client, auth_header):

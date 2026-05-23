@@ -22,13 +22,24 @@ from fastapi.responses import HTMLResponse
 
 from spammers.common.errors import discord_error
 from spammers.common.ids import oauth_code
+from spammers.discord.dto import application_dto
 from spammers.discord.responses import DiscordJSONResponse
+from spammers.discord.routes._deps import authed
 from spammers.discord.state import state as get_state
 
 router = APIRouter()
 
 DEFAULT_SCOPE = "bot applications.commands"
 TOKEN_TTL_S = 604800  # Discord access tokens live 7 days.
+
+
+@router.get("/api/v10/oauth2/applications/@me")
+async def get_application_me(request: Request):
+    """The bot's own application — discord.py's login()/setup fetches this."""
+    app, headers, err = await authed(request, "oauth2/applications/@me")
+    if err is not None:
+        return err
+    return DiscordJSONResponse(application_dto(app), headers=headers)
 
 
 @router.get("/oauth2/authorize")

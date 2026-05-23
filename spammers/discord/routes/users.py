@@ -4,7 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Request
 
 from spammers.common.errors import discord_error
-from spammers.discord.dto import bot_user_dto, user_dto
+from spammers.discord.dto import bot_user_dto, partial_guild_dto, user_dto
 from spammers.discord.responses import DiscordJSONResponse
 from spammers.discord.routes._deps import authed
 from spammers.discord.state import state
@@ -18,6 +18,20 @@ async def get_me(request: Request):
     if err is not None:
         return err
     return DiscordJSONResponse(bot_user_dto(app["application_id"]), headers=headers)
+
+
+@router.get("/api/v10/users/@me/guilds")
+async def get_my_guilds(request: Request):
+    app, headers, err = await authed(request, "users/@me/guilds")
+    if err is not None:
+        return err
+    rows = await state().pool.fetch(
+        "SELECT guild_id, name, icon_hash, owner_user_id "
+        "FROM app_discord.guilds WHERE application_pk = $1 ORDER BY created_at",
+        app["application_pk"],
+    )
+    guilds = [partial_guild_dto(dict(r), bot_id=app["application_id"]) for r in rows]
+    return DiscordJSONResponse(guilds, headers=headers)
 
 
 @router.get("/api/v10/users/{user_id}")

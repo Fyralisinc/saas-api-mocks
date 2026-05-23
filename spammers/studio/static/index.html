@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>SPAMMER // CONTROL</title>
+<style>
+  :root{
+    --bg:#04100a; --bg2:#020a06;
+    --ink:#d8ffe6;            /* readable body text */
+    --ink-dim:#88c7a2;        /* muted labels */
+    --neon:#00ff66;           /* accents */
+    --head:#86ffb2;           /* headings */
+    --line:rgba(0,255,120,.20);
+    --line-bri:rgba(0,255,120,.55);
+    --panel:#07160e;          /* solid panels — text never sits on the rain */
+    --panel-2:#0a1f13;
+    --danger:#ff6b66; --amber:#ffd479;
+    --shadow:0 0 0 1px var(--line), 0 8px 30px rgba(0,0,0,.55);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:radial-gradient(1200px 700px at 50% -10%, #0a2415 0%, var(--bg) 55%, var(--bg2) 100%);
+    color:var(--ink);
+    font-family:'DejaVu Sans Mono','Cascadia Mono','Consolas','Courier New',monospace;
+    font-size:15px; line-height:1.6; overflow-x:hidden;
+  }
+  /* Background rain — kept very subtle so it never competes with text. */
+  #rain{position:fixed;inset:0;z-index:0;opacity:.10;pointer-events:none}
+  .vign{position:fixed;inset:0;z-index:1;pointer-events:none;
+    background:radial-gradient(900px 600px at 50% 30%, transparent 60%, rgba(0,0,0,.45) 100%)}
+  .wrap{position:relative;z-index:2;max-width:1300px;margin:0 auto;padding:16px 26px 24px}
+  .glow{text-shadow:0 0 10px rgba(0,255,102,.55)}
+
+  header{margin-bottom:4px}
+  h1{font-size:25px;letter-spacing:5px;margin:0;color:var(--head);font-weight:700}
+  h1 .b{animation:blink 1.2s steps(1) infinite;color:var(--neon)}
+  @keyframes blink{50%{opacity:0}}
+  .sub{color:var(--ink-dim);letter-spacing:1px;margin:5px 0 0;font-size:13px}
+
+  .brief{border:1px solid var(--line);background:var(--panel);box-shadow:var(--shadow);
+    border-left:3px solid var(--neon);padding:11px 15px;margin:12px 0;line-height:1.5;font-size:13.5px;color:var(--ink)}
+  .brief b{color:var(--head)}
+  .brief code{color:var(--neon);background:rgba(0,255,102,.08);padding:1px 5px;border-radius:3px}
+
+  .label{color:var(--neon);letter-spacing:2px;font-size:12px;margin:14px 0 9px;text-transform:uppercase}
+
+  .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px}
+  @media(max-width:620px){.grid{grid-template-columns:repeat(2,1fr)}}
+  /* boot layout: org grid on the left, live system feed on the right */
+  .bootmain{display:flex;gap:20px;align-items:stretch;flex-wrap:wrap;margin-top:8px}
+  .bootleft{flex:1 1 560px;min-width:0}
+  .bootleft .label:first-child{margin-top:0}
+  .feed{flex:0 0 300px;border:1px solid var(--line);background:var(--bg2);box-shadow:var(--shadow);
+    border-radius:6px;overflow:hidden;display:flex;flex-direction:column}
+  @media(max-width:840px){.feed{flex-basis:100%}}
+  .feed-h{display:flex;align-items:center;gap:7px;background:var(--panel-2);border-bottom:1px solid var(--line);
+    padding:9px 13px;font-size:11px;letter-spacing:2px;color:var(--ink-dim)}
+  .feed-h .d{width:9px;height:9px;border-radius:50%}
+  .feed-h .r{background:#ff6b66}.feed-h .y{background:#ffd479}.feed-h .g{background:var(--neon)}
+  .feed-body{margin:0;padding:13px 15px;font-size:12.5px;line-height:1.7;color:var(--ink);
+    white-space:pre-wrap;word-break:break-word}
+  .feed-body .ok{color:var(--neon)} .feed-body .pmpt{color:var(--head)} .feed-body .wn{color:var(--amber)}
+  .cursor{color:var(--neon);animation:blink 1.05s steps(1) infinite}
+  .scope{flex:1;display:block;width:100%;min-height:120px;border-top:1px solid var(--line);
+    background:rgba(0,20,8,.20)}
+
+  /* per-company glyphs */
+  .chead{display:flex;align-items:center;gap:9px}
+  .clogo{width:20px;height:20px;flex:0 0 auto;color:var(--neon);
+    filter:drop-shadow(0 0 4px rgba(0,255,102,.5))}
+  .card{border:1px solid var(--line);background:var(--panel);box-shadow:var(--shadow);
+    padding:11px 13px;cursor:pointer;transition:transform .12s, border-color .12s, background .12s}
+  .card:hover{border-color:var(--line-bri);background:var(--panel-2);transform:translateY(-2px)}
+  .card.sel{border-color:var(--neon);box-shadow:0 0 0 1px var(--neon),0 0 18px rgba(0,255,102,.30)}
+  .card.sel::after{content:'▸ SELECTED';position:absolute;margin-top:-13px;margin-left:8px;
+    background:var(--neon);color:#022; font-size:9px;letter-spacing:1px;padding:2px 6px;border-radius:3px}
+  .card .nm{color:var(--head);font-size:15.5px;letter-spacing:.5px}
+  .card .stg{color:var(--amber);font-size:10.5px;letter-spacing:1px;margin-top:2px;text-transform:uppercase}
+  .card .tag{color:var(--ink);opacity:.85;font-size:12.5px;margin-top:6px;line-height:1.45}
+  .card .meta{color:var(--ink-dim);font-size:11.5px;margin-top:7px;border-top:1px solid var(--line);padding-top:6px}
+
+  .bar{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-top:16px}
+  button{font-family:inherit;background:var(--neon);color:#032611;border:1px solid var(--neon);
+    padding:11px 22px;letter-spacing:1.5px;cursor:pointer;transition:.12s;font-size:14px;font-weight:700;border-radius:4px}
+  button:hover:not(:disabled){box-shadow:0 0 16px rgba(0,255,102,.55);filter:brightness(1.08)}
+  button:disabled{opacity:.4;cursor:not-allowed;filter:grayscale(.3)}
+  button.ghost{background:transparent;color:var(--neon)}
+  button.ghost:hover:not(:disabled){background:rgba(0,255,102,.12)}
+  button.danger{background:transparent;color:var(--danger);border-color:var(--danger);font-weight:600}
+  button.danger:hover{background:rgba(255,107,102,.14);box-shadow:0 0 14px rgba(255,107,102,.4)}
+  .phase{color:var(--amber);letter-spacing:1px;font-size:13px}
+  .err{color:var(--danger);font-size:13px;margin-top:12px}
+  .hidden{display:none !important}
+
+  /* console */
+  .topbar{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:14px;
+    border-bottom:1px solid var(--line);padding-bottom:14px;margin-bottom:20px}
+  .dossier{border:1px solid var(--line);background:var(--panel);box-shadow:var(--shadow);padding:18px 20px;margin-bottom:22px}
+  .dossier .smry{font-size:15px;line-height:1.75;color:var(--ink)}
+  .dossier .smry b{color:var(--head)}
+  .dcols{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px;margin-top:18px;
+    border-top:1px solid var(--line);padding-top:16px}
+  .dcols h4{margin:0 0 8px;color:var(--neon);letter-spacing:1.5px;font-size:12px;text-transform:uppercase}
+  .dcols ul{margin:0;padding-left:18px;font-size:13.5px;line-height:1.7;color:var(--ink)}
+  .dcols li::marker{color:var(--neon)}
+  .dcols li.ob{color:var(--amber)}
+  .pill{display:inline-block;border:1px solid var(--line);background:var(--panel-2);padding:3px 9px;
+    margin:3px 5px 3px 0;font-size:12px;color:var(--ink);border-radius:3px}
+
+  .panels{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:18px}
+  .panel{border:1px solid var(--line);background:var(--panel);box-shadow:var(--shadow);padding:16px 17px;border-radius:4px}
+  .panel h3{margin:0;letter-spacing:3px;color:var(--head);font-size:16px;display:flex;align-items:center;gap:8px}
+  .stat{display:flex;gap:22px;flex-wrap:wrap;margin:14px 0 16px;padding:12px 14px;
+    background:var(--panel-2);border:1px solid var(--line);border-radius:4px}
+  .stat b{color:var(--neon);font-size:22px;display:block;line-height:1.1}
+  .stat span{color:var(--ink-dim);font-size:10.5px;letter-spacing:1px}
+  .field{font-size:11px;color:var(--ink-dim);letter-spacing:1px;margin:10px 0 4px;text-transform:uppercase}
+  select,textarea,input{width:100%;font-family:inherit;font-size:14px;background:var(--bg2);color:var(--ink);
+    border:1px solid var(--line);padding:9px 10px;border-radius:4px;margin-bottom:4px}
+  select:focus,textarea:focus{outline:none;border-color:var(--neon);box-shadow:0 0 0 2px rgba(0,255,102,.18)}
+  textarea{resize:vertical;min-height:58px;line-height:1.5}
+  .sugs{display:flex;flex-wrap:wrap;gap:7px;margin:8px 0}
+  .sug{border:1px solid var(--line);background:var(--panel-2);color:var(--ink);font-size:12px;
+    padding:5px 9px;cursor:pointer;border-radius:3px;transition:.12s}
+  .sug:hover{border-color:var(--neon);color:var(--head);background:rgba(0,255,102,.10)}
+  .row{display:flex;gap:10px;align-items:center;margin-top:8px}
+
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(8px);z-index:9;
+    border:1px solid var(--neon);background:#06160d;color:var(--head);padding:11px 20px;font-size:13px;
+    letter-spacing:.5px;border-radius:5px;box-shadow:0 0 18px rgba(0,255,102,.35);transition:.25s;opacity:0}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .toast.bad{border-color:var(--danger);color:var(--danger);box-shadow:0 0 18px rgba(255,107,102,.4)}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle}
+  .up{background:var(--neon);box-shadow:0 0 8px var(--neon)} .down{background:#5a3a3a}
+  #health{font-size:12px;color:var(--ink-dim)}
+
+  /* brand logos — same green/glow theme, transparent, vector-sharp */
+  .panel{position:relative;overflow:hidden}
+  .pbody{position:relative;z-index:1}
+  .brand{width:22px;height:22px;fill:var(--neon);flex:0 0 auto;
+    filter:drop-shadow(0 0 5px rgba(0,255,102,.55))}
+  .wm{position:absolute;top:-16px;right:-18px;width:150px;height:150px;fill:var(--neon);
+    opacity:.07;z-index:0;pointer-events:none}
+  .logos{display:flex;gap:16px;align-items:center;margin-top:8px;opacity:.85}
+  .logos svg{width:22px;height:22px;fill:var(--ink-dim);
+    filter:drop-shadow(0 0 5px rgba(0,255,102,.30))}
+</style>
+</head>
+<body>
+<canvas id="rain"></canvas>
+<div class="vign"></div>
+<div class="wrap">
+
+  <header>
+    <h1 class="glow">SPAMMER&nbsp;//&nbsp;CONTROL<span class="b">_</span></h1>
+    <p class="sub">wire-faithful slack · github · discord mocks &nbsp;—&nbsp; synthetic org generator</p>
+    <div class="logos" id="logos"></div>
+  </header>
+
+  <!-- ===================== BOOT VIEW ===================== -->
+  <section id="boot">
+    <div class="brief">
+      This console runs a self-hosted <b>spammer</b>: mock Slack, GitHub and Discord services that are
+      wire-compatible with the real APIs, populated with a deterministic synthetic company — people,
+      teams, projects, channels, repos and a full history of activity. Pick a company profile and
+      <b>Initialize</b>; the mocks come up fresh on <code>:7001</code> <code>:7002</code>
+      <code>:7003</code>. <b>Terminate</b> wipes everything back to zero.
+    </div>
+
+    <div class="bootmain">
+      <div class="bootleft">
+        <div class="label">// select target organization</div>
+        <div id="companies" class="grid"></div>
+        <div class="bar">
+          <button id="startBtn" disabled>► Initialize</button>
+          <span id="phase" class="phase"></span>
+        </div>
+        <div id="bootErr" class="err"></div>
+      </div>
+      <aside class="feed">
+        <div class="feed-h"><span class="d r"></span><span class="d y"></span><span class="d g"></span>&nbsp;SYSTEM // FEED</div>
+        <pre class="feed-body" id="feed"></pre>
+        <canvas class="scope" id="scope"></canvas>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ===================== CONSOLE VIEW ===================== -->
+  <section id="console" class="hidden">
+    <div class="topbar">
+      <div>
+        <h1 id="coName" class="glow" style="font-size:23px"></h1>
+        <p id="coSub" class="sub"></p>
+      </div>
+      <div class="bar" style="margin:0">
+        <span id="health"></span>
+        <button id="stopBtn" class="danger">■ Terminate</button>
+      </div>
+    </div>
+
+    <div class="dossier">
+      <div class="label" style="margin:0 0 10px">// company dossier — derived from seeded data</div>
+      <div id="summary" class="smry"></div>
+      <div id="dcols" class="dcols"></div>
+    </div>
+
+    <div class="label">// live injection consoles</div>
+    <div id="panels" class="panels"></div>
+  </section>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+//============================ matrix rain (subtle) ============================
+(function(){
+  const c=document.getElementById('rain'),x=c.getContext('2d');
+  let cols,drops;const ch="01ｱｲｳｴｵｶｷｸ<>/\\#$%*+=01234567ABCDEF".split('');
+  function size(){c.width=innerWidth;c.height=innerHeight;cols=Math.floor(c.width/16);drops=Array(cols).fill(1);}
+  size();addEventListener('resize',size);
+  function draw(){
+    x.fillStyle='rgba(2,8,4,.14)';x.fillRect(0,0,c.width,c.height);   // shorter trails = calmer
+    x.fillStyle='#1aa055';x.font='15px monospace';                    // dimmer green
+    for(let i=0;i<cols;i++){
+      x.fillText(ch[Math.random()*ch.length|0],i*16,drops[i]*16);
+      if(drops[i]*16>c.height&&Math.random()>.98)drops[i]=0;
+      drops[i]++;
+    }
+  }
+  setInterval(draw,80);
+})();
+
+//============================ brand logos (inline svg, themed) ============================
+const BRAND={
+  github:"M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12",
+  slack:"M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.685 8.834a2.528 2.528 0 0 1-2.521 2.521 2.527 2.527 0 0 1-2.521-2.521V2.522A2.527 2.527 0 0 1 15.164 0a2.528 2.528 0 0 1 2.521 2.522v6.312zM15.164 18.956a2.528 2.528 0 0 1 2.521 2.522A2.528 2.528 0 0 1 15.164 24a2.527 2.527 0 0 1-2.521-2.522v-2.522h2.521zM15.164 17.685a2.527 2.527 0 0 1-2.521-2.52 2.526 2.526 0 0 1 2.521-2.521h6.314A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.52h-6.314z",
+  discord:"M20.317 4.3698a19.7913 19.7913 0 0 0-4.8851-1.5152.0741.0741 0 0 0-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 0 0-.0785-.037 19.7363 19.7363 0 0 0-4.8852 1.515.0699.0699 0 0 0-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 0 0 .0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 0 0 .0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 0 0-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 0 1-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 0 1 .0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 0 1 .0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 0 1-.0066.1276 12.2986 12.2986 0 0 1-1.873.8914.0766.0766 0 0 0-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 0 0 .0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 0 0 .0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 0 0-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z",
+};
+const brandSvg=(p,cls)=>`<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="${BRAND[p]}"/></svg>`;
+
+// per-company line-glyphs (stroke = currentColor), themed to each org's vibe
+const ICONS={
+  seedling:'<path d="M12 22V11"/><path d="M12 14C8 14 5 12 5 8c4 0 7 2 7 6z"/><path d="M12 12c0-3 2.5-5 6-5 0 3-2.5 5-6 5z"/>',
+  tinker:'<path d="M14.5 6.5a4 4 0 0 0-5.2 5.2l-5 5a1.8 1.8 0 1 0 2.5 2.5l5-5a4 4 0 0 0 5.2-5.2l-2.4 2.4-2-2 1.9-2.5z"/>',
+  garage:'<path d="M3 10l9-6 9 6"/><path d="M5 10v10h14V10"/><path d="M9 20v-6h6v6"/>',
+  vertex:'<polyline points="22 7 13 16 9 12 2 19"/><polyline points="16 7 22 7 22 13"/>',
+  quanta:'<circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><ellipse cx="12" cy="12" rx="10" ry="4"/><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(60 12 12)"/><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(120 12 12)"/>',
+  meridian:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c3.6 3.6 3.6 14.4 0 18M12 3c-3.6 3.6-3.6 14.4 0 18"/>',
+  hyperion:'<circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1l2.1-2.1M17 7l2.1-2.1"/>',
+  olympus:'<path d="M3 20l6-11 4 6 2-3 6 8z"/>',
+  atlas:'<path d="M4 21V7l6-3v17"/><path d="M10 21V11l8-2.5V21"/><path d="M3 21h18"/>',
+};
+const coIcon=k=>`<svg class="clogo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[k]||''}</svg>`;
+
+//============================ app ============================
+const $=s=>document.querySelector(s), api=(p,o)=>fetch(p,o).then(r=>r.json());
+let selected=null, statePoll=null;
+
+function toast(msg,bad){const t=$('#toast');t.textContent=msg;t.className='toast show'+(bad?' bad':'');
+  clearTimeout(t._t);t._t=setTimeout(()=>t.className='toast',2600);}
+
+let COMPANIES={};
+async function loadCompanies(){
+  const {companies}=await api('/api/companies');
+  COMPANIES={};companies.forEach(c=>COMPANIES[c.key]=c);
+  $('#companies').innerHTML=companies.map(c=>`
+    <div class="card" data-key="${c.key}" style="position:relative">
+      <div class="chead">${coIcon(c.key)}<div class="nm">${c.name}</div></div>
+      <div class="stg">${c.stage}</div>
+      <div class="tag">${c.tagline}</div>
+      <div class="meta">${c.headcount} · ${c.span}</div>
+    </div>`).join('');
+  document.querySelectorAll('.card').forEach(el=>el.onclick=()=>{
+    document.querySelectorAll('.card').forEach(e=>e.classList.remove('sel'));
+    el.classList.add('sel');selected=el.dataset.key;$('#startBtn').disabled=false;
+    typeFeed(companyBriefing(COMPANIES[selected]));
+  });
+}
+
+$('#startBtn').onclick=async()=>{
+  if(!selected)return;
+  $('#startBtn').disabled=true;$('#bootErr').textContent='';
+  const phases={resetting:'wiping previous state…',seeding:'generating synthetic org…',
+    launching:'bringing mock services online…',stopping:'clearing…'};
+  let polling=setInterval(async()=>{
+    const s=await api('/api/status');
+    $('#phase').textContent=s.busy?('▌ '+(phases[s.phase]||s.phase)):'';
+  },500);
+  const res=await api('/api/start',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({company:selected})});
+  clearInterval(polling);$('#phase').textContent='';
+  if(res.error){$('#bootErr').textContent='ERROR: '+res.error;$('#startBtn').disabled=false;return;}
+  enterConsole();
+};
+
+function enterConsole(){
+  $('#boot').classList.add('hidden');$('#console').classList.remove('hidden');
+  window.scrollTo(0,0);loadState();statePoll=setInterval(refreshStatus,4000);
+}
+function exitConsole(){
+  clearInterval(statePoll);$('#console').classList.add('hidden');$('#boot').classList.remove('hidden');
+  selected=null;$('#startBtn').disabled=true;document.querySelectorAll('.card').forEach(e=>e.classList.remove('sel'));
+  typeFeed(WELCOME);
+}
+
+$('#stopBtn').onclick=async()=>{
+  $('#stopBtn').disabled=true;
+  await api('/api/stop',{method:'POST'});
+  $('#stopBtn').disabled=false;exitConsole();toast('Terminated · state wiped');
+};
+
+let CACHE={people:[],channels:{},repos:[]};
+
+async function loadState(){
+  const s=await api('/api/state');
+  if(!s.running){exitConsole();return;}
+  CACHE.people=s.people;CACHE.channels=s.channels;CACHE.repos=s.repos;
+  const co=s.company,d=s.dossier;
+  $('#coName').textContent=co.name;
+  $('#coSub').textContent=`${co.stage}  ·  ${co.headcount}  ·  ${co.span}  ·  as of ${d.as_of.slice(0,10)}`;
+  $('#summary').innerHTML=esc(d.summary);
+  $('#dcols').innerHTML=`
+    ${col('Trying to achieve',[d.goal].concat((d.projects.in_progress||[]).map(p=>`${p.title} — ${p.owner_name||p.owner||'?'}`)))}
+    ${col('Achieved',(d.achieved.shipped_projects.length?d.achieved.shipped_projects:['—']).concat(
+        [`${d.achieved.merged_prs} PRs merged`,`${d.achieved.closed_issues} issues closed`]))}
+    ${col('Still to do',(d.remaining.in_progress_projects.concat(d.remaining.planned_projects).slice(0,6))
+        .concat([`${d.remaining.open_prs} PRs open`]))}
+    ${col('Obstacles',(d.obstacles.items.length?d.obstacles.items:['none recorded']),true)}
+    ${teamsCol(d.teams)}`;
+  renderPanels(s.status);
+}
+
+function col(title,items,ob){
+  return `<div><h4>${title}</h4><ul>${items.map(i=>`<li class="${ob?'ob':''}">${esc(i)}</li>`).join('')}</ul></div>`;
+}
+function teamsCol(teams){
+  return `<div><h4>Teams</h4><div>${teams.map(t=>`<span class="pill">${esc(t.name)} · ${t.headcount}</span>`).join('')}</div></div>`;
+}
+
+const PROVIDERS=[
+  {id:'slack',label:'SLACK',icon:'#'},
+  {id:'discord',label:'DISCORD',icon:'#'},
+  {id:'github',label:'GITHUB',icon:'◇'},
+];
+
+function renderPanels(status){
+  $('#panels').innerHTML=PROVIDERS.map(p=>{
+    const targets=p.id==='github'?CACHE.repos:(CACHE.channels[p.id]||[]);
+    const tgtLabel=p.id==='github'?'repository':'channel';
+    return `
+    <div class="panel" data-prov="${p.id}">
+      ${brandSvg(p.id,'wm')}
+      <div class="pbody">
+        <h3>${brandSvg(p.id,'brand')} ${p.label}</h3>
+        <div class="stat" id="stat-${p.id}">${statHTML(p.id,status[p.id])}</div>
+        <div class="field">Impersonate actor</div>
+        <select class="who" data-prov="${p.id}">${peopleOpts()}</select>
+        <div class="field">${tgtLabel}</div>
+        <select class="tgt" data-prov="${p.id}">${targets.map(t=>`<option>${esc(t)}</option>`).join('')||'<option>—</option>'}</select>
+        <div class="field">Suggestions — click to use</div>
+        <div class="sugs" id="sug-${p.id}"></div>
+        <textarea class="msg" data-prov="${p.id}" placeholder="type a message as the selected actor…"></textarea>
+        <div class="row"><button class="ghost send" data-prov="${p.id}">⇪ Inject message</button></div>
+      </div>
+    </div>`;
+  }).join('');
+  document.querySelectorAll('.who').forEach(sel=>sel.onchange=()=>loadSuggestions(sel.dataset.prov));
+  document.querySelectorAll('.send').forEach(b=>b.onclick=()=>doInject(b.dataset.prov));
+  PROVIDERS.forEach(p=>loadSuggestions(p.id));
+}
+
+function statHTML(id,st){
+  if(id==='github') return `
+    <div><b>${st.repos}</b><span>REPOS</span></div><div><b>${st.issues}</b><span>ISSUES</span></div>
+    <div><b>${st.pull_requests}</b><span>PRs</span></div><div><b>${st.commits}</b><span>COMMITS</span></div>`;
+  return `<div><b>${st.messages}</b><span>MESSAGES</span></div><div><b>${st.channels}</b><span>CHANNELS</span></div>`;
+}
+
+function peopleOpts(){
+  return CACHE.people.map(p=>`<option value="${esc(p.handle)}">${esc(p.handle)} — ${esc(p.role||'?')}${p.team?(' · '+esc(p.team)):''}</option>`).join('');
+}
+
+async function loadSuggestions(prov){
+  const who=document.querySelector(`.who[data-prov="${prov}"]`);
+  if(!who||!who.value)return;
+  const {suggestions}=await api(`/api/suggest?handle=${encodeURIComponent(who.value)}&provider=${prov}`);
+  const box=$(`#sug-${prov}`);
+  box.innerHTML=(suggestions||[]).map(s=>`<span class="sug">${esc(s)}</span>`).join('');
+  box.querySelectorAll('.sug').forEach(el=>el.onclick=()=>{
+    document.querySelector(`.msg[data-prov="${prov}"]`).value=el.textContent;
+  });
+}
+
+async function doInject(prov){
+  const who=document.querySelector(`.who[data-prov="${prov}"]`).value;
+  const tgt=document.querySelector(`.tgt[data-prov="${prov}"]`).value;
+  const msg=document.querySelector(`.msg[data-prov="${prov}"]`).value.trim();
+  if(!msg){toast('message is empty',true);return;}
+  const body={provider:prov,handle:who,text:msg};
+  if(prov==='github')body.repo=tgt;else body.channel=tgt;
+  const res=await api('/api/inject',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(res.error){toast('ERR: '+res.error,true);return;}
+  document.querySelector(`.msg[data-prov="${prov}"]`).value='';
+  toast(`✓ injected as ${who} → ${prov}`);
+  refreshStatus();
+}
+
+async function refreshStatus(){
+  const s=await api('/api/state');
+  if(!s.running){exitConsole();return;}
+  PROVIDERS.forEach(p=>{const el=$(`#stat-${p.id}`);if(el)el.innerHTML=statHTML(p.id,s.status[p.id]);});
+  const sv=await api('/api/status');
+  $('#health').innerHTML=Object.entries(sv.servers).map(([k,v])=>`<span class="dot ${v==='up'?'up':'down'}"></span>${k}:${sv.ports[k]}`).join('&nbsp;&nbsp;');
+}
+
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+//============================ system feed (typewriter, 1 cancelable timer) ============================
+const WELCOME=[
+  {t:"spammer@matrix:~$ welcome",c:"pmpt"},
+  {t:"",c:""},
+  {t:"wire-faithful slack · github · discord",c:"ok"},
+  {t:"deterministic synthetic org generator",c:"ok"},
+  {t:"",c:""},
+  {t:"9 organization profiles loaded",c:"ok"},
+  {t:"↳ select a target for its dossier",c:"pmpt"},
+];
+function companyBriefing(c){
+  return [
+    {t:"> TARGET ACQUIRED",c:"pmpt"},
+    {t:"",c:""},
+    {t:c.name,c:"ok"},
+    {t:"class ...... "+c.stage.toLowerCase(),c:""},
+    {t:"profile .... "+c.size+" / "+c.runtime,c:""},
+    {t:"headcount .. "+c.headcount,c:""},
+    {t:"history .... "+c.span,c:""},
+    {t:"",c:""},
+    {t:"“"+c.tagline+"”",c:"wn"},
+    {t:"",c:""},
+    {t:"► Initialize to deploy",c:"pmpt"},
+  ];
+}
+let _feedGen=0;
+function typeFeed(lines){
+  const el=$('#feed');if(!el)return;
+  const gen=++_feedGen;                 // supersedes any running typer
+  let li=0,ci=0,buf="";
+  const CUR='<span class="cursor">▋</span>';
+  (function step(){
+    if(gen!==_feedGen)return;            // a newer typeFeed took over
+    if(li>=lines.length){el.innerHTML=buf+CUR;return;}
+    const line=lines[li];
+    if(ci<line.t.length){ci++;
+      el.innerHTML=buf+`<span class="${line.c}">${esc(line.t.slice(0,ci))}</span>`+CUR;
+      setTimeout(step,14+Math.random()*22);
+    }else{
+      buf+=`<span class="${line.c}">${esc(line.t)}</span>\n`;li++;ci=0;
+      setTimeout(step,line.t?150:70);
+    }
+  })();
+}
+
+//============================ signal scope (fills the feed, ~18fps, pauses off-screen) ============================
+function startScope(){
+  const cv=$('#scope');if(!cv)return;const x=cv.getContext('2d');
+  let W=0,H=0,t=0,dpr=Math.min(devicePixelRatio||1,2);
+  function size(){const r=cv.getBoundingClientRect();if(!r.width)return;
+    W=cv.width=r.width*dpr|0;H=cv.height=r.height*dpr|0;}
+  size();addEventListener('resize',size);
+  setInterval(()=>{
+    if(!W){size();return;}
+    if($('#boot').classList.contains('hidden'))return;     // paused on console view
+    x.clearRect(0,0,W,H);
+    x.lineWidth=1;x.strokeStyle='rgba(0,255,102,.08)';      // faint grid
+    const g=22*dpr;
+    for(let gx=(t*dpr)%g;gx<W;gx+=g){x.beginPath();x.moveTo(gx,0);x.lineTo(gx,H);x.stroke();}
+    for(let gy=0;gy<H;gy+=g){x.beginPath();x.moveTo(0,gy);x.lineTo(W,gy);x.stroke();}
+    x.lineWidth=2*dpr;x.strokeStyle='#00ff66';x.shadowColor='#00ff66';x.shadowBlur=8;  // signal
+    x.beginPath();
+    for(let px=0;px<=W;px+=3){
+      const u=px/W;
+      const y=H/2 + Math.sin(u*9+t*0.12)*(H*0.20)*Math.sin(u*2.3+t*0.05)
+              + (Math.random()-0.5)*(H*0.05);
+      px?x.lineTo(px,y):x.moveTo(px,y);
+    }
+    x.stroke();x.shadowBlur=0;
+    t+=1;
+  },55);
+}
+
+(async function(){
+  $('#logos').innerHTML=['github','slack','discord'].map(p=>brandSvg(p,'')).join('');
+  typeFeed(WELCOME);startScope();
+  await loadCompanies();
+  const s=await api('/api/status');
+  if(s.running)enterConsole();
+})();
+</script>
+</body>
+</html>

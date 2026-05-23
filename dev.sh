@@ -145,6 +145,13 @@ cmd_serve() {
     exec "$PY" -m "spammers.$provider" run --port "$port"
 }
 
+cmd_studio() {
+    require_setup; load_env
+    local port="${PORT:-7000}"
+    echo "Spammer Studio on http://localhost:$port  (control + observe the mocks)"
+    exec "$PY" -m spammers.studio --port "$port"
+}
+
 cmd_stop() {
     local port="${PORT:-7001}"
     if command -v fuser >/dev/null 2>&1 && fuser -k "${port}/tcp" 2>/dev/null; then
@@ -177,6 +184,7 @@ dev.sh — setup + task runner for the spammer mocks
   ./dev.sh test [pytest args] Run the Slack fidelity suite
   ./dev.sh prepare            Seed a synthetic org + historical timeline
   ./dev.sh serve [slack|discord|github]  Start a mock (slack:7001, discord:7002, github:7003; \$PORT overrides)
+  ./dev.sh studio             Launch the Studio control UI (http://localhost:7000)
   ./dev.sh stop               Stop the mock (frees port \$PORT, default 7001)
   ./dev.sh token              Print a bot token for curl-ing the mock
   ./dev.sh status             Show run + clock + counts
@@ -195,6 +203,7 @@ case "$cmd" in
     test)    cmd_test "$@" ;;
     prepare) cmd_prepare "$@" ;;
     serve)   cmd_serve "$@" ;;
+    studio)  cmd_studio "$@" ;;
     stop)    cmd_stop ;;
     token)   cmd_token ;;
     status|inject|emit|jump|reset|install)

@@ -1,7 +1,8 @@
 # saas-api-mocks — Architecture & Design
 
-Self-hosted, drop-in replicas of **Slack**, **Discord**, **GitHub**, and **Gmail**
-that a data-ingestion product can point at without changing its ingestion code.
+Self-hosted, drop-in replicas of **Slack**, **Discord**, **GitHub**, **Gmail**,
+**Google Calendar**, and **Notion** that a data-ingestion product can point at
+without changing its ingestion code.
 A single **Director** compiles a deterministic, organization-wide narrative; each
 **mock** projects its slice through wire-accurate REST APIs and signed webhook
 deliveries.
@@ -14,10 +15,11 @@ the real services.*
 > Example environment-variable names below sometimes use the historical prefix
 > `FYRALIS_` — substitute whatever your consumer expects.
 
-> **Status:** Slack is fully implemented. GitHub / Discord / Gmail are designed
-> here but not yet built — their sections describe intended behavior, and the
-> shared infrastructure (schema, signing, rate limiting, pagination, webhook
-> delivery, OrgGen) already supports them.
+> **Status:** Slack, GitHub, Discord, Gmail, Google Calendar, and Notion all
+> have wire-compatible mocks + OrgGen content. Live webhook/push emission is
+> wired for Slack/GitHub/Discord; the Gmail Pub/Sub OIDC push machinery
+> (`/jwks` + signed envelope) is built and verifiable, and Calendar (poll-only)
+> + Notion live webhooks are pending Director emit-loop integration.
 
 ---
 
@@ -88,12 +90,11 @@ the real services.*
                   │   app_discord.* · app_github.* · app_gmail.*  │
                   │   oauth.{installs,codes,states}               │
                   └──────────────────────────────────────────────┘
-   ┌─────────────┬───────────────┬───────────────┬───────────────┐
-slack-mock   discord-mock     github-mock     gmail-mock
-:7001        :7002 (+WS)      :7003           :7004
-(implemented)  (planned)      (implemented)    (planned)
+   ┌──────────┬──────────┬──────────┬──────────┬────────────┬──────────┐
+slack-mock discord    github     gmail      calendar     notion
+:7001      :7002 (+WS) :7003      :7004      :7005        :7006
    │
-   └──── signed webhooks ────►  consumer  /webhooks/{provider}
+   └──── signed webhooks / Pub-Sub push ────►  consumer  /webhooks/{provider}
 ```
 
 ---
@@ -118,8 +119,10 @@ production behavior is unchanged when unset.
 | GitHub — App install | `GITHUB_APP_INSTALL_BASE_URL` | `https://github.com` |
 | Gmail — REST | `GMAIL_API_BASE_URL` | `https://gmail.googleapis.com/gmail/v1` |
 | Directory — REST | `DIRECTORY_API_BASE_URL` | `https://admin.googleapis.com/admin/directory/v1` |
+| Google Calendar — REST | `GOOGLE_CALENDAR_API_BASE_URL` | `https://www.googleapis.com/calendar/v3` |
 | Google — OAuth token | `GOOGLE_OAUTH_TOKEN_URL` | `https://oauth2.googleapis.com/token` |
 | Google — OIDC JWKS | `GOOGLE_OIDC_JWKS_URL` | `https://www.googleapis.com/oauth2/v3/certs` |
+| Notion — REST | `NOTION_API_BASE_URL` | `https://api.notion.com` |
 
 ### 4.2 Inbound (mock → consumer): same secrets, same endpoints
 
@@ -253,17 +256,54 @@ projected for subsequent reads.
 body on exhaustion. (Secondary "abuse" limits + `Retry-After` and
 `Last-Modified`/`If-Modified-Since` are not yet modeled.)
 
-### 5.4 gmail-mock (:7004) — planned
+### 5.4 gmail-mock (:7004) — implemented
 
-**OAuth (domain-wide delegation)**: `POST /token` consumes a service-account JWT
-(RS256), returns a bearer token.
-**Gmail API**: `users/me/watch`, `users/me/stop`, `users/me/history` (paginated),
-`users/me/messages/{id}`, `users/me/threads/{id}`, `users/me/profile`.
-**Directory API**: `users`, `groups`, `orgunits` (paginated).
-**Pub/Sub push**: mock holds an OIDC keypair, publishes a JWKS at `/jwks`, and
-POSTs OIDC-JWT-signed push notifications to the consumer.
-**Rate limits**: 250 quota units/sec/user; `429` / `403` with
-`rateLimitExceeded` / `quotaExceeded` reasons.
+**OAuth (domain-wide delegation)**: `POST /token` decodes the consumer's
+service-account JWT assertion (no signature check — the mock holds no SA key) and
+mints an opaque `ya29.…` bearer that self-encodes the impersonated subject +
+scope (`spammers/common/google_token.py`, shared with the Calendar mock).
+**Gmail API**: `users/{id}/messages` (list, newest-first, label filter) +
+`/messages/{id}` (`format=full|metadata|minimal|raw`), `users/{id}/threads/{id}`,
+`users/{id}/history` (`startHistoryId` drain, paginated), `users/{id}/watch` +
+`/stop`, `users/{id}/profile`. `userId` "me" resolves to the token's subject.
+**Directory API**: `users`, `groups`, `groups/{key}/members`, `orgunits`
+(paginated) — backs mailbox enumeration off `org.people`/`org.teams`.
+**Pub/Sub push (full OIDC fidelity)**: the customer carries an RSA keypair; the
+mock publishes the public half as a JWKS at `/jwks` (+ `/oauth2/v3/certs`) and
+signs the push envelope's `Authorization: Bearer` with an RS256 OIDC JWT
+(`iss=https://accounts.google.com`, `aud`=configured audience, `email`=push SA,
+`email_verified=true`) — verifiable end-to-end against the JWKS. Envelope `data`
+is base64(`{emailAddress, historyId}`). See `spammers/gmail/push.py`.
+Per-mailbox `historyId` is monotonic; messages fan out to every participant's
+mailbox (sender `SENT`, recipients `INBOX`) with RFC-5322 threading headers.
+
+### 5.5 calendar-mock (:7005) — implemented
+
+**OAuth**: shared Google DWD `POST /token`. One calendar per person
+(`calendarId` == the person's email == their primary calendar).
+**Calendar API**: `GET /calendar/v3/calendars/{calendarId}/events` in its three
+modes — full sync (`timeMin`/`timeMax`/`singleEvents`/`orderBy=startTime` with
+`nextPageToken` paging, last page yields `nextSyncToken`), incremental
+(`syncToken` returns only events changed since, `showDeleted` includes
+cancellations), and the reconcile probe (`updatedMin` + `maxResults=1`). An
+unparseable / `EXPIRED` `syncToken` returns **HTTP 410 `fullSyncRequired`**.
+`GET /calendar/v3/users/me/calendarList` for onboarding. Events carry the real
+shape (`start`/`end` `dateTime`+`timeZone`, `organizer`, `attendees[]`,
+`htmlLink`, …). Poll-only in v1 (push/watch reserved).
+
+### 5.6 notion-mock (:7006) — implemented
+
+**Auth**: integration bot token (`Bearer`), API version `2022-06-28` (the
+version the consumer pins — `page`/`database` objects, not the newer
+`data_source`). OAuth install (`/v1/oauth/authorize` auto-approve +
+`/v1/oauth/token`) supported.
+**API**: `POST /v1/search` (filter `value=page|database`, the 1-row sorted
+reconcile probe), `POST /v1/databases/{id}/query` (rows), `GET /v1/databases/{id}`,
+`GET /v1/blocks/{id}/children` (page content blocks), `GET /v1/comments?block_id=`,
+`GET /v1/pages/{id}` (webhook hydration), `GET /v1/users/me` + `/users/{id}`.
+Cursor pagination is opaque (`start_cursor`/`next_cursor`/`has_more`, page size
+≤100). Errors are `{object:"error",status,code,message}`. Content is a small
+workspace: a wiki + per-project databases, pages (rows + loose), blocks, comments.
 
 ---
 
@@ -495,10 +535,13 @@ providers land, each gets the same layers, plus an OrgGen determinism layer
 | slack-mock | OAuth + Web API + Events + tiered rate limits + install walk | ✅ done |
 | Slack test suite | contract + behavior + fidelity layers | ✅ done |
 | github-mock | App install + App-JWT validate + REST reads + signed webhooks + fidelity audit | ✅ done |
-| discord-mock | OAuth + REST + interactions + Gateway WS (the hardest) | ⏳ next |
-| gmail-mock | DwD `/token` + Gmail/Directory REST + Pub/Sub OIDC push | ⏳ planned |
+| discord-mock | OAuth + REST + interactions + Gateway WS (the hardest) | ✅ done |
+| gmail-mock | DwD `/token` + Gmail/Directory REST + Pub/Sub OIDC push (`/jwks` + signed envelope) | ✅ done |
+| calendar-mock | DwD `/token` + events.list (full/incremental/reconcile) + syncToken/410 (poll-only) | ✅ done |
+| notion-mock | Bearer auth + search/query/blocks/comments/pages/users + cursor pagination (v2022-06-28) | ✅ done |
+| Live emit (new) | Director emit-loop wiring for Calendar/Notion/Gmail live paths | ⏳ next |
+| Studio panels | per-provider observe/inject panels for Gmail/Calendar/Notion | ⏳ planned |
 | Cross-app refs | weave references across providers in OrgGen | ⏳ planned |
-| Profiles fill-out | medium + large dials; load characterization | ⏳ planned |
 
 ---
 

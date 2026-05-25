@@ -66,7 +66,7 @@ The resolved connection string is written to `.env` and reused by every command.
 | `./dev.sh setup` | Build everything: venv, dependencies, database. Run once. |
 | `./dev.sh test [pytest args]` | Run the fidelity test suite (spins up its own throwaway test DB). |
 | `./dev.sh prepare` | Create a run and generate the synthetic org + historical timeline. |
-| `./dev.sh serve` | Start the Slack mock (port `$PORT`, default 7001). |
+| `./dev.sh serve [provider]` | Start a mock: `slack`:7001 `discord`:7002 `github`:7003 `gmail`:7004 `calendar`:7005 `notion`:7006 (`$PORT` overrides). |
 | `./dev.sh stop` | Stop the mock / free the port. |
 | `./dev.sh token` | Print a bot token you can use to call the mock. |
 | `./dev.sh status` | Show the current run, virtual clock, and counts. |
@@ -250,10 +250,59 @@ live `discord.interaction` events are Ed25519-signed (`X-Signature-Ed25519` /
 
 ### Gmail
 
-Not implemented yet. The database schema and shared infrastructure (signing,
-rate limiting, pagination, webhook delivery, OrgGen) already support it; it
-needs its API surface built out, after which it gets a `serve` target and a
-section here.
+```bash
+./dev.sh serve gmail                 # http://localhost:7004
+```
+
+Domain-wide delegation: the consumer POSTs its service-account JWT assertion to
+`POST /token`; the mock mints an opaque `ya29.…` bearer (it doesn't hold the SA
+key, so it decodes the assertion's `sub`/`scope` rather than verifying it).
+`userId` "me" resolves to that subject. Surface: `users/{id}/messages` (list +
+`/messages/{id}` with `format=full|metadata|minimal|raw`), `threads/{id}`,
+`history` (`startHistoryId` drain), `watch`/`stop`, `profile`, and the Admin
+Directory `users`/`groups`/`members`/`orgunits` (mailbox enumeration).
+
+```bash
+# point the consumer's overrides at the mock:
+export GMAIL_API_BASE_URL=http://localhost:7004/gmail/v1
+export DIRECTORY_API_BASE_URL=http://localhost:7004/admin/directory/v1
+export GOOGLE_OAUTH_TOKEN_URL=http://localhost:7004/token
+export GOOGLE_OIDC_JWKS_URL=http://localhost:7004/jwks
+```
+
+**Pub/Sub push (full OIDC):** the mock serves its OIDC public key at `/jwks` and
+signs push envelopes with an RS256 JWT the consumer verifies against it — so the
+live path works end-to-end. The envelope `data` is base64(`{emailAddress,
+historyId}`); the drain then reads `history` from the bookmark.
+
+### Google Calendar
+
+```bash
+./dev.sh serve calendar              # http://localhost:7005
+export GOOGLE_CALENDAR_API_BASE_URL=http://localhost:7005/calendar/v3
+export GOOGLE_OAUTH_TOKEN_URL=http://localhost:7005/token   # (shared with Gmail)
+```
+
+One calendar per person (`calendarId` = their email = `primary`).
+`GET /calendar/v3/calendars/{calendarId}/events` serves all three sync modes —
+full (`timeMin`/`singleEvents`/`orderBy=startTime` + `nextPageToken`, final page
+yields `nextSyncToken`), incremental (`syncToken` + `showDeleted`), and the
+`updatedMin` reconcile probe. An expired/`EXPIRED` `syncToken` returns **410
+`fullSyncRequired`**. Poll-only (no watch in v1).
+
+### Notion
+
+```bash
+./dev.sh serve notion                # http://localhost:7006
+export NOTION_API_BASE_URL=http://localhost:7006
+```
+
+API version `2022-06-28`, integration bot token (`Authorization: Bearer …`).
+Backfill tree-walk: `POST /v1/search` (filter `value=page|database`) →
+`POST /v1/databases/{id}/query` → `GET /v1/blocks/{id}/children` →
+`GET /v1/comments?block_id=`; webhook hydration via `GET /v1/pages/{id}`; bot
+identity at `GET /v1/users/me`. Opaque cursor pagination
+(`start_cursor`/`next_cursor`/`has_more`).
 
 ---
 

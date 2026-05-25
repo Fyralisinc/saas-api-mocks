@@ -26,11 +26,15 @@ class ProfileSpec:
 
     daily_events: int                  # total events/day across all four apps
 
-    # Per-app share of daily events (sum to 1.0)
+    # Per-app share of daily events. These are independent rate multipliers
+    # (each provider generates ``int(daily_events * its_share)`` events/day), not
+    # a partition — adding a provider raises total volume rather than reslicing.
     slack_share: float = 0.50
     github_share: float = 0.15
     gmail_share: float = 0.25
     discord_share: float = 0.10
+    calendar_share: float = 0.12
+    notion_share: float = 0.15
 
     @property
     def duration(self) -> timedelta:

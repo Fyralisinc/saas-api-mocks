@@ -7,14 +7,18 @@ over the mocks' REST APIs immediately (no emission loop needed).
 from __future__ import annotations
 
 import json
+import os
 import random
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from uuid import UUID, uuid4
 
 import asyncpg
 
-from spammers.common.ids import slack_ts, discord_snowflake
+from spammers.common.ids import (
+    slack_ts, discord_snowflake, gcal_event_id, gcal_ical_uid,
+    gmail_message_id, gmail_thread_id, notion_id,
+)
 from spammers.orggen.live import inject_github_event
 
 
@@ -70,7 +74,44 @@ async def provider_status(pool: asyncpg.Pool, run_id: UUID) -> dict:
                 github["pull_requests"] = await pool.fetchval("SELECT count(*) FROM app_github.pull_requests WHERE repo_pk=ANY($1)", ids)
                 github["commits"] = await pool.fetchval("SELECT count(*) FROM app_github.commits WHERE repo_pk=ANY($1)", ids)
 
-    return {"people": people, "teams": teams, "slack": slack, "discord": discord, "github": github}
+    # Google Calendar
+    cal_acct = await pool.fetchrow("SELECT id FROM app_calendar.accounts WHERE run_id=$1", run_id)
+    calendar = {"calendars": 0, "events": 0}
+    if cal_acct:
+        calendar["calendars"] = await pool.fetchval(
+            "SELECT count(*) FROM app_calendar.calendars WHERE account_pk=$1", cal_acct["id"])
+        calendar["events"] = await pool.fetchval(
+            "SELECT count(*) FROM app_calendar.events e JOIN app_calendar.calendars c ON c.id=e.calendar_pk "
+            "WHERE c.account_pk=$1", cal_acct["id"])
+
+    # Notion
+    integ = await pool.fetchrow("SELECT id FROM app_notion.integrations WHERE run_id=$1", run_id)
+    notion = {"databases": 0, "pages": 0, "comments": 0}
+    if integ:
+        notion["databases"] = await pool.fetchval(
+            "SELECT count(*) FROM app_notion.databases WHERE integration_pk=$1", integ["id"])
+        notion["pages"] = await pool.fetchval(
+            "SELECT count(*) FROM app_notion.pages WHERE integration_pk=$1", integ["id"])
+        notion["comments"] = await pool.fetchval(
+            "SELECT count(*) FROM app_notion.comments c JOIN app_notion.pages p ON p.id=c.page_pk "
+            "WHERE p.integration_pk=$1", integ["id"])
+
+    # Gmail
+    cust = await pool.fetchrow("SELECT id FROM app_gmail.customers WHERE run_id=$1", run_id)
+    gmail = {"mailboxes": 0, "threads": 0, "messages": 0}
+    if cust:
+        mboxes = await pool.fetch("SELECT id FROM app_gmail.mailboxes WHERE customer_pk=$1", cust["id"])
+        mids = [m["id"] for m in mboxes]
+        gmail["mailboxes"] = len(mids)
+        if mids:
+            gmail["threads"] = await pool.fetchval(
+                "SELECT count(*) FROM app_gmail.threads WHERE mailbox_pk=ANY($1)", mids)
+            gmail["messages"] = await pool.fetchval(
+                "SELECT count(*) FROM app_gmail.messages m JOIN app_gmail.threads t ON t.id=m.thread_pk "
+                "WHERE t.mailbox_pk=ANY($1)", mids)
+
+    return {"people": people, "teams": teams, "slack": slack, "discord": discord,
+            "github": github, "calendar": calendar, "notion": notion, "gmail": gmail}
 
 
 # --------------------------------------------------------------------------- people / channels / repos
@@ -153,6 +194,38 @@ async def suggestions(pool: asyncpg.Pool, run_id: UUID, handle: str, provider: s
             f"{slug} returns stale data after deploy",
             f"Investigate flaky tests in {slug}",
             f"{title}: tracking issue",
+        ]
+
+    if provider == "gmail":
+        # gmail inject sends an email → first line is the subject
+        return [
+            f"Re: {title} rollout plan\n\nLooping you in — can you confirm the timeline?",
+            f"Question about {slug}\n\nQuick one before I ship: is the rollback documented?",
+            f"Notes from the {title} sync\n\nSummarizing the decisions from today.",
+            "Weekly update\n\nOn track for the milestone; fuller writeup to follow.",
+            f"Heads up: {slug} incident\n\nSeeing 5xx on the hot path — digging in now.",
+        ]
+
+    if provider == "calendar":
+        # calendar inject creates an event → text is the title/summary
+        return [
+            f"{title} sync",
+            "Design review",
+            f"{team or 'Team'} weekly",
+            "1:1",
+            "Roadmap check-in",
+            f"Interview — {slug} candidate",
+        ]
+
+    if provider == "notion":
+        # notion inject creates a page → text is the page title
+        return [
+            f"Design doc: {slug}",
+            f"{title} runbook",
+            f"RFC: {slug} rollout",
+            "Weekly sync notes",
+            f"{slug} postmortem",
+            f"Spec: {title} v2",
         ]
 
     if is_sales:
@@ -244,6 +317,94 @@ async def inject_discord(pool: asyncpg.Pool, run_id: UUID, *, handle: str, chann
     return {"provider": "discord", "channel": crow["channel_id"], "message_id": mid, "author": urow["discord_user_id"]}
 
 
+_GH_PEM_PATH = "/tmp/github-app.pem"
+
+
+async def credentials(pool: asyncpg.Pool, run_id: UUID) -> dict:
+    """Everything Fyralis needs to point at this run. Also writes the GitHub
+    private key to a .pem so it can be referenced by path."""
+    creds: dict = {"base_urls": {
+        "slack": "http://localhost:7001/api/",
+        "github": "http://localhost:7003",
+        "discord_rest": "http://localhost:7002/api/v10",
+        "discord_gateway": "ws://localhost:7002/gateway",
+        "gmail": "http://localhost:7004/gmail/v1",
+        "gmail_token": "http://localhost:7004/token",
+        "gmail_jwks": "http://localhost:7004/jwks",
+        "gmail_directory": "http://localhost:7004/admin/directory/v1",
+        "calendar": "http://localhost:7005/calendar/v3",
+        "calendar_token": "http://localhost:7005/token",
+        "notion": "http://localhost:7006",
+    }}
+
+    ws = await pool.fetchrow(
+        "SELECT bot_token, team_id, team_name, signing_secret FROM app_slack.workspaces WHERE run_id=$1", run_id)
+    if ws:
+        creds["slack"] = {
+            "bot_token": ws["bot_token"], "team_id": ws["team_id"], "team_name": ws["team_name"],
+            "signing_secret": ws["signing_secret"],
+            "secret_store_key": f"slack_bot_token:{ws['team_id']}",
+        }
+
+    app = await pool.fetchrow(
+        "SELECT id, app_id, private_key, webhook_secret FROM app_github.apps WHERE run_id=$1", run_id)
+    if app:
+        inst = await pool.fetchrow(
+            "SELECT installation_id FROM app_github.installations WHERE app_pk=$1", app["id"])
+        pem_path: Optional[str] = _GH_PEM_PATH
+        try:
+            pk = app["private_key"]
+            with open(_GH_PEM_PATH, "w") as f:
+                f.write(pk if pk.endswith("\n") else pk + "\n")
+        except OSError:
+            pem_path = None
+        creds["github"] = {
+            "app_id": app["app_id"],
+            "installation_id": inst["installation_id"] if inst else None,
+            "webhook_secret": app["webhook_secret"],
+            "private_key_path": pem_path,
+            "private_key": app["private_key"],
+        }
+
+    dapp = await pool.fetchrow(
+        "SELECT id, application_id, bot_token, public_key FROM app_discord.applications WHERE run_id=$1", run_id)
+    if dapp:
+        g = await pool.fetchrow("SELECT guild_id FROM app_discord.guilds WHERE application_pk=$1", dapp["id"])
+        creds["discord"] = {
+            "bot_token": dapp["bot_token"], "application_id": dapp["application_id"],
+            "guild_id": g["guild_id"] if g else None, "public_key": dapp["public_key"],
+        }
+
+    # Gmail (DWD): the mock doesn't verify the SA signature, so any fake SA JSON
+    # works as long as its token_uri points at gmail_token. For the Pub/Sub push,
+    # point GOOGLE_OIDC_JWKS_URL at gmail_jwks and use the audience + push SA below.
+    cust = await pool.fetchrow(
+        "SELECT customer_id, domain, service_account_email, pubsub_audience FROM app_gmail.customers WHERE run_id=$1",
+        run_id)
+    if cust:
+        creds["gmail"] = {
+            "customer_id": cust["customer_id"], "domain": cust["domain"],
+            "service_account_email": cust["service_account_email"],
+            "push_audience": cust["pubsub_audience"],
+            "push_sa_email": cust["service_account_email"],
+        }
+        creds["calendar"] = {
+            "customer_id": cust["customer_id"], "domain": cust["domain"],
+            "service_account_email": cust["service_account_email"],
+        }
+
+    notion = await pool.fetchrow(
+        "SELECT bot_token, workspace_id, workspace_name, verification_token FROM app_notion.integrations WHERE run_id=$1",
+        run_id)
+    if notion:
+        creds["notion"] = {
+            "bot_token": notion["bot_token"], "workspace_id": notion["workspace_id"],
+            "workspace_name": notion["workspace_name"],
+            "webhook_verification_token": notion["verification_token"],
+        }
+    return creds
+
+
 async def inject_github(pool: asyncpg.Pool, run_id: UUID, *, handle: str, repo: str, text: str) -> dict:
     """A GitHub 'message' = a newly opened issue (title=text), by the actor."""
     repos = await list_repos(pool, run_id)
@@ -253,3 +414,161 @@ async def inject_github(pool: asyncpg.Pool, run_id: UUID, *, handle: str, repo: 
         repo = repos[0]
     event_id = await inject_github_event(pool, run_id, kind="issues", repo=repo, handle=handle, title=text)
     return {"provider": "github", "repo": repo, "event_id": str(event_id)}
+
+
+# --------------------------------------------------------------------------- new-provider targets
+
+async def list_notion_databases(pool: asyncpg.Pool, run_id: UUID) -> list[str]:
+    integ = await pool.fetchrow("SELECT id FROM app_notion.integrations WHERE run_id=$1", run_id)
+    if not integ:
+        return []
+    rows = await pool.fetch(
+        "SELECT title FROM app_notion.databases WHERE integration_pk=$1 ORDER BY title", integ["id"])
+    return [r["title"] for r in rows]
+
+
+# --------------------------------------------------------------------------- inject: gmail / calendar / notion
+
+async def _person(pool, run_id, handle) -> Optional[dict]:
+    return await pool.fetchrow(
+        "SELECT id, handle, full_name, email FROM org.people WHERE run_id=$1 AND handle=$2",
+        run_id, handle)
+
+
+def _notion_rt(c: str) -> list:
+    return [{"type": "text", "text": {"content": c, "link": None},
+             "annotations": {"bold": False, "italic": False, "strikethrough": False,
+                             "underline": False, "code": False, "color": "default"},
+             "plain_text": c, "href": None}]
+
+
+async def inject_gmail(pool: asyncpg.Pool, run_id: UUID, *, handle: str, recipient: str, text: str) -> dict:
+    """Send a live email from ``handle`` to ``recipient`` — lands in the sender's
+    SENT and the recipient's INBOX, both immediately visible over the REST API."""
+    from email.utils import format_datetime, make_msgid
+    cust = await pool.fetchrow("SELECT id, domain FROM app_gmail.customers WHERE run_id=$1", run_id)
+    if not cust:
+        raise ValueError("no gmail customer for this run")
+    sender = await _person(pool, run_id, handle)
+    if not sender:
+        raise ValueError(f"unknown person: {handle}")
+    recp = await _person(pool, run_id, recipient)
+    if not recp or recp["id"] == sender["id"]:
+        recp = await pool.fetchrow(
+            "SELECT id, handle, full_name, email FROM org.people WHERE run_id=$1 AND id<>$2 LIMIT 1",
+            run_id, sender["id"])
+    if not recp:
+        raise ValueError("need at least two people to send mail")
+    now = datetime.now(timezone.utc)
+    rfc_id = make_msgid(domain=cust["domain"])
+    subject = text.strip().splitlines()[0][:78] if text.strip() else "(no subject)"
+    headers = [
+        {"name": "From", "value": f"{sender['full_name']} <{sender['email']}>"},
+        {"name": "To", "value": recp["email"]},
+        {"name": "Subject", "value": subject},
+        {"name": "Date", "value": format_datetime(now)},
+        {"name": "Message-ID", "value": rfc_id},
+    ]
+    out = {"provider": "gmail", "from": sender["email"], "to": recp["email"], "subject": subject}
+    for email_addr, labels, is_sender in ((sender["email"], ["SENT"], True),
+                                          (recp["email"], ["INBOX", "UNREAD"], False)):
+        mbox = await pool.fetchrow(
+            "SELECT id, history_id FROM app_gmail.mailboxes WHERE customer_pk=$1 AND email=$2",
+            cust["id"], email_addr)
+        if not mbox:
+            continue
+        new_hid = int(mbox["history_id"]) + 1
+        tpk, gtid, gmid = uuid4(), gmail_thread_id(), gmail_message_id()
+        await pool.execute(
+            "INSERT INTO app_gmail.threads (id, mailbox_pk, thread_id, subject, snippet) VALUES ($1,$2,$3,$4,$5)",
+            tpk, mbox["id"], gtid, subject, text[:100])
+        await pool.execute(
+            """INSERT INTO app_gmail.messages
+                (id, thread_pk, message_id, history_id, rfc822_msg_id, label_ids, headers,
+                 snippet, body_plain, body_html, internal_date, size_estimate)
+               VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7::jsonb,$8,$9,'',$10,$11)""",
+            uuid4(), tpk, gmid, new_hid, rfc_id, json.dumps(labels), json.dumps(headers),
+            text[:120].replace("\n", " "), text, now, len(text) + 200)
+        await pool.execute(
+            """INSERT INTO app_gmail.history (mailbox_pk, history_id, history_type, message_id, thread_id, label_ids, occurred_at)
+               VALUES ($1,$2,'messageAdded',$3,$4,$5::jsonb,$6)""",
+            mbox["id"], new_hid, gmid, gtid, json.dumps(labels), now)
+        await pool.execute("UPDATE app_gmail.mailboxes SET history_id=$1 WHERE id=$2", new_hid, mbox["id"])
+        if is_sender:
+            out["message_id"] = gmid
+    return out
+
+
+async def inject_calendar(pool: asyncpg.Pool, run_id: UUID, *, handle: str, attendee: str, text: str) -> dict:
+    """Create a live calendar event on ``handle``'s calendar (summary=text),
+    optionally inviting ``attendee`` — visible immediately + via incremental sync."""
+    organizer = await _person(pool, run_id, handle)
+    if not organizer:
+        raise ValueError(f"unknown person: {handle}")
+    cal = await pool.fetchrow(
+        """SELECT c.id, c.calendar_id FROM app_calendar.calendars c
+             JOIN app_calendar.accounts a ON a.id=c.account_pk
+            WHERE a.run_id=$1 AND c.calendar_id=$2""", run_id, organizer["email"])
+    if not cal:
+        raise ValueError("no calendar for this person")
+    now = datetime.now(timezone.utc)
+    end = now + timedelta(minutes=30)
+    attendees = [{"email": organizer["email"], "displayName": organizer["full_name"],
+                  "organizer": True, "self": True, "responseStatus": "accepted"}]
+    att = await _person(pool, run_id, attendee)
+    if att and att["id"] != organizer["id"]:
+        attendees.append({"email": att["email"], "displayName": att["full_name"],
+                          "responseStatus": "needsAction"})
+    event_id = gcal_event_id()
+    await pool.execute(
+        """INSERT INTO app_calendar.events
+            (id, calendar_pk, event_id, status, summary, description, location,
+             start_time, end_time, all_day, organizer_email, creator_email, attendees,
+             recurring_event_id, event_type, hangout_link, html_link, sequence, ical_uid,
+             created_at, updated_at)
+           VALUES ($1,$2,$3,'confirmed',$4,'','',$5,$6,FALSE,$7,$7,$8::jsonb,
+                   NULL,'default',NULL,$9,0,$10,$11,$11)""",
+        uuid4(), cal["id"], event_id, (text[:200] or "(untitled)"), now, end, organizer["email"],
+        json.dumps(attendees), f"https://www.google.com/calendar/event?eid={event_id}",
+        gcal_ical_uid(), now)
+    return {"provider": "calendar", "calendar": cal["calendar_id"], "event_id": event_id, "summary": text[:200]}
+
+
+async def inject_notion(pool: asyncpg.Pool, run_id: UUID, *, handle: str, database: str, text: str) -> dict:
+    """Create a live Notion page (title=text) in ``database`` — visible via search,
+    database query, and page hydration immediately."""
+    integ = await pool.fetchrow("SELECT id FROM app_notion.integrations WHERE run_id=$1", run_id)
+    if not integ:
+        raise ValueError("no notion integration for this run")
+    db = await pool.fetchrow(
+        "SELECT id, database_id FROM app_notion.databases WHERE integration_pk=$1 AND title=$2",
+        integ["id"], database)
+    if not db:
+        db = await pool.fetchrow(
+            "SELECT id, database_id FROM app_notion.databases WHERE integration_pk=$1 ORDER BY title LIMIT 1",
+            integ["id"])
+    if not db:
+        raise ValueError("no notion database for this run")
+    user_id = notion_id()
+    now = datetime.now(timezone.utc)
+    page_id = notion_id()
+    title = text.strip()[:120] or "Untitled"
+    props = {"Name": {"id": "title", "type": "title", "title": _notion_rt(title)},
+             "Status": {"id": "statU", "type": "select", "select": {"name": "Draft", "color": "default"}}}
+    page_pk = uuid4()
+    await pool.execute(
+        """INSERT INTO app_notion.pages
+            (id, integration_pk, page_id, parent_type, parent_id, database_pk, title, properties,
+             icon, archived, url, created_by, created_time, last_edited_time)
+           VALUES ($1,$2,$3,'database_id',$4,$5,$6,$7::jsonb,NULL,FALSE,$8,$9,$10,$10)""",
+        page_pk, integ["id"], page_id, db["database_id"], db["id"], title, json.dumps(props),
+        f"https://www.notion.so/{page_id.replace('-', '')}", user_id, now)
+    await pool.execute(
+        """INSERT INTO app_notion.blocks
+            (id, page_pk, block_id, parent_block_id, type, content, has_children, position,
+             created_by, created_time, last_edited_time)
+           VALUES ($1,$2,$3,NULL,'paragraph',$4::jsonb,FALSE,0,$5,$6,$6)""",
+        uuid4(), page_pk, notion_id(),
+        json.dumps({"rich_text": _notion_rt("Created via Spammer Studio."), "color": "default"}),
+        user_id, now)
+    return {"provider": "notion", "database": database, "page_id": page_id, "title": title}

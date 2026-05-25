@@ -21,21 +21,22 @@ class Company:
 
     def as_dict(self) -> dict:
         d = asdict(self)
-        d["headcount"], d["span"] = _PROFILE_HINT[(self.size, self.runtime)]
+        d["headcount"], d["span"], d["est"] = _PROFILE_HINT[(self.size, self.runtime)]
         return d
 
 
-# (size, runtime) -> (approx headcount, human span) — for display only.
+# (size, runtime) -> (approx headcount, human span, est. init time) — display only.
+# Init time grows with daily_events × duration (millions of rows for the big ones).
 _PROFILE_HINT = {
-    ("small", "few_months"): ("~8 people", "~3 months of history"),
-    ("small", "one_year"): ("~12 people", "~1 year of history"),
-    ("small", "few_years"): ("~20 people", "~3 years of history"),
-    ("medium", "few_months"): ("~60 people", "~3 months of history"),
-    ("medium", "one_year"): ("~100 people", "~1 year of history"),
-    ("medium", "few_years"): ("~150 people", "~3 years of history"),
-    ("large", "few_months"): ("~600 people", "~3 months of history"),
-    ("large", "one_year"): ("~1,200 people", "~1 year of history"),
-    ("large", "few_years"): ("~2,000 people", "~3 years of history"),
+    ("small", "few_months"): ("~8 people", "~3 months of history", "~3s"),
+    ("small", "one_year"): ("~12 people", "~1 year of history", "~4s"),
+    ("small", "few_years"): ("~20 people", "~3 years of history", "~6s"),
+    ("medium", "few_months"): ("~60 people", "~3 months of history", "~10s"),
+    ("medium", "one_year"): ("~100 people", "~1 year of history", "~35s"),
+    ("medium", "few_years"): ("~150 people", "~3 years of history", "~3 min"),
+    ("large", "few_months"): ("~600 people", "~3 months of history", "~50s"),
+    ("large", "one_year"): ("~1,200 people", "~1 year of history", "~7 min"),
+    ("large", "few_years"): ("~2,000 people", "~3 years of history", "~30 min"),
 }
 
 

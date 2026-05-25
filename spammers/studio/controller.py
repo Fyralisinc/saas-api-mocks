@@ -27,10 +27,13 @@ from typing import Optional
 from spammers.studio import companies
 
 # provider -> port
-SERVERS = {"slack": 7001, "discord": 7002, "github": 7003}
+SERVERS = {"slack": 7001, "discord": 7002, "github": 7003,
+           "gmail": 7004, "calendar": 7005, "notion": 7006}
 _PY = sys.executable
 _CLI = [_PY, "-m", "spammers.director.cli"]
-_SERVER_MODULE = {"slack": "spammers.slack", "discord": "spammers.discord", "github": "spammers.github"}
+_SERVER_MODULE = {"slack": "spammers.slack", "discord": "spammers.discord",
+                  "github": "spammers.github", "gmail": "spammers.gmail",
+                  "calendar": "spammers.calendar", "notion": "spammers.notion"}
 
 
 @dataclass
@@ -156,9 +159,12 @@ class Controller:
                 await self._run_cli("reset", "--confirm", "yes")
 
                 self.state.phase = "seeding"
+                # Big profiles generate millions of rows — large/few_years can
+                # take ~30 min. Allow up to an hour so it doesn't false-fail.
                 await self._run_cli(
                     "prepare", "--size", comp.size, "--runtime", comp.runtime,
                     "--seed", str(comp.seed), "--tenant-id", str(uuid.uuid4()),
+                    timeout=3600.0,
                 )
 
                 self.state.phase = "launching"

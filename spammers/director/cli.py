@@ -248,7 +248,8 @@ async def _cmd_reset(args: argparse.Namespace) -> int:
         _eprint("pass --confirm yes to actually drop schemas")
         await pool.close()
         return 2
-    schemas = ["timeline", "app_slack", "app_discord", "app_github", "app_gmail", "oauth", "org"]
+    schemas = ["timeline", "app_slack", "app_discord", "app_github", "app_gmail",
+               "app_calendar", "app_notion", "oauth", "org"]
     for s in schemas:
         await pool.execute(f"DROP SCHEMA IF EXISTS {s} CASCADE")
     _eprint(f"dropped schemas: {schemas}")

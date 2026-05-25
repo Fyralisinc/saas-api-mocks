@@ -22,7 +22,9 @@ import asyncpg
 import structlog
 
 from spammers.common.clock import get_clock
-from spammers.common.ids import github_sha
+from spammers.common.ids import (
+    gcal_event_id, gcal_ical_uid, github_sha, gmail_message_id, gmail_thread_id, notion_id,
+)
 from spammers.orggen.profiles import resolve
 from spammers.orggen.render import render
 from spammers.orggen.seed import RunRandom
@@ -381,6 +383,224 @@ async def inject_github_event(
             uuid4(), repo_pk, next_num, title or f"Live issue #{next_num}", login, when, event_id,
         )
 
+    return event_id
+
+
+async def _live_person(pool, run_id: UUID, handle: Optional[str]):
+    if handle is not None:
+        row = await pool.fetchrow(
+            "SELECT id, handle, full_name, email FROM org.people WHERE run_id=$1 AND handle=$2",
+            run_id, handle)
+    else:
+        row = await pool.fetchrow(
+            "SELECT id, handle, full_name, email FROM org.people WHERE run_id=$1 ORDER BY random() LIMIT 1",
+            run_id)
+    if row is None:
+        raise LookupError("no people in this run; did you forget `prepare`?")
+    return row
+
+
+def _notion_rich_text(content: str) -> list:
+    return [{"type": "text", "text": {"content": content, "link": None},
+             "annotations": {"bold": False, "italic": False, "strikethrough": False,
+                             "underline": False, "code": False, "color": "default"},
+             "plain_text": content, "href": None}]
+
+
+async def inject_notion_page(
+    pool: asyncpg.Pool,
+    run_id: UUID,
+    *,
+    handle: Optional[str] = None,
+    database: Optional[str] = None,
+    title: Optional[str] = None,
+    at_virtual: Optional[datetime] = None,
+) -> UUID:
+    """Create a live Notion page in a database + a not-historical ``notion.page``
+    event. The page is projected immediately (REST sees it); the event drives the
+    signed thin webhook the consumer hydrates via GET /v1/pages/{id}."""
+    integ = await pool.fetchrow("SELECT id FROM app_notion.integrations WHERE run_id=$1", run_id)
+    if integ is None:
+        raise LookupError("no notion integration in this run; did you forget `prepare`?")
+    db = await pool.fetchrow(
+        "SELECT id, database_id FROM app_notion.databases WHERE integration_pk=$1 "
+        "AND ($2::text IS NULL OR title=$2) ORDER BY (title=$2) DESC, title LIMIT 1",
+        integ["id"], database)
+    if db is None:
+        raise LookupError("no notion database in this run")
+    person = await _live_person(pool, run_id, handle)
+    clock = await get_clock(pool, run_id)
+    when = at_virtual or (clock.virtual_now + timedelta(seconds=1))
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+
+    page_id = notion_id()
+    ttl = (title or f"Live page @ {when.isoformat()}")[:120]
+    event_id = uuid4()
+    await pool.execute(
+        """INSERT INTO timeline.events
+            (id, run_id, virtual_ts, type, actor_id, payload, cross_refs, is_historical)
+           VALUES ($1,$2,$3,'notion.page',$4,$5::jsonb,'{}'::jsonb,FALSE)""",
+        event_id, run_id, when, person["id"],
+        json.dumps({"object": "page", "page_id": page_id, "event_type": "page.created", "title": ttl}))
+
+    props = {"Name": {"id": "title", "type": "title", "title": _notion_rich_text(ttl)},
+             "Status": {"id": "statU", "type": "select", "select": {"name": "Draft", "color": "default"}}}
+    page_pk = uuid4()
+    await pool.execute(
+        """INSERT INTO app_notion.pages
+            (id, integration_pk, page_id, parent_type, parent_id, database_pk, title, properties,
+             icon, archived, url, created_by, created_time, last_edited_time, timeline_event_id)
+           VALUES ($1,$2,$3,'database_id',$4,$5,$6,$7::jsonb,NULL,FALSE,$8,$9,$10,$10,$11)""",
+        page_pk, integ["id"], page_id, db["database_id"], db["id"], ttl, json.dumps(props),
+        f"https://www.notion.so/{page_id.replace('-', '')}", notion_id(), when, event_id)
+    await pool.execute(
+        """INSERT INTO app_notion.blocks
+            (id, page_pk, block_id, parent_block_id, type, content, has_children, position,
+             created_by, created_time, last_edited_time, timeline_event_id)
+           VALUES ($1,$2,$3,NULL,'paragraph',$4::jsonb,FALSE,0,$5,$6,$6,$7)""",
+        uuid4(), page_pk, notion_id(),
+        json.dumps({"rich_text": _notion_rich_text("Injected live."), "color": "default"}),
+        notion_id(), when, event_id)
+    return event_id
+
+
+async def inject_gmail_message(
+    pool: asyncpg.Pool,
+    run_id: UUID,
+    *,
+    handle: Optional[str] = None,
+    recipient: Optional[str] = None,
+    text: Optional[str] = None,
+    at_virtual: Optional[datetime] = None,
+) -> UUID:
+    """Send a live email (sender SENT + recipient INBOX, history bumped) + a
+    not-historical ``gmail.message`` event carrying the recipient's mailbox +
+    new historyId, which drives the OIDC-signed Pub/Sub push."""
+    from email.utils import format_datetime, make_msgid
+    cust = await pool.fetchrow("SELECT id, domain FROM app_gmail.customers WHERE run_id=$1", run_id)
+    if cust is None:
+        raise LookupError("no gmail customer in this run; did you forget `prepare`?")
+    sender = await _live_person(pool, run_id, handle)
+    if recipient is not None:
+        recp = await pool.fetchrow(
+            "SELECT id, handle, full_name, email FROM org.people WHERE run_id=$1 AND handle=$2",
+            run_id, recipient)
+    else:
+        recp = None
+    if recp is None or recp["id"] == sender["id"]:
+        recp = await pool.fetchrow(
+            "SELECT id, handle, full_name, email FROM org.people WHERE run_id=$1 AND id<>$2 LIMIT 1",
+            run_id, sender["id"])
+    if recp is None:
+        raise LookupError("need at least two people to send mail")
+
+    clock = await get_clock(pool, run_id)
+    when = at_virtual or (clock.virtual_now + timedelta(seconds=1))
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+    rfc_id = make_msgid(domain=cust["domain"])
+    body_txt = text or f"[live] note from {sender['handle']} @ {when.isoformat()}"
+    subject = body_txt.strip().splitlines()[0][:78]
+    headers = [
+        {"name": "From", "value": f"{sender['full_name']} <{sender['email']}>"},
+        {"name": "To", "value": recp["email"]},
+        {"name": "Subject", "value": subject},
+        {"name": "Date", "value": format_datetime(when)},
+        {"name": "Message-ID", "value": rfc_id},
+    ]
+    recipient_hid = 1
+    for email_addr, labels, is_recipient in ((sender["email"], ["SENT"], False),
+                                             (recp["email"], ["INBOX", "UNREAD"], True)):
+        mbox = await pool.fetchrow(
+            "SELECT id, history_id FROM app_gmail.mailboxes WHERE customer_pk=$1 AND email=$2",
+            cust["id"], email_addr)
+        if not mbox:
+            continue
+        new_hid = int(mbox["history_id"]) + 1
+        tpk, gtid, gmid = uuid4(), gmail_thread_id(), gmail_message_id()
+        await pool.execute(
+            "INSERT INTO app_gmail.threads (id, mailbox_pk, thread_id, subject, snippet) "
+            "VALUES ($1,$2,$3,$4,$5)", tpk, mbox["id"], gtid, subject, body_txt[:100])
+        await pool.execute(
+            """INSERT INTO app_gmail.messages
+                (id, thread_pk, message_id, history_id, rfc822_msg_id, label_ids, headers,
+                 snippet, body_plain, body_html, internal_date, size_estimate)
+               VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7::jsonb,$8,$9,'',$10,$11)""",
+            uuid4(), tpk, gmid, new_hid, rfc_id, json.dumps(labels), json.dumps(headers),
+            body_txt[:120].replace("\n", " "), body_txt, when, len(body_txt) + 200)
+        await pool.execute(
+            """INSERT INTO app_gmail.history
+                (mailbox_pk, history_id, history_type, message_id, thread_id, label_ids, occurred_at)
+               VALUES ($1,$2,'messageAdded',$3,$4,$5::jsonb,$6)""",
+            mbox["id"], new_hid, gmid, gtid, json.dumps(labels), when)
+        await pool.execute("UPDATE app_gmail.mailboxes SET history_id=$1 WHERE id=$2", new_hid, mbox["id"])
+        if is_recipient:
+            recipient_hid = new_hid
+
+    event_id = uuid4()
+    await pool.execute(
+        """INSERT INTO timeline.events
+            (id, run_id, virtual_ts, type, actor_id, payload, cross_refs, is_historical)
+           VALUES ($1,$2,$3,'gmail.message',$4,$5::jsonb,'{}'::jsonb,FALSE)""",
+        event_id, run_id, when, sender["id"],
+        json.dumps({"email": recp["email"], "history_id": recipient_hid, "kind": "live"}))
+    return event_id
+
+
+async def inject_calendar_event(
+    pool: asyncpg.Pool,
+    run_id: UUID,
+    *,
+    handle: Optional[str] = None,
+    attendee: Optional[str] = None,
+    text: Optional[str] = None,
+    at_virtual: Optional[datetime] = None,
+) -> UUID:
+    """Create a live calendar event on the actor's calendar. Calendar is
+    poll-only (no push), so this just projects the event with a fresh
+    ``updated_at`` — the consumer's next incremental ``syncToken`` poll sees it.
+    A ``calendar.event`` timeline row is recorded for bookkeeping."""
+    organizer = await _live_person(pool, run_id, handle)
+    cal = await pool.fetchrow(
+        """SELECT c.id, c.calendar_id FROM app_calendar.calendars c
+             JOIN app_calendar.accounts a ON a.id=c.account_pk
+            WHERE a.run_id=$1 AND c.calendar_id=$2""", run_id, organizer["email"])
+    if cal is None:
+        raise LookupError("no calendar for this person; did you forget `prepare`?")
+    clock = await get_clock(pool, run_id)
+    when = at_virtual or (clock.virtual_now + timedelta(seconds=1))
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+    end = when + timedelta(minutes=30)
+    summary = (text or "Live meeting")[:200]
+    attendees = [{"email": organizer["email"], "displayName": organizer["full_name"],
+                  "organizer": True, "self": True, "responseStatus": "accepted"}]
+    if attendee:
+        att = await pool.fetchrow(
+            "SELECT full_name, email FROM org.people WHERE run_id=$1 AND handle=$2", run_id, attendee)
+        if att:
+            attendees.append({"email": att["email"], "displayName": att["full_name"],
+                              "responseStatus": "needsAction"})
+
+    event_id = uuid4()
+    await pool.execute(
+        """INSERT INTO timeline.events
+            (id, run_id, virtual_ts, type, actor_id, payload, cross_refs, is_historical)
+           VALUES ($1,$2,$3,'calendar.event',$4,$5::jsonb,'{}'::jsonb,FALSE)""",
+        event_id, run_id, when, organizer["id"],
+        json.dumps({"summary": summary, "kind": "live"}))
+    gid = gcal_event_id()
+    await pool.execute(
+        """INSERT INTO app_calendar.events
+            (id, calendar_pk, event_id, status, summary, description, location,
+             start_time, end_time, all_day, organizer_email, creator_email, attendees,
+             recurring_event_id, event_type, hangout_link, html_link, sequence, ical_uid,
+             created_at, updated_at, timeline_event_id)
+           VALUES ($1,$2,$3,'confirmed',$4,'','',$5,$6,FALSE,$7,$7,$8::jsonb,
+                   NULL,'default',NULL,$9,0,$10,$11,$11,$12)""",
+        uuid4(), cal["id"], gid, summary, when, end, organizer["email"], json.dumps(attendees),
+        f"https://www.google.com/calendar/event?eid={gid}", gcal_ical_uid(), when, event_id)
     return event_id
 
 

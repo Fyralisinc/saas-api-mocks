@@ -30,9 +30,12 @@ from spammers.director.runs import create_run, get_run, latest_run
 from spammers.orggen.compile import compile_run
 from spammers.orggen.live import (
     LiveEventGenerator,
+    inject_calendar_event,
     inject_discord_interaction,
     inject_discord_message,
+    inject_gmail_message,
     inject_github_event,
+    inject_notion_page,
     inject_slack_message,
 )
 
@@ -114,6 +117,8 @@ async def _cmd_emit(args: argparse.Namespace) -> int:
     slack_events_url = args.slack_events_url or f"{fyralis_base}/webhooks/slack"
     github_events_url = args.github_events_url or f"{fyralis_base}/webhooks/github"
     discord_interactions_url = args.discord_interactions_url or f"{fyralis_base}/webhooks/discord"
+    notion_webhook_url = args.notion_webhook_url or f"{fyralis_base}/webhooks/notion"
+    gmail_pubsub_url = args.gmail_pubsub_url or f"{fyralis_base}/webhooks/gmail/pubsub"
 
     # set live mode at requested speed
     await set_mode(pool, rid, mode="live", speed_multiplier=args.speed)
@@ -126,10 +131,13 @@ async def _cmd_emit(args: argparse.Namespace) -> int:
 
     loop = EmissionLoop(pool, rid, slack_events_url=slack_events_url,
                         github_events_url=github_events_url,
-                        discord_interactions_url=discord_interactions_url)
+                        discord_interactions_url=discord_interactions_url,
+                        notion_webhook_url=notion_webhook_url,
+                        gmail_pubsub_url=gmail_pubsub_url)
     loop.start()
     _eprint(f"emitting → slack:{slack_events_url} github:{github_events_url} "
-            f"discord:{discord_interactions_url} (Ctrl-C to stop)")
+            f"discord:{discord_interactions_url} notion:{notion_webhook_url} "
+            f"gmail:{gmail_pubsub_url} (Ctrl-C to stop)")
 
     live_gen: LiveEventGenerator | None = None
     if args.live_rate > 0:
@@ -172,6 +180,18 @@ async def _cmd_inject(args: argparse.Namespace) -> int:
             event_id = await inject_discord_message(
                 pool, rid, handle=args.handle, channel=args.channel, text=args.text,
             )
+    elif args.provider == "notion":
+        event_id = await inject_notion_page(
+            pool, rid, handle=args.handle, database=args.target, title=args.text,
+        )
+    elif args.provider == "gmail":
+        event_id = await inject_gmail_message(
+            pool, rid, handle=args.handle, recipient=args.target, text=args.text,
+        )
+    elif args.provider == "calendar":
+        event_id = await inject_calendar_event(
+            pool, rid, handle=args.handle, attendee=args.target, text=args.text,
+        )
     else:
         event_id = await inject_slack_message(
             pool, rid,
@@ -295,20 +315,29 @@ def main() -> None:
                         help="defaults to {fyralis_base}/webhooks/github")
     p_emit.add_argument("--discord-interactions-url", default=None,
                         help="defaults to {fyralis_base}/webhooks/discord")
+    p_emit.add_argument("--notion-webhook-url", default=None,
+                        help="defaults to {fyralis_base}/webhooks/notion")
+    p_emit.add_argument("--gmail-pubsub-url", default=None,
+                        help="defaults to {fyralis_base}/webhooks/gmail/pubsub")
     p_emit.add_argument("--live-rate", type=float, default=0.0,
                         help="msgs/minute to generate live (default 0 = none)")
     p_emit.set_defaults(func=_cmd_emit)
 
     p_inj = sub.add_parser("inject", help="inject a one-off live event")
     p_inj.add_argument("--run-id", default=None)
-    p_inj.add_argument("--provider", choices=["slack", "discord", "github"], default="slack")
+    p_inj.add_argument("--provider",
+                       choices=["slack", "discord", "github", "notion", "gmail", "calendar"],
+                       default="slack")
     p_inj.add_argument("--handle", default=None, help="org.people.handle (default: random)")
     p_inj.add_argument("--channel", default="#general", help="slack/discord channel")
     p_inj.add_argument("--kind", choices=["pull_request", "issues", "message", "interaction"],
                        default="pull_request",
                        help="github event kind, or discord message/interaction")
     p_inj.add_argument("--repo", default=None, help="github repo name (default: first)")
-    p_inj.add_argument("--text", default=None, help="slack/discord text / github title")
+    p_inj.add_argument("--target", default=None,
+                       help="notion database / gmail recipient handle / calendar attendee handle")
+    p_inj.add_argument("--text", default=None,
+                       help="slack/discord text · github/notion title · gmail body · calendar summary")
     p_inj.set_defaults(func=_cmd_inject)
 
     p_jump = sub.add_parser("jump", help="advance virtual time")

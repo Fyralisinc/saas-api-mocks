@@ -268,7 +268,10 @@ def pull_request_dto(pr: dict, full_name: str, repo_row: dict | None = None) -> 
     statuses_url = f"{_API}/repos/{full_name}/statuses/{pr['head_sha']}"
     return {
         "id": _num_id(pr["id"]),
-        "node_id": _node_id("PullRequest", num),
+        # node_id must be globally unique like real GitHub's — PR numbers
+        # restart per repo, so key it on the row UUID, not the number, or a
+        # dedup-by-node_id consumer collapses same-numbered PRs across repos.
+        "node_id": _node_id("PullRequest", _num_id(pr["id"])),
         "number": num,
         "state": pr["state"],
         "locked": False,
@@ -328,7 +331,11 @@ def issue_dto(issue: dict, full_name: str, comments: int = 0, *, pull_request: d
     num = issue["number"]
     dto = {
         "id": _num_id(issue["id"]),
-        "node_id": _node_id("Issue", num),
+        # Globally unique node_id (issue numbers restart per repo — keying on
+        # the number collides across repos and a dedup-by-node_id consumer
+        # collapses them). PRs-as-issues pass their PR UUID here, so their
+        # Issue-kind node_id stays distinct from their PullRequest-kind one.
+        "node_id": _node_id("Issue", _num_id(issue["id"])),
         "number": num,
         "state": issue["state"],
         "locked": False,

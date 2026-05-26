@@ -288,3 +288,100 @@ def compile_discord_events(
 
     events.sort(key=lambda e: e.virtual_ts)
     return events
+
+
+_MEETING_DURATIONS = [30, 30, 45, 60, 60, 90]
+
+
+def compile_calendar_events(
+    spec: ProfileSpec,
+    rng: RunRandom,
+    people: Sequence[Person],
+    projects: Sequence[Project],
+    *,
+    virtual_now: datetime,
+) -> list[TimelineEvent]:
+    """Generate Google Calendar events for the entire runtime.
+
+    Each event is a meeting the actor *organizes*; one to a handful of other
+    people are invited as attendees. It lands on the organizer's calendar at
+    projection time. ``actor_id`` is the organizer.
+    """
+    rng_c = rng.sub("calendar")
+    earliest = virtual_now - spec.duration
+    cal_daily = max(1, int(spec.daily_events * spec.calendar_share))
+    events: list[TimelineEvent] = []
+
+    cursor = earliest
+    while cursor < virtual_now:
+        dayofweek = cursor.weekday()
+        n_today = _daily_event_count(rng_c, cal_daily, dayofweek)
+        for _ in range(n_today):
+            organizer = rng_c.choice(people)
+            active_projects = [
+                p for p in projects
+                if p.started_at <= cursor and (p.ended_at is None or p.ended_at >= cursor)
+            ]
+            project = (
+                rng_c.choice(active_projects)
+                if active_projects and rng_c.bool_with_prob(0.5) else None
+            )
+
+            start = _local_business_day(rng_c, cursor, organizer.timezone)
+            if start is None or start > virtual_now:
+                continue
+            duration = rng_c.choice(_MEETING_DURATIONS)
+
+            kind = rng_c.weighted_pick([
+                ("one_on_one", 0.25),
+                ("team_meeting", 0.30),
+                ("project_sync", 0.25),
+                ("interview", 0.10),
+                ("standup", 0.10),
+            ])
+
+            # Invite a plausible set of attendees (always includes the organizer).
+            others = [p for p in people if p.id != organizer.id]
+            if kind == "one_on_one":
+                n_inv = 1
+            elif kind == "interview":
+                n_inv = rng_c.randint(1, 3)
+            elif kind == "standup":
+                n_inv = min(len(others), rng_c.randint(2, 6))
+            else:
+                n_inv = min(len(others), rng_c.randint(2, 5))
+            invited = rng_c.sample(others, n_inv) if others and n_inv else []
+            attendee_ids = [str(organizer.id)] + [str(p.id) for p in invited]
+
+            if kind == "one_on_one" and invited:
+                summary = f"{organizer.full_name.split()[0]} / {invited[0].full_name.split()[0]} 1:1"
+            elif kind == "team_meeting":
+                summary = f"{organizer.team_name} {rng_c.choice(['weekly', 'sync', 'planning', 'retro'])}"
+            elif kind == "project_sync" and project is not None:
+                summary = f"{project.title} sync"
+            elif kind == "interview":
+                summary = f"Interview — {rng_c.choice(['Backend', 'Frontend', 'Platform', 'Data', 'SRE'])} candidate"
+            elif kind == "standup":
+                summary = f"{organizer.team_name} standup"
+            else:
+                summary = rng_c.choice(["Design review", "Roadmap check-in", "Bug triage", "Architecture chat"])
+
+            events.append(TimelineEvent(
+                id=uuid4(),
+                virtual_ts=start,
+                type="calendar.event",
+                actor_id=organizer.id,
+                project_id=project.id if project else None,
+                payload={
+                    "kind": kind,
+                    "summary": summary,
+                    "duration_mins": duration,
+                    "attendee_ids": attendee_ids,
+                    "location": rng_c.choice(["", "", "Zoom", "Meet", "Conf Room A", "Conf Room B"]),
+                },
+                cross_refs={},
+            ))
+        cursor = cursor + timedelta(days=1)
+
+    events.sort(key=lambda e: e.virtual_ts)
+    return events

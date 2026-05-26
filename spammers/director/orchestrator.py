@@ -23,6 +23,8 @@ import structlog
 from spammers.common.clock import get_clock
 from spammers.discord import interactions_out as discord_interactions
 from spammers.github import webhooks as github_webhooks
+from spammers.gmail import webhooks as gmail_webhooks
+from spammers.notion import webhooks as notion_webhooks
 from spammers.slack import events as slack_events
 
 
@@ -38,6 +40,8 @@ class EmissionLoop:
         slack_events_url: Optional[str] = None,
         github_events_url: Optional[str] = None,
         discord_interactions_url: Optional[str] = None,
+        notion_webhook_url: Optional[str] = None,
+        gmail_pubsub_url: Optional[str] = None,
         poll_interval_s: float = 0.5,
         batch_size: int = 20,
     ) -> None:
@@ -46,6 +50,8 @@ class EmissionLoop:
         self._slack_events_url = slack_events_url
         self._github_events_url = github_events_url
         self._discord_interactions_url = discord_interactions_url
+        self._notion_webhook_url = notion_webhook_url
+        self._gmail_pubsub_url = gmail_pubsub_url
         self._poll_interval_s = poll_interval_s
         self._batch_size = batch_size
         self._stop = asyncio.Event()
@@ -90,6 +96,20 @@ class EmissionLoop:
                         run_id=self._run_id,
                         event_id=row["id"],
                         discord_interactions_url=self._discord_interactions_url,
+                    )
+                elif etype == "notion.page" and self._notion_webhook_url:
+                    await notion_webhooks.emit_event(
+                        self._pool,
+                        run_id=self._run_id,
+                        event_id=row["id"],
+                        notion_webhook_url=self._notion_webhook_url,
+                    )
+                elif etype == "gmail.message" and self._gmail_pubsub_url:
+                    await gmail_webhooks.emit_event(
+                        self._pool,
+                        run_id=self._run_id,
+                        event_id=row["id"],
+                        gmail_pubsub_url=self._gmail_pubsub_url,
                     )
                 else:
                     # No emitter registered — mark as emitted to skip

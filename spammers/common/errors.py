@@ -38,6 +38,38 @@ def gmail_error(code: int, message: str, *, reason: str | None = None) -> dict[s
     }
 
 
+def notion_error(status: int, code: str, message: str) -> dict[str, Any]:
+    """Notion returns ``{"object":"error","status":…,"code":"…","message":"…"}``."""
+    return {"object": "error", "status": status, "code": code, "message": message}
+
+
+def google_error(
+    code: int,
+    message: str,
+    *,
+    reason: str | None = None,
+    domain: str = "global",
+    location: str | None = None,
+    location_type: str | None = None,
+) -> dict[str, Any]:
+    """Google's standard error envelope (Calendar / Gmail / Directory share it)."""
+    entry: dict[str, Any] = {"domain": domain, "message": message}
+    if reason:
+        entry["reason"] = reason
+    if location_type:
+        entry["locationType"] = location_type
+    if location:
+        entry["location"] = location
+    return {
+        "error": {
+            "errors": [entry] if reason else [],
+            "code": code,
+            "message": message,
+            "status": _GOOGLE_STATUS.get(code, "INTERNAL"),
+        },
+    }
+
+
 _GOOGLE_STATUS = {
     400: "INVALID_ARGUMENT",
     401: "UNAUTHENTICATED",

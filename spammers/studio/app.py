@@ -49,7 +49,12 @@ app = FastAPI(title="Spammer Studio", lifespan=_lifespan)
 
 @app.get("/")
 async def index():
-    return FileResponse(_STATIC / "index.html")
+    # No-cache so the single-page UI always reflects the latest build (the file
+    # changes as providers/panels are added); avoids stale cached JS.
+    return FileResponse(
+        _STATIC / "index.html",
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
 
 
 @app.get("/api/companies")
@@ -103,10 +108,29 @@ async def api_state():
             "discord": await queries.list_channels(pool, run_id, "discord"),
         }
         repos = await queries.list_repos(pool, run_id)
+        notion_databases = await queries.list_notion_databases(pool, run_id)
         return {
             "running": True, "company": company.as_dict(), "dossier": dossier,
             "status": status, "people": people, "channels": channels, "repos": repos,
+            "notion_databases": notion_databases,
         }
+    except asyncpg.PostgresError as e:
+        return JSONResponse({"error": f"db: {e}"}, status_code=503)
+
+
+@app.get("/api/credentials")
+async def api_credentials():
+    """Current run's tokens/IDs + base URLs, for pointing Fyralis at it."""
+    if not controller.state.running:
+        return {"running": False}
+    pool = _pool_or_none()
+    if pool is None:
+        return JSONResponse({"error": "no db pool"}, status_code=503)
+    run_id = await queries.current_run_id(pool)
+    if run_id is None:
+        return {"running": False}
+    try:
+        return {"running": True, "credentials": await queries.credentials(pool, run_id)}
     except asyncpg.PostgresError as e:
         return JSONResponse({"error": f"db: {e}"}, status_code=503)
 
@@ -146,6 +170,12 @@ async def api_inject(body: dict = Body(...)):
             res = await queries.inject_discord(pool, run_id, handle=handle, channel=body.get("channel", "general"), text=text)
         elif provider == "github":
             res = await queries.inject_github(pool, run_id, handle=handle, repo=body.get("repo", ""), text=text)
+        elif provider == "gmail":
+            res = await queries.inject_gmail(pool, run_id, handle=handle, recipient=body.get("recipient", ""), text=text)
+        elif provider == "calendar":
+            res = await queries.inject_calendar(pool, run_id, handle=handle, attendee=body.get("attendee", ""), text=text)
+        elif provider == "notion":
+            res = await queries.inject_notion(pool, run_id, handle=handle, database=body.get("database", ""), text=text)
         else:
             return JSONResponse({"error": f"unknown provider: {provider}"}, status_code=400)
         return {"ok": True, "injected": res}

@@ -150,6 +150,37 @@ def gmail_rfc822_id(domain: str) -> str:
     return f"<{_rand(_HEX, 16)}@{domain}>"
 
 
+# ---- Google Calendar ----
+
+# Real Google event ids are base32hex (digits + lowercase a-v), 26 chars.
+_BASE32HEX = string.digits + "abcdefghijklmnopqrstuv"
+
+
+def gcal_event_id() -> str:
+    return _rand(_BASE32HEX, 26)
+
+
+def gcal_ical_uid() -> str:
+    return f"{_rand(_HEX, 8)}-{_rand(_HEX, 4)}-{_rand(_HEX, 4)}-{_rand(_HEX, 4)}-{_rand(_HEX, 12)}@google.com"
+
+
+# ---- Notion ----
+
+def notion_id() -> str:
+    """Notion object ids are UUIDv4, rendered dashed (8-4-4-4-12)."""
+    import uuid
+    return str(uuid.uuid4())
+
+
+def notion_token() -> str:
+    """Notion internal-integration token: 'ntn_' + ~46 base62 chars."""
+    return "ntn_" + _rand(_UPPER_ALNUM.lower() + _UPPER_ALNUM, 46)
+
+
+def notion_verification_token() -> str:
+    return "secret_" + _rand(_LOWER_ALNUM + string.ascii_uppercase, 43)
+
+
 # ---- OAuth code/state ----
 
 def oauth_code() -> str:

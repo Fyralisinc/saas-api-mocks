@@ -2,9 +2,11 @@
 
 Owns the lifecycle the UI's START/STOP buttons drive:
 
-  START(company): free ports -> reset DB -> prepare(size,runtime,seed)
-                  -> spawn the three mock servers -> wait healthy.
-  STOP:           kill the three servers -> reset DB.
+  START(company): free ports -> reset DB -> prepare (backfill corpus to as-of)
+                  -> spawn the eight mock servers -> wait healthy
+                  -> start emit (LiveClockTicker + CorpusReplayLoop + EmissionLoop)
+                  so the clock advances and forward-replay events keep landing.
+  STOP:           kill emit -> kill the eight servers -> reset DB.
 
 The mocks resolve "the current run" once at startup, so a new company is
 only served after the servers are (re)spawned — which is exactly what
@@ -61,6 +63,7 @@ class Controller:
     def __init__(self) -> None:
         self.state = State()
         self._procs: dict[str, subprocess.Popen] = {}
+        self._emit_proc: Optional[subprocess.Popen] = None
         self._lock = asyncio.Lock()
 
     # ---- low-level helpers -------------------------------------------------
@@ -140,6 +143,26 @@ class Controller:
         for port in SERVERS.values():
             self._free_port(port)
 
+    def _spawn_emit(self, speed: float) -> None:
+        """Start `spammer emit` in the background. Drives the live clock,
+        the corpus forward-replay, and the webhook emission loop."""
+        self._emit_proc = subprocess.Popen(
+            [*_CLI, "emit", "--speed", str(speed)],
+            env=os.environ.copy(),
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+
+    def _kill_emit(self) -> None:
+        if self._emit_proc is None:
+            return
+        with contextlib.suppress(Exception):
+            self._emit_proc.terminate()
+        with contextlib.suppress(Exception):
+            self._emit_proc.wait(timeout=5)
+        with contextlib.suppress(Exception):
+            self._emit_proc.kill()
+        self._emit_proc = None
+
     # ---- public API --------------------------------------------------------
 
     async def start(self, company_key: str) -> dict:
@@ -155,16 +178,20 @@ class Controller:
             try:
                 # clean slate
                 self.state.phase = "stopping"
+                self._kill_emit()
                 self._kill_servers()
 
                 self.state.phase = "resetting"
                 await self._run_cli("reset", "--confirm", "yes")
 
                 self.state.phase = "seeding"
-                # Corpus backfill — ~22k events across ~18mo of Alpen history.
-                # Generous timeout so a cold DB still completes.
+                # Backfill corpus up to 2025-11-28 — matches dev.sh's default.
+                # That leaves ~11 months of corpus for forward-replay to land
+                # after the mocks come up, so counts visibly tick up in the UI
+                # instead of going straight to "all 34k events landed".
                 await self._run_cli(
                     "prepare", "--tenant-id", str(uuid.uuid4()),
+                    "--as-of", "2025-11-28",
                     timeout=600.0,
                 )
 
@@ -177,6 +204,13 @@ class Controller:
                 if any(v == "down" for v in healthy.values()):
                     raise RuntimeError(f"some servers failed to start: {healthy}")
 
+                # Start emit: clock ticker + corpus forward-replay + webhook
+                # emission. Default speed 60× so ~11mo of remaining corpus
+                # plays out in ~5.5 real-time days — fast enough to see
+                # counts move in the UI, slow enough not to flush the
+                # corpus end before anyone notices.
+                self._spawn_emit(speed=60.0)
+
                 self.state.running = True
                 self.state.phase = "running"
                 return self.state.public()
@@ -184,6 +218,7 @@ class Controller:
                 self.state.error = str(e)
                 self.state.running = False
                 self.state.phase = "idle"
+                self._kill_emit()
                 self._kill_servers()
                 raise
             finally:
@@ -196,6 +231,7 @@ class Controller:
             self.state.busy = True
             self.state.phase = "stopping"
             try:
+                self._kill_emit()
                 self._kill_servers()
                 with contextlib.suppress(Exception):
                     await self._run_cli("reset", "--confirm", "yes")
@@ -216,5 +252,6 @@ class Controller:
             }
 
     def shutdown(self) -> None:
-        """Called on Studio process exit — don't orphan mock servers."""
+        """Called on Studio process exit — don't orphan mock servers or emit."""
+        self._kill_emit()
         self._kill_servers()

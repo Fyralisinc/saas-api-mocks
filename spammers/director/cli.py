@@ -149,6 +149,18 @@ async def _cmd_emit(args: argparse.Namespace) -> int:
             f"discord:{discord_interactions_url} notion:{notion_webhook_url} "
             f"gmail:{gmail_pubsub_url} jira:{jira_webhook_url} (Ctrl-C to stop)")
 
+    # If this is a corpus run, also start the forward-replay loop. It lands
+    # corpus events into provider tables as virtual_now advances past their
+    # `t`, and writes timeline.events rows that the EmissionLoop above
+    # drains as signed webhooks.
+    corpus_loop = None
+    corpus_path = run.get("corpus_path")
+    if corpus_path:
+        from spammers.corpus.replay_loop import CorpusReplayLoop
+        corpus_loop = CorpusReplayLoop(pool, rid, corpus_path)
+        corpus_loop.start()
+        _eprint(f"corpus replay loop active (source: {corpus_path})")
+
     try:
         stop = asyncio.Event()
         try:
@@ -156,6 +168,8 @@ async def _cmd_emit(args: argparse.Namespace) -> int:
         except asyncio.CancelledError:
             pass
     finally:
+        if corpus_loop is not None:
+            await corpus_loop.stop()
         await loop.stop()
         await ticker.stop()
         await set_mode(pool, rid, mode="frozen")

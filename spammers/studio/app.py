@@ -109,10 +109,11 @@ async def api_state():
         }
         repos = await queries.list_repos(pool, run_id)
         notion_databases = await queries.list_notion_databases(pool, run_id)
+        jira_projects = await queries.list_jira_projects(pool, run_id)
         return {
             "running": True, "company": company.as_dict(), "dossier": dossier,
             "status": status, "people": people, "channels": channels, "repos": repos,
-            "notion_databases": notion_databases,
+            "notion_databases": notion_databases, "jira_projects": jira_projects,
         }
     except asyncpg.PostgresError as e:
         return JSONResponse({"error": f"db: {e}"}, status_code=503)
@@ -176,6 +177,10 @@ async def api_inject(body: dict = Body(...)):
             res = await queries.inject_calendar(pool, run_id, handle=handle, attendee=body.get("attendee", ""), text=text)
         elif provider == "notion":
             res = await queries.inject_notion(pool, run_id, handle=handle, database=body.get("database", ""), text=text)
+        elif provider == "drive":
+            res = await queries.inject_drive(pool, run_id, handle=handle, title=text)
+        elif provider == "jira":
+            res = await queries.inject_jira(pool, run_id, handle=handle, project=body.get("project", ""), summary=text)
         else:
             return JSONResponse({"error": f"unknown provider: {provider}"}, status_code=400)
         return {"ok": True, "injected": res}

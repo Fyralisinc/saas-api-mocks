@@ -19,7 +19,11 @@ from spammers.common.ids import (
     slack_ts, discord_snowflake, gcal_event_id, gcal_ical_uid,
     gmail_message_id, gmail_thread_id, notion_id,
 )
-from spammers.orggen.live import inject_github_event
+from spammers.orggen.live import (
+    inject_github_event,
+    inject_drive_file as _inject_drive_file,
+    inject_jira_issue as _inject_jira_issue,
+)
 
 
 # --------------------------------------------------------------------------- run
@@ -110,8 +114,33 @@ async def provider_status(pool: asyncpg.Pool, run_id: UUID) -> dict:
                 "SELECT count(*) FROM app_gmail.messages m JOIN app_gmail.threads t ON t.id=m.thread_pk "
                 "WHERE t.mailbox_pk=ANY($1)", mids)
 
+    # Google Drive
+    dinst = await pool.fetchrow("SELECT id FROM app_drive.installations WHERE run_id=$1", run_id)
+    drive = {"drives": 0, "files": 0, "comments": 0}
+    if dinst:
+        drive["drives"] = await pool.fetchval(
+            "SELECT count(*) FROM app_drive.drives WHERE installation_pk=$1", dinst["id"])
+        drive["files"] = await pool.fetchval(
+            "SELECT count(*) FROM app_drive.files WHERE installation_pk=$1", dinst["id"])
+        drive["comments"] = await pool.fetchval(
+            "SELECT count(*) FROM app_drive.comments c JOIN app_drive.files f ON f.id=c.file_pk "
+            "WHERE f.installation_pk=$1", dinst["id"])
+
+    # Jira
+    jinst = await pool.fetchrow("SELECT id FROM app_jira.installations WHERE run_id=$1", run_id)
+    jira = {"projects": 0, "issues": 0, "comments": 0}
+    if jinst:
+        jira["projects"] = await pool.fetchval(
+            "SELECT count(*) FROM app_jira.projects WHERE installation_pk=$1", jinst["id"])
+        jira["issues"] = await pool.fetchval(
+            "SELECT count(*) FROM app_jira.issues WHERE installation_pk=$1", jinst["id"])
+        jira["comments"] = await pool.fetchval(
+            "SELECT count(*) FROM app_jira.comments c JOIN app_jira.issues i ON i.id=c.issue_pk "
+            "WHERE i.installation_pk=$1", jinst["id"])
+
     return {"people": people, "teams": teams, "slack": slack, "discord": discord,
-            "github": github, "calendar": calendar, "notion": notion, "gmail": gmail}
+            "github": github, "calendar": calendar, "notion": notion, "gmail": gmail,
+            "drive": drive, "jira": jira}
 
 
 # --------------------------------------------------------------------------- people / channels / repos
@@ -228,6 +257,28 @@ async def suggestions(pool: asyncpg.Pool, run_id: UUID, handle: str, provider: s
             f"Spec: {title} v2",
         ]
 
+    if provider == "drive":
+        # drive inject creates a file → text is the file name
+        return [
+            f"{title} design doc",
+            f"{slug} runbook",
+            "Q-planning",
+            "Roadmap",
+            f"{slug} architecture",
+            f"Incident review: {slug}",
+        ]
+
+    if provider == "jira":
+        # jira inject creates an issue → text is the summary
+        return [
+            f"Fix flaky retry in {slug}",
+            f"Investigate {slug} timeout",
+            f"Add pagination to {slug}",
+            f"{slug} crashes on empty payload",
+            f"Improve {slug} error messages",
+            f"Tighten {slug} validation",
+        ]
+
     if is_sales:
         base = [
             "closed the Northwind deal 🎉",
@@ -335,6 +386,9 @@ async def credentials(pool: asyncpg.Pool, run_id: UUID) -> dict:
         "calendar": "http://localhost:7005/calendar/v3",
         "calendar_token": "http://localhost:7005/token",
         "notion": "http://localhost:7006",
+        "drive": "http://localhost:7007/drive/v3",
+        "drive_token": "http://localhost:7007/token",
+        "jira": "http://localhost:7008",
     }}
 
     ws = await pool.fetchrow(
@@ -401,6 +455,28 @@ async def credentials(pool: asyncpg.Pool, run_id: UUID) -> dict:
             "bot_token": notion["bot_token"], "workspace_id": notion["workspace_id"],
             "workspace_name": notion["workspace_name"],
             "webhook_verification_token": notion["verification_token"],
+        }
+
+    # Google Drive (DWD): same posture as Gmail/Calendar — any fake SA JSON whose
+    # token_uri points at drive_token works; the mock doesn't verify the SA sig.
+    drive = await pool.fetchrow(
+        "SELECT customer_id, domain, service_account_email FROM app_drive.installations WHERE run_id=$1",
+        run_id)
+    if drive:
+        creds["drive"] = {
+            "customer_id": drive["customer_id"], "domain": drive["domain"],
+            "service_account_email": drive["service_account_email"],
+        }
+
+    jira = await pool.fetchrow(
+        "SELECT base_url, site_name, cloud_id, account_email, account_id, api_token, webhook_secret "
+        "FROM app_jira.installations WHERE run_id=$1", run_id)
+    if jira:
+        creds["jira"] = {
+            "base_url": jira["base_url"], "site_name": jira["site_name"],
+            "cloud_id": jira["cloud_id"], "account_email": jira["account_email"],
+            "account_id": jira["account_id"], "api_token": jira["api_token"],
+            "webhook_secret": jira["webhook_secret"],
         }
     return creds
 
@@ -572,3 +648,27 @@ async def inject_notion(pool: asyncpg.Pool, run_id: UUID, *, handle: str, databa
         json.dumps({"rich_text": _notion_rt("Created via Spammer Studio."), "color": "default"}),
         user_id, now)
     return {"provider": "notion", "database": database, "page_id": page_id, "title": title}
+
+
+async def list_jira_projects(pool: asyncpg.Pool, run_id: UUID) -> list[str]:
+    inst = await pool.fetchrow("SELECT id FROM app_jira.installations WHERE run_id=$1", run_id)
+    if not inst:
+        return []
+    rows = await pool.fetch(
+        "SELECT key FROM app_jira.projects WHERE installation_pk=$1 ORDER BY key", inst["id"])
+    return [r["key"] for r in rows]
+
+
+async def inject_drive(pool: asyncpg.Pool, run_id: UUID, *, handle: str, title: str) -> dict:
+    """Create a live Drive file (name=text) on ``handle``'s My Drive — visible via
+    files.list + the changes feed immediately; drives the changes-poll live path."""
+    eid = await _inject_drive_file(pool, run_id, handle=handle, title=title)
+    return {"provider": "drive", "file": (title or "")[:120], "event_id": str(eid)}
+
+
+async def inject_jira(pool: asyncpg.Pool, run_id: UUID, *, handle: str, project: str, summary: str) -> dict:
+    """Create a live Jira issue (summary=text) in ``project`` (or the first
+    project) with a status transition — visible via search/jql + drives the
+    signed webhook live path."""
+    eid = await _inject_jira_issue(pool, run_id, handle=handle, project=project or None, summary=summary)
+    return {"provider": "jira", "summary": (summary or "")[:200], "event_id": str(eid)}

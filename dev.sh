@@ -130,6 +130,24 @@ cmd_prepare() {
         --tenant-id="$tid" --fyralis-base=http://localhost:8000 "$@"
 }
 
+cmd_prepare_alpen() {
+    require_setup; load_env
+    local corpus="${ALPEN_CORPUS_PATH:-$HOME/alpen-corpus/build/events.jsonl}"
+    local as_of="${AS_OF:-2025-11-28}"      # default: 18 months back from May 2026
+    if [ ! -f "$corpus" ]; then
+        c_red "corpus file not found: $corpus"
+        c_red "  override with ALPEN_CORPUS_PATH=/abs/path/to/events.jsonl"
+        exit 1
+    fi
+    local tid; tid="$("$PY" -c 'import uuid; print(uuid.uuid4())')"
+    echo "Preparing Alpen Labs corpus run (as-of=$as_of, tenant=$tid)..."
+    echo "  corpus: $corpus"
+    "$SPAMMER" prepare \
+        --size=small --runtime=few_years --seed=43 \
+        --tenant-id="$tid" --fyralis-base=http://localhost:8000 \
+        --corpus="$corpus" --as-of="$as_of" "$@"
+}
+
 cmd_serve() {
     require_setup; load_env
     local provider="${1:-slack}"
@@ -141,7 +159,9 @@ cmd_serve() {
         gmail)    default_port=7004 ;;
         calendar) default_port=7005 ;;
         notion)   default_port=7006 ;;
-        *) c_red "unknown provider: $provider (use slack|discord|github|gmail|calendar|notion)"; exit 1 ;;
+        drive)    default_port=7007 ;;
+        jira)     default_port=7008 ;;
+        *) c_red "unknown provider: $provider (use slack|discord|github|gmail|calendar|notion|drive|jira)"; exit 1 ;;
     esac
     local port="${PORT:-$default_port}"
     echo "$provider mock on http://localhost:$port  (health: /_health)"
@@ -186,9 +206,10 @@ dev.sh — setup + task runner for the spammer mocks
   ./dev.sh setup              Build everything (venv, deps, Postgres, .env). Run once.
   ./dev.sh test [pytest args] Run the Slack fidelity suite
   ./dev.sh prepare            Seed a synthetic org + historical timeline
-  ./dev.sh serve [slack|discord|github|gmail|calendar|notion]
+  ./dev.sh serve [slack|discord|github|gmail|calendar|notion|drive|jira]
                               Start a mock (slack:7001 discord:7002 github:7003
-                              gmail:7004 calendar:7005 notion:7006; \$PORT overrides)
+                              gmail:7004 calendar:7005 notion:7006 drive:7007
+                              jira:7008; \$PORT overrides)
   ./dev.sh studio             Launch the Studio control UI (http://localhost:7000)
   ./dev.sh stop               Stop the mock (frees port \$PORT, default 7001)
   ./dev.sh token              Print a bot token for curl-ing the mock
@@ -207,6 +228,7 @@ case "$cmd" in
     setup)   cmd_setup "$@" ;;
     test)    cmd_test "$@" ;;
     prepare) cmd_prepare "$@" ;;
+    prepare-alpen) cmd_prepare_alpen "$@" ;;
     serve)   cmd_serve "$@" ;;
     studio)  cmd_studio "$@" ;;
     stop)    cmd_stop ;;

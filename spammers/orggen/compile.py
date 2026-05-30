@@ -9,17 +9,21 @@ Idempotent on the run_id: clears and regenerates.
 from __future__ import annotations
 
 import json
-import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Sequence
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import asyncpg
 import structlog
 
 from spammers.common.ids import (
+    det_uuid,
     discord_bot_token,
     discord_snowflake,
+    drive_comment_id,
+    drive_file_id,
+    drive_revision_id,
+    drive_shared_drive_id,
     gcal_event_id,
     gcal_ical_uid,
     gmail_message_id,
@@ -30,9 +34,15 @@ from spammers.common.ids import (
     github_sha,
     github_user_id,
     github_webhook_secret,
+    gmail_rfc822_id,
+    jira_account_id,
+    jira_api_token,
+    jira_cloud_id,
     notion_id,
     notion_token,
     notion_verification_token,
+    rand_hex,
+    seed_ids,
     slack_app_id,
     slack_bot_token,
     slack_channel_id,
@@ -74,6 +84,10 @@ async def compile_run(pool: asyncpg.Pool, run_id: UUID) -> dict:
     seed = int(row["seed"])
 
     rng = RunRandom(seed)
+    # Make all generated object IDs + PKs deterministic for this seed, so a
+    # reseed produces byte-identical IDs and a consumer's external_id dedup is
+    # stable run-to-run (re-ingestion collapses instead of accumulating).
+    seed_ids(seed)
 
     log.info("orggen_start", run_id=str(run_id), size=spec.size, runtime=spec.runtime,
              people=spec.people, daily_events=spec.daily_events)
@@ -126,6 +140,16 @@ async def compile_run(pool: asyncpg.Pool, run_id: UUID) -> dict:
                 conn, run_id, projects, people, rng.sub("gmail"), virtual_now, spec,
             )
 
+            # Google Drive installation + drives + files + comments + revisions.
+            drive_counts = await _generate_drive_content(
+                conn, run_id, projects, people, rng.sub("drive"), virtual_now, spec,
+            )
+
+            # Jira site + projects + issues + changelogs + comments.
+            jira_counts = await _generate_jira_content(
+                conn, run_id, projects, people, rng.sub("jira"), virtual_now, spec,
+            )
+
             # Timeline events + message projections (Slack + Discord + Calendar)
             await _insert_timeline_events(conn, run_id, slack_events, virtual_now)
             await _insert_timeline_events(conn, run_id, discord_events, virtual_now)
@@ -162,6 +186,8 @@ async def compile_run(pool: asyncpg.Pool, run_id: UUID) -> dict:
         **{f"github_{k}": v for k, v in github_counts.items()},
         **{f"notion_{k}": v for k, v in notion_counts.items()},
         **{f"gmail_{k}": v for k, v in gmail_counts.items()},
+        **{f"drive_{k}": v for k, v in drive_counts.items()},
+        **{f"jira_{k}": v for k, v in jira_counts.items()},
     }
 
 
@@ -177,6 +203,8 @@ async def _clear_existing(conn, run_id: UUID) -> None:
     await conn.execute("DELETE FROM app_calendar.accounts WHERE run_id = $1", run_id)
     await conn.execute("DELETE FROM app_notion.integrations WHERE run_id = $1", run_id)
     await conn.execute("DELETE FROM app_gmail.customers WHERE run_id = $1", run_id)
+    await conn.execute("DELETE FROM app_drive.installations WHERE run_id = $1", run_id)
+    await conn.execute("DELETE FROM app_jira.installations WHERE run_id = $1", run_id)
     await conn.execute("DELETE FROM org.projects WHERE run_id = $1", run_id)
     await conn.execute("DELETE FROM org.people WHERE run_id = $1", run_id)
     await conn.execute("DELETE FROM org.teams WHERE run_id = $1", run_id)
@@ -185,7 +213,7 @@ async def _clear_existing(conn, run_id: UUID) -> None:
 async def _insert_teams(conn, run_id: UUID, team_names: Sequence[str]) -> dict[str, UUID]:
     ids: dict[str, UUID] = {}
     for name in team_names:
-        tid = uuid4()
+        tid = det_uuid()
         ids[name] = tid
         await conn.execute(
             "INSERT INTO org.teams(id, run_id, name) VALUES ($1, $2, $3)",
@@ -245,7 +273,7 @@ async def _create_slack_workspace(
     projects: Sequence[Project],
 ) -> tuple[UUID, dict[str, UUID], dict[UUID, UUID]]:
     """Create workspace, channels, users. Returns (workspace_id, name→channel_pk, person_id→user_pk)."""
-    workspace_id = uuid4()
+    workspace_id = det_uuid()
     team_id = slack_team_id()
     await conn.execute(
         """
@@ -263,7 +291,7 @@ async def _create_slack_workspace(
     user_pks: dict[UUID, UUID] = {}
     user_id_str: dict[UUID, str] = {}
     for person in people:
-        uid = uuid4()
+        uid = det_uuid()
         slack_uid = slack_user_id()
         user_pks[person.id] = uid
         user_id_str[person.id] = slack_uid
@@ -312,7 +340,7 @@ async def _create_slack_workspace(
     chan_pks: dict[str, UUID] = {}
     earliest = next((p.started_at for p in people), datetime.now(timezone.utc))
     for name, is_general, purpose in deduped:
-        cid = uuid4()
+        cid = det_uuid()
         chan_pks[name] = cid
         await conn.execute(
             """
@@ -370,7 +398,7 @@ async def _create_github_app(
     account_login = next(iter(seen.values()))[0]
     app_id = github_app_id()
     private_pem, public_pem = generate_rsa_keypair()
-    app_pk = uuid4()
+    app_pk = det_uuid()
     await conn.execute(
         """
         INSERT INTO app_github.apps
@@ -379,7 +407,7 @@ async def _create_github_app(
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12::jsonb)
         """,
         app_pk, run_id, app_id, f"{account_login}-ingest", f"{account_login.title()} Ingest",
-        "Iv1." + secrets.token_hex(8), secrets.token_hex(20), github_webhook_secret(),
+        "Iv1." + rand_hex(8), rand_hex(20), github_webhook_secret(),
         private_pem, public_pem,
         json.dumps({"contents": "read", "metadata": "read", "issues": "read",
                     "pull_requests": "read", "checks": "read"}),
@@ -387,7 +415,7 @@ async def _create_github_app(
                     "pull_request_review", "check_run"]),
     )
 
-    installation_pk = uuid4()
+    installation_pk = det_uuid()
     await conn.execute(
         """
         INSERT INTO app_github.installations
@@ -402,7 +430,7 @@ async def _create_github_app(
     records: list[dict] = []
     rows = []
     for owner, name in seen.values():
-        repo_pk = uuid4()
+        repo_pk = det_uuid()
         rows.append((repo_pk, installation_pk, github_repo_id(), owner, name, False, "main",
                      f"The {name} service.", virtual_now))
         records.append({"id": repo_pk, "owner": owner, "name": name, "full_name": f"{owner}/{name}"})
@@ -455,7 +483,7 @@ async def _generate_github_content(
         return earliest + timedelta(seconds=rng.uniform(0, span))
 
     async def event(virtual_ts: datetime, etype: str, actor_id, payload: dict) -> UUID:
-        eid = uuid4()
+        eid = det_uuid()
         await conn.execute(
             """
             INSERT INTO timeline.events (id, run_id, virtual_ts, type, actor_id, payload, is_historical)
@@ -484,7 +512,7 @@ async def _generate_github_content(
                      parents, additions, deletions)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10)
                 """,
-                uuid4(), repo_pk, sha, rng.choice(_COMMIT_MSGS), author.handle, author.email,
+                det_uuid(), repo_pk, sha, rng.choice(_COMMIT_MSGS), author.handle, author.email,
                 committed, json.dumps(prev[-1:]), adds, dels,
             )
             shas.append(sha)
@@ -508,7 +536,7 @@ async def _generate_github_content(
             head_sha = rng.choice(shas) if shas else github_sha()
             base_sha = rng.choice(shas) if shas else github_sha()
             svc = repo["name"]
-            pr_pk = uuid4()
+            pr_pk = det_uuid()
             ev = await event(created, "github.pull_request", author.id,
                              {"action": "opened", "repo": full, "number": number})
             await conn.execute(
@@ -539,7 +567,7 @@ async def _generate_github_content(
                     INSERT INTO app_github.reviews (id, pr_pk, user_login, state, body, submitted_at, timeline_event_id)
                     VALUES ($1, $2, $3, $4, $5, $6, $7)
                     """,
-                    uuid4(), pr_pk, reviewer.handle, rstate, "LGTM" if rstate == "approved" else "Some comments.",
+                    det_uuid(), pr_pk, reviewer.handle, rstate, "LGTM" if rstate == "approved" else "Some comments.",
                     submitted, rev_ev,
                 )
                 counts["reviews"] += 1
@@ -555,7 +583,7 @@ async def _generate_github_content(
                         (id, repo_pk, name, head_sha, status, conclusion, started_at, completed_at, timeline_event_id)
                     VALUES ($1, $2, $3, $4, 'completed', $5, $6, $7, $8)
                     """,
-                    uuid4(), repo_pk, rng.choice(_CHECK_NAMES), head_sha, concl,
+                    det_uuid(), repo_pk, rng.choice(_CHECK_NAMES), head_sha, concl,
                     started, started + timedelta(minutes=rng.randint(1, 15)), cr_ev,
                 )
                 counts["check_runs"] += 1
@@ -580,7 +608,7 @@ async def _generate_github_content(
                      created_at, updated_at, closed_at, timeline_event_id)
                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb,$10,$11,$12,$13)
                 """,
-                uuid4(), repo_pk, number, _ISSUE_TITLES[number % len(_ISSUE_TITLES)].format(svc=svc),
+                det_uuid(), repo_pk, number, _ISSUE_TITLES[number % len(_ISSUE_TITLES)].format(svc=svc),
                 f"Observed in {svc}.", state, author.handle,
                 json.dumps([]), json.dumps(rng.sample(["bug", "question", "wontfix"], k=rng.randint(0, 1))),
                 created, closed or created, closed, ev,
@@ -598,7 +626,7 @@ async def _generate_github_content(
                         (id, repo_pk, issue_number, user_login, body, created_at, timeline_event_id)
                     VALUES ($1, $2, $3, $4, $5, $6, $7)
                     """,
-                    uuid4(), repo_pk, number, commenter.handle, "Thanks for the report.", cwhen, c_ev,
+                    det_uuid(), repo_pk, number, commenter.handle, "Thanks for the report.", cwhen, c_ev,
                 )
                 counts["issue_comments"] += 1
 
@@ -647,7 +675,7 @@ async def _project_slack_messages(
             ts = _bump_ts(ts)
         seen.add(ts)
         rows.append((
-            uuid4(), chan_pk, user_pk, ts, None, None,
+            det_uuid(), chan_pk, user_pk, ts, None, None,
             e.payload["text"], None, None, 0, json.dumps([]), None, False,
             e.id,
         ))
@@ -678,7 +706,7 @@ async def _create_discord_application(
 
     Returns (channel name→channel_pk, person_id→user_pk).
     """
-    application_pk = uuid4()
+    application_pk = det_uuid()
     application_id = discord_snowflake()
     private_hex, public_hex = generate_ed25519_keypair()
     await conn.execute(
@@ -689,7 +717,7 @@ async def _create_discord_application(
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         """,
         application_pk, run_id, application_id, application_id,
-        secrets.token_hex(16), discord_bot_token(), public_hex, private_hex,
+        rand_hex(16), discord_bot_token(), public_hex, private_hex,
     )
 
     earliest = next((p.started_at for p in people), datetime.now(timezone.utc))
@@ -698,7 +726,7 @@ async def _create_discord_application(
     user_pks: dict[UUID, UUID] = {}
     owner_discord_id: str | None = None
     for person in people:
-        uid = uuid4()
+        uid = det_uuid()
         discord_uid = discord_snowflake()
         user_pks[person.id] = uid
         if owner_discord_id is None:
@@ -714,7 +742,7 @@ async def _create_discord_application(
         )
 
     # Guild
-    guild_pk = uuid4()
+    guild_pk = det_uuid()
     guild_id = discord_snowflake()
     await conn.execute(
         """
@@ -741,7 +769,7 @@ async def _create_discord_application(
         if name in seen:
             continue
         seen.add(name)
-        cid = uuid4()
+        cid = det_uuid()
         chan_pks[name] = cid
         await conn.execute(
             """
@@ -784,7 +812,7 @@ async def _project_discord_messages(
             message_id = str(int(message_id) + 1)
         seen.add(message_id)
         rows.append((
-            uuid4(), chan_pk, message_id, user_pk, e.payload.get("text", "") or "",
+            det_uuid(), chan_pk, message_id, user_pk, e.payload.get("text", "") or "",
             0, e.virtual_ts, e.id,
         ))
 
@@ -815,8 +843,8 @@ async def _create_calendar_account(
     """
     domain = people[0].email.split("@", 1)[1] if people else "example.com"
     private_pem, public_pem = generate_rsa_keypair()
-    sa_id = secrets.token_hex(10)
-    account_pk = uuid4()
+    sa_id = rand_hex(10)
+    account_pk = det_uuid()
     await conn.execute(
         """
         INSERT INTO app_calendar.accounts
@@ -824,7 +852,7 @@ async def _create_calendar_account(
              service_account_client_id, service_account_private_key, service_account_public_key)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         """,
-        account_pk, run_id, "C" + secrets.token_hex(4), domain,
+        account_pk, run_id, "C" + rand_hex(4), domain,
         f"ingest@{domain.split('.')[0]}-ingest.iam.gserviceaccount.com",
         sa_id, private_pem, public_pem,
     )
@@ -832,7 +860,7 @@ async def _create_calendar_account(
     calendar_pks: dict[UUID, UUID] = {}
     rows = []
     for person in people:
-        cal_pk = uuid4()
+        cal_pk = det_uuid()
         calendar_pks[person.id] = cal_pk
         rows.append((cal_pk, account_pk, person.id, person.email,
                      f"{person.full_name}", person.timezone))
@@ -901,7 +929,7 @@ async def _project_calendar_events(
         hangout = f"https://meet.google.com/{gcal_event_id()[:3]}-{gcal_event_id()[:4]}-{gcal_event_id()[:3]}" if location == "Meet" else None
         html_link = f"https://www.google.com/calendar/event?eid={event_id}"
         rows.append((
-            uuid4(), cal_pk, event_id, "confirmed",
+            det_uuid(), cal_pk, event_id, "confirmed",
             e.payload.get("summary", ""), "", location,
             start, end, False,
             organizer.email, organizer.email, json.dumps(attendees),
@@ -971,7 +999,7 @@ async def _generate_notion_content(
 
     workspace_name = (plist[0].email.split("@", 1)[1].split(".")[0].title() + " Workspace") if plist else "Workspace"
     bot_user_id = notion_id()
-    integ_pk = uuid4()
+    integ_pk = det_uuid()
     await conn.execute(
         """
         INSERT INTO app_notion.integrations
@@ -980,7 +1008,7 @@ async def _generate_notion_content(
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         """,
         integ_pk, run_id, notion_token(), notion_id(), workspace_name, bot_user_id,
-        "Ingest Bot", notion_id(), secrets.token_hex(20), notion_verification_token(),
+        "Ingest Bot", notion_id(), rand_hex(20), notion_verification_token(),
     )
 
     # Stable per-person Notion user ids (partial-user references on objects).
@@ -990,7 +1018,7 @@ async def _generate_notion_content(
         return earliest + timedelta(seconds=rng.uniform(0, span))
 
     async def event(virtual_ts: datetime, payload: dict, actor_id) -> UUID:
-        eid = uuid4()
+        eid = det_uuid()
         await conn.execute(
             """
             INSERT INTO timeline.events
@@ -1014,7 +1042,7 @@ async def _generate_notion_content(
     pages_per_db = max(3, int(rng.randint(3, 7) * (span_days / 90.0)))
 
     for db_title, proj in db_specs:
-        db_pk = uuid4()
+        db_pk = det_uuid()
         db_id = notion_id()
         db_created = proj.started_at if proj is not None else earliest
         await conn.execute(
@@ -1038,7 +1066,7 @@ async def _generate_notion_content(
             if edited > virtual_now:
                 edited = virtual_now
             title = rng.choice(_NOTION_DOC_TITLES).format(svc=svc)
-            page_pk = uuid4()
+            page_pk = det_uuid()
             page_id = notion_id()
             user_id = person_users[author.id]
             props = {
@@ -1073,7 +1101,7 @@ async def _generate_notion_content(
                 if kind == "to_do":
                     content["checked"] = rng.bool_with_prob(0.4)
                 brows.append((
-                    uuid4(), page_pk, notion_id(), None, kind, json.dumps(content),
+                    det_uuid(), page_pk, notion_id(), None, kind, json.dumps(content),
                     False, pos, user_id, created, edited, ev,
                 ))
             await conn.executemany(
@@ -1100,7 +1128,7 @@ async def _generate_notion_content(
                          rich_text, created_by, created_time, last_edited_time)
                     VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9)
                     """,
-                    uuid4(), page_pk, notion_id(), notion_id(), page_id,
+                    det_uuid(), page_pk, notion_id(), notion_id(), page_id,
                     json.dumps(_notion_rich_text(rng.choice([
                         "Nice — left a couple of notes.", "Can we add a rollback plan?",
                         "LGTM once the open question is resolved.", "Bumping this for visibility.",
@@ -1139,7 +1167,7 @@ async def _generate_gmail_content(
     threads fanned out to each participant's mailbox (sender SENT, recipients
     INBOX) with RFC-5322 threading headers and a monotonic per-mailbox historyId.
     """
-    from email.utils import format_datetime, make_msgid
+    from email.utils import format_datetime
 
     if not people:
         return {"mailboxes": 0, "threads": 0, "messages": 0}
@@ -1151,7 +1179,7 @@ async def _generate_gmail_content(
 
     sa_priv, sa_pub = generate_rsa_keypair()
     oidc_priv, oidc_pub = generate_rsa_keypair()
-    customer_pk = uuid4()
+    customer_pk = det_uuid()
     await conn.execute(
         """
         INSERT INTO app_gmail.customers
@@ -1159,7 +1187,7 @@ async def _generate_gmail_content(
              service_account_public_key, pubsub_oidc_public_key, pubsub_oidc_private_key, pubsub_audience)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         """,
-        customer_pk, run_id, "C" + secrets.token_hex(4), domain,
+        customer_pk, run_id, "C" + rand_hex(4), domain,
         domain.split(".")[0].title(),
         f"gmail-push@{domain.split('.')[0]}-ingest.iam.gserviceaccount.com",
         sa_pub, oidc_pub, oidc_priv,
@@ -1169,7 +1197,7 @@ async def _generate_gmail_content(
     mailbox_pk: dict[UUID, UUID] = {}
     mbox_rows = []
     for p in plist:
-        mp = uuid4()
+        mp = det_uuid()
         mailbox_pk[p.id] = mp
         mbox_rows.append((mp, customer_pk, p.id, p.email))
     await conn.executemany(
@@ -1200,7 +1228,7 @@ async def _generate_gmail_content(
             pr = rng.choice(active)
             svc = pr.repos[0].split("/")[-1]
         subject = rng.choice(_GMAIL_SUBJECTS).format(svc=svc, team=initiator.team_name)
-        logical_tid = uuid4().hex
+        logical_tid = det_uuid().hex
         counts["threads"] += 1
 
         n_msgs = rng.weighted_pick([(1, 0.4), (2, 0.3), (3, 0.2), (4, 0.1)])
@@ -1212,7 +1240,7 @@ async def _generate_gmail_content(
             when_msg = t0 + timedelta(hours=rng.uniform(0, 72) * mi)
             if when_msg > virtual_now:
                 break
-            rfc_id = make_msgid(domain=domain)
+            rfc_id = gmail_rfc822_id(domain)
             recipients = [q for q in participants if q.id != author.id]
             to_hdr = ", ".join(q.email for q in recipients) or author.email
             body = rng.choice(_GMAIL_BODIES)
@@ -1276,7 +1304,7 @@ async def _generate_gmail_content(
             tkey = (mp, logical_tid)
             tpk = thread_pk_by_key.get(tkey)
             if tpk is None:
-                tpk = uuid4()
+                tpk = det_uuid()
                 thread_pk_by_key[tkey] = tpk
                 gtid = gmail_thread_id()
                 thread_ids[tkey] = gtid
@@ -1284,7 +1312,7 @@ async def _generate_gmail_content(
             gtid = thread_ids[tkey]
             gmid = gmail_message_id()
             msg_rows.append((
-                uuid4(), tpk, gmid, hid, rfc_id, json.dumps(labels), json.dumps(headers),
+                det_uuid(), tpk, gmid, hid, rfc_id, json.dumps(labels), json.dumps(headers),
                 body[:120].replace("\n", " "), body, when_msg, len(body) + 200,
             ))
             hist_rows.append((mp, hid, gmid, gtid, json.dumps(labels), when_msg))
@@ -1299,4 +1327,432 @@ async def _generate_gmail_content(
             len({k for k in thread_pk_by_key if k[0] == mp}), str(cur_hid), mp,
         )
     await _flush()
+    return counts
+
+
+# =============================================================================
+# Google Drive
+# =============================================================================
+
+_DRIVE_MIME = [
+    ("application/vnd.google-apps.document", "doc"),
+    ("application/vnd.google-apps.document", "doc"),
+    ("application/vnd.google-apps.spreadsheet", "sheet"),
+    ("application/vnd.google-apps.presentation", "slides"),
+    ("text/plain", "txt"),
+    ("text/markdown", "md"),
+]
+_FOLDER_MIME = "application/vnd.google-apps.folder"
+_DRIVE_DOC_NAMES = [
+    "{svc} design doc", "{svc} runbook", "Q-planning", "Roadmap", "Meeting notes",
+    "{svc} architecture", "Onboarding guide", "Incident review: {svc}", "Budget",
+    "{svc} metrics", "Spec: {svc} v2", "Retro notes", "Team charter",
+]
+_DRIVE_BODY = [
+    "This document captures the current design and the open questions we still need to resolve.",
+    "Action items from the sync are listed below; owners are tagged inline.",
+    "We agreed to ship behind a flag and ramp gradually over the next two weeks.",
+    "Background: this came out of the incident last week and the follow-up discussion.",
+    "Summary of decisions and the rationale for each, plus links to the relevant tickets.",
+]
+_DRIVE_COMMENTS = [
+    "Left a couple of notes inline.", "Can we add a rollback plan here?",
+    "LGTM once the open question is resolved.", "Bumping this for visibility.",
+]
+
+
+async def _generate_drive_content(
+    conn, run_id: UUID, projects: Sequence[Project], people: Sequence[Person],
+    rng: RunRandom, virtual_now: datetime, spec: ProfileSpec,
+) -> dict:
+    """Seed a Drive installation + per-person My Drives + Shared Drives + files
+    (with comments & revisions), emitting a ``drive.file`` timeline event each.
+
+    ``change_seq`` is assigned in modified_time order across the whole install so
+    the changes feed pages deterministically; the warm-start token (captured at
+    backfill) sits past the last change, so a frozen run has an empty delta.
+    """
+    if not people:
+        return {"drives": 0, "files": 0, "comments": 0, "revisions": 0}
+    domain = people[0].email.split("@", 1)[1]
+    earliest = virtual_now - spec.duration
+    span = max(1.0, (virtual_now - earliest).total_seconds())
+    plist = list(people)
+
+    private_pem, public_pem = generate_rsa_keypair()
+    inst_pk = det_uuid()
+    await conn.execute(
+        """
+        INSERT INTO app_drive.installations
+            (id, run_id, customer_id, domain, service_account_email,
+             service_account_client_id, service_account_private_key, service_account_public_key)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        """,
+        inst_pk, run_id, "C" + rand_hex(4), domain,
+        f"drive-ingest@{domain.split('.')[0]}-ingest.iam.gserviceaccount.com",
+        rand_hex(10), private_pem, public_pem,
+    )
+
+    # Drives: one My Drive per person + a couple of Shared Drives.
+    drive_rows: list[tuple] = []
+    my_drive_pk: dict[UUID, UUID] = {}
+    for p in plist:
+        dpk = det_uuid()
+        my_drive_pk[p.id] = dpk
+        # Internal drive_id is unique per row; kind='my_drive' makes the DTO omit
+        # driveId (real My Drive files carry no driveId).
+        drive_rows.append((dpk, inst_pk, "md-" + rand_hex(8), f"{p.full_name} — My Drive",
+                           "my_drive", p.id, p.email, p.started_at))
+    shared_specs = [("Engineering", None), ("Company Shared", None)]
+    shared_pks: list[UUID] = []
+    for name, _ in shared_specs:
+        spk = det_uuid()
+        shared_pks.append(spk)
+        drive_rows.append((spk, inst_pk, drive_shared_drive_id(), f"{name} Drive",
+                           "shared_drive", None, plist[0].email, earliest))
+    await conn.executemany(
+        """
+        INSERT INTO app_drive.drives
+            (id, installation_pk, drive_id, name, kind, owner_person_id, owner_email, created_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        """,
+        drive_rows,
+    )
+
+    def when() -> datetime:
+        return earliest + timedelta(seconds=rng.uniform(0, span))
+
+    # Build files in memory first so change_seq can be assigned in modified order.
+    pending: list[dict] = []
+    active_projects = [p for p in projects if p.repos] or list(projects)
+
+    def _make_files(drive_pk, owner: Person, count: int, shared: bool):
+        for _ in range(count):
+            mime, kind = rng.choice(_DRIVE_MIME)
+            proj = rng.choice(active_projects) if active_projects else None
+            svc = (proj.repos[0].split("/")[-1] if proj and proj.repos else "core")
+            name = rng.choice(_DRIVE_DOC_NAMES).format(svc=svc)
+            created = when()
+            modified = created + timedelta(hours=rng.uniform(0, 24 * 21))
+            if modified > virtual_now:
+                modified = virtual_now
+            editor = rng.choice(plist)
+            text = rng.choice(_DRIVE_BODY) + " " + rng.choice(_DRIVE_BODY)
+            size = None if mime.startswith("application/vnd.google-apps") else len(text)
+            ext = ".txt" if mime == "text/plain" else ".md" if mime == "text/markdown" else ""
+            # ~1 in 9 files is trashed (some hard-deleted). Trashed files are
+            # EXCLUDED from backfill (files.list q=trashed=false) — faithful to
+            # real Drive — so they don't inflate the backfill; they exist for
+            # realism + the changes-feed/removal path.
+            trashed = rng.bool_with_prob(0.11)
+            hard = trashed and rng.bool_with_prob(0.4)
+            pending.append({
+                "drive_pk": drive_pk, "file_id": drive_file_id(), "name": name + ext,
+                "mime": mime, "version": rng.randint(1, 9), "size": size,
+                "owner": owner, "editor": editor, "text": text,
+                "created": created, "modified": modified, "shared": shared,
+                "starred": rng.bool_with_prob(0.15), "kind": kind,
+                "trashed": trashed, "hard": hard,
+            })
+
+    for p in plist:
+        _make_files(my_drive_pk[p.id], p, rng.randint(3, 7), shared=False)
+    for spk in shared_pks:
+        _make_files(spk, plist[0], rng.randint(8, 16), shared=True)
+
+    # Assign change_seq in modified_time order across the whole installation.
+    pending.sort(key=lambda f: f["modified"])
+    counts = {"drives": len(drive_rows), "files": 0, "trashed": 0, "comments": 0, "revisions": 0}
+    seq = 0
+    for f in pending:
+        seq += 1
+        file_pk = det_uuid()
+        eid = det_uuid()
+        await conn.execute(
+            """
+            INSERT INTO timeline.events (id, run_id, virtual_ts, type, actor_id, payload, is_historical)
+            VALUES ($1, $2, $3, 'drive.file', $4, $5::jsonb, $6)
+            """,
+            eid, run_id, f["modified"], f["editor"].id,
+            json.dumps({"file_id": f["file_id"], "name": f["name"], "mime_type": f["mime"]}),
+            f["modified"] <= virtual_now,
+        )
+        await conn.execute(
+            """
+            INSERT INTO app_drive.files
+                (id, installation_pk, drive_pk, file_id, name, mime_type, version, trashed,
+                 explicitly_trashed, size, web_view_link, owner_email, owner_name,
+                 last_modifying_email, last_modifying_name, parents, shared, starred,
+                 extracted_text, created_time, modified_time, change_seq, timeline_event_id)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::jsonb,$17,$18,$19,$20,$21,$22,$23)
+            """,
+            file_pk, inst_pk, f["drive_pk"], f["file_id"], f["name"], f["mime"], f["version"],
+            f["trashed"], f["hard"],
+            f["size"], f"https://drive.google.com/file/d/{f['file_id']}/view",
+            f["owner"].email, f["owner"].full_name, f["editor"].email, f["editor"].full_name,
+            json.dumps([]), f["shared"], f["starred"], f["text"], f["created"], f["modified"],
+            seq, eid,
+        )
+        counts["files"] += 1
+        if f["trashed"]:
+            counts["trashed"] += 1
+
+        # Revisions — oldest→newest, version count bounded.
+        n_rev = min(int(f["version"]), rng.randint(1, 4))
+        rev_rows = []
+        for ri in range(n_rev):
+            rt = f["created"] + (f["modified"] - f["created"]) * ((ri + 1) / n_rev)
+            rev_rows.append((
+                det_uuid(), file_pk, drive_revision_id(), ri == n_rev - 1, False,
+                f["size"], f["editor"].email, f["editor"].full_name, rt, ri,
+            ))
+        await conn.executemany(
+            """
+            INSERT INTO app_drive.revisions
+                (id, file_pk, revision_id, keep_forever, published, size,
+                 last_modifying_email, last_modifying_name, modified_time, position)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+            """,
+            rev_rows,
+        )
+        counts["revisions"] += len(rev_rows)
+
+        # Comments.
+        for ci in range(rng.randint(0, 2)):
+            commenter = rng.choice(plist)
+            ct = f["modified"] + timedelta(hours=rng.uniform(0, 48))
+            if ct > virtual_now:
+                continue
+            await conn.execute(
+                """
+                INSERT INTO app_drive.comments
+                    (id, file_pk, comment_id, content, author_name, author_email, resolved,
+                     quoted_value, replies, created_time, modified_time, position)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12)
+                """,
+                det_uuid(), file_pk, drive_comment_id(), rng.choice(_DRIVE_COMMENTS),
+                commenter.full_name, commenter.email, rng.bool_with_prob(0.3),
+                None, json.dumps([]), ct, ct, ci,
+            )
+            counts["comments"] += 1
+
+    return counts
+
+
+# =============================================================================
+# Jira
+# =============================================================================
+
+_JIRA_ISSUE_TYPES = ["Story", "Task", "Bug", "Sub-task", "Epic"]
+_JIRA_PRIORITIES = ["Highest", "High", "Medium", "Medium", "Low"]
+_JIRA_STATUSES = [
+    ("To Do", "new"), ("In Progress", "indeterminate"),
+    ("In Review", "indeterminate"), ("Done", "done"),
+]
+_JIRA_SUMMARIES = [
+    "Fix flaky retry in {svc}", "Add pagination to {svc}", "Investigate {svc} timeout",
+    "Document {svc} setup", "Improve {svc} error messages", "{svc} crashes on empty payload",
+    "Add metrics for {svc}", "Refactor {svc} config", "Tighten {svc} validation",
+]
+_JIRA_COMMENTS = [
+    "Picking this up now.", "Blocked on the upstream change — will revisit.",
+    "Pushed a fix, please review.", "Can repro on staging.", "Closing as resolved.",
+]
+_JIRA_DESCS = [
+    "Steps to reproduce are in the linked thread. Expected vs actual is described below.",
+    "We should scope this to the minimal change and add a regression test.",
+    "Context from the planning session: this is a prerequisite for the rollout.",
+]
+
+
+def _jira_adf(text: str) -> dict:
+    return {"type": "doc", "version": 1,
+            "content": [{"type": "paragraph", "content": [{"type": "text", "text": text}]}]}
+
+
+async def _generate_jira_content(
+    conn, run_id: UUID, projects: Sequence[Project], people: Sequence[Person],
+    rng: RunRandom, virtual_now: datetime, spec: ProfileSpec,
+) -> dict:
+    """Seed a Jira site + projects + issues (with changelog histories & comments),
+    emitting a ``jira.issue`` timeline event per issue. Status/resolution changelog
+    items are the state_change signal; ``updated_at`` reflects the latest activity.
+    """
+    if not people:
+        return {"projects": 0, "issues": 0, "transitions": 0, "comments": 0}
+    domain = people[0].email.split("@", 1)[1]
+    site = domain.split(".")[0]
+    base_url = f"https://{site}.atlassian.net"
+    earliest = virtual_now - spec.duration
+    span = max(1.0, (virtual_now - earliest).total_seconds())
+    span_days = max(1, spec.duration.days)
+    plist = list(people)
+
+    lead = plist[0]
+    inst_pk = det_uuid()
+    await conn.execute(
+        """
+        INSERT INTO app_jira.installations
+            (id, run_id, base_url, site_name, cloud_id, account_email, account_id,
+             api_token, webhook_secret)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        """,
+        inst_pk, run_id, base_url, site.title(), jira_cloud_id(),
+        lead.email, jira_account_id(), jira_api_token(), rand_hex(20),
+    )
+
+    # Users: one per person (stable accountId).
+    account_of: dict[UUID, str] = {}
+    user_rows = []
+    for p in plist:
+        acct = jira_account_id()
+        account_of[p.id] = acct
+        user_rows.append((det_uuid(), inst_pk, p.id, acct, p.email, p.full_name))
+    await conn.executemany(
+        "INSERT INTO app_jira.users (id, installation_pk, person_id, account_id, email, display_name) "
+        "VALUES ($1,$2,$3,$4,$5,$6)",
+        user_rows,
+    )
+
+    # Projects: one per org project, unique uppercase key.
+    import re as _re
+    used_keys: set[str] = set()
+
+    def _key_for(slug: str, idx: int) -> str:
+        letters = _re.sub(r"[^A-Za-z]", "", slug).upper()
+        base = (letters[:4] or f"PRJ{idx}")
+        key = base
+        n = 1
+        while key in used_keys:
+            n += 1
+            key = f"{base}{n}"
+        used_keys.add(key)
+        return key
+
+    proj_pks: list[tuple[UUID, str, Project]] = []
+    issue_seq = rng.randint(10000, 20000)
+    for i, proj in enumerate(projects):
+        ppk = det_uuid()
+        key = _key_for(proj.slug, i)
+        await conn.execute(
+            """
+            INSERT INTO app_jira.projects
+                (id, installation_pk, project_id, key, name, project_type_key, lead_account_id)
+            VALUES ($1,$2,$3,$4,$5,'software',$6)
+            """,
+            ppk, inst_pk, str(rng.randint(10000, 99999)), key, proj.title,
+            account_of[lead.id],
+        )
+        proj_pks.append((ppk, key, proj))
+
+    counts = {"projects": len(proj_pks), "issues": 0, "transitions": 0, "comments": 0}
+    pages_factor = max(1.0, span_days / 90.0)
+
+    for ppk, key, proj in proj_pks:
+        svc = (proj.repos[0].split("/")[-1] if proj.repos else proj.slug)
+        n_issues = max(3, int(rng.randint(4, 10) * pages_factor))
+        for n in range(1, n_issues + 1):
+            issue_seq += 1
+            reporter = rng.choice(plist)
+            assignee = rng.choice(plist)
+            created = earliest + timedelta(seconds=rng.uniform(0, span))
+            status, status_cat = rng.choice(_JIRA_STATUSES)
+            resolution = None
+            resolution_date = None
+            if status_cat == "done":
+                resolution = "Done"
+            issue_key = f"{key}-{n}"
+            issue_pk = det_uuid()
+
+            # Changelog histories: 1-3, each a few minutes/hours apart; some carry
+            # a status transition (state_change). updated tracks the latest event.
+            n_hist = rng.randint(1, 3)
+            hist_rows = []
+            last_ts = created
+            prev_status = "To Do"
+            for hi in range(n_hist):
+                htime = created + timedelta(hours=rng.uniform(1, 24 * 10))
+                if htime > virtual_now:
+                    htime = virtual_now
+                author = rng.choice(plist)
+                items = []
+                if hi == n_hist - 1 and status != "To Do":
+                    items.append({
+                        "field": "status", "fieldtype": "jira", "fieldId": "status",
+                        "from": "1", "fromString": prev_status,
+                        "to": "3", "toString": status,
+                    })
+                    counts["transitions"] += 1
+                else:
+                    nxt = rng.choice(["In Progress", "In Review"])
+                    items.append({
+                        "field": "status", "fieldtype": "jira", "fieldId": "status",
+                        "from": "1", "fromString": prev_status, "to": "2", "toString": nxt,
+                    })
+                    prev_status = nxt
+                    counts["transitions"] += 1
+                hist_rows.append((det_uuid(), issue_pk, str(rng.randint(100000, 999999)),
+                                  account_of[author.id], json.dumps(items), htime, hi))
+                last_ts = max(last_ts, htime)
+            if status_cat == "done":
+                resolution_date = last_ts
+
+            # Comments.
+            comment_rows = []
+            for ci in range(rng.randint(0, 3)):
+                ctime = created + timedelta(hours=rng.uniform(1, 24 * 12))
+                if ctime > virtual_now:
+                    continue
+                commenter = rng.choice(plist)
+                comment_rows.append((det_uuid(), issue_pk, str(rng.randint(100000, 999999)),
+                                     account_of[commenter.id],
+                                     json.dumps(_jira_adf(rng.choice(_JIRA_COMMENTS))),
+                                     ctime, ctime, ci))
+                last_ts = max(last_ts, ctime)
+
+            eid = det_uuid()
+            await conn.execute(
+                """
+                INSERT INTO timeline.events (id, run_id, virtual_ts, type, actor_id, payload, is_historical)
+                VALUES ($1, $2, $3, 'jira.issue', $4, $5::jsonb, $6)
+                """,
+                eid, run_id, last_ts, reporter.id,
+                json.dumps({"issue_key": issue_key, "status": status}),
+                last_ts <= virtual_now,
+            )
+            await conn.execute(
+                """
+                INSERT INTO app_jira.issues
+                    (id, installation_pk, project_pk, issue_id, issue_key, summary, description,
+                     issue_type, status, status_category, priority, resolution, resolution_date,
+                     assignee_account_id, reporter_account_id, creator_account_id, labels, components,
+                     story_points, created_at, updated_at, timeline_event_id)
+                VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17::jsonb,$18::jsonb,$19,$20,$21,$22)
+                """,
+                issue_pk, inst_pk, ppk, str(issue_seq), issue_key,
+                rng.choice(_JIRA_SUMMARIES).format(svc=svc),
+                json.dumps(_jira_adf(rng.choice(_JIRA_DESCS))),
+                rng.choice(_JIRA_ISSUE_TYPES), status, status_cat, rng.choice(_JIRA_PRIORITIES),
+                resolution, resolution_date,
+                account_of[assignee.id], account_of[reporter.id], account_of[reporter.id],
+                json.dumps(rng.sample(["backend", "frontend", "infra", "tech-debt"], k=rng.randint(0, 2))),
+                json.dumps([]),
+                float(rng.choice([1, 2, 3, 5, 8])) if rng.bool_with_prob(0.6) else None,
+                created, last_ts, eid,
+            )
+            counts["issues"] += 1
+            if hist_rows:
+                await conn.executemany(
+                    "INSERT INTO app_jira.changelogs (id, issue_pk, history_id, author_account_id, items, created_at, position) "
+                    "VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7)",
+                    hist_rows,
+                )
+            if comment_rows:
+                await conn.executemany(
+                    "INSERT INTO app_jira.comments (id, issue_pk, comment_id, author_account_id, body, created_at, updated_at, position) "
+                    "VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8)",
+                    comment_rows,
+                )
+                counts["comments"] += len(comment_rows)
+
     return counts

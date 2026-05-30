@@ -35,6 +35,8 @@ class ProfileSpec:
     discord_share: float = 0.10
     calendar_share: float = 0.12
     notion_share: float = 0.15
+    drive_share: float = 0.10
+    jira_share: float = 0.18
 
     @property
     def duration(self) -> timedelta:

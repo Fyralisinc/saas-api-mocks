@@ -16,8 +16,10 @@
 """
 from __future__ import annotations
 
+import random
 import secrets
 import string
+import uuid as _uuid
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -27,8 +29,32 @@ _LOWER_ALNUM = string.ascii_lowercase + string.digits
 _HEX = string.hexdigits.lower()[:16]
 
 
+# Module-level RNG for all generated IDs. Random by default (system entropy), so
+# ad-hoc / live-injection calls stay unique. ``compile_run`` calls ``seed_ids``
+# with the run seed, making every backfill object ID (and PK) byte-identical
+# across reseeds of the same seed — so a consumer's dedup key (external_id) is
+# stable run-to-run and re-ingestion collapses instead of accumulating.
+_RNG = random.Random()
+_RNG.seed(secrets.randbits(128))
+
+
+def seed_ids(seed: int) -> None:
+    """Make all subsequent ID generation in this process deterministic."""
+    _RNG.seed(seed)
+
+
+def det_uuid() -> _uuid.UUID:
+    """A v4-shaped UUID drawn from the seeded RNG (deterministic under seed_ids)."""
+    return _uuid.UUID(int=_RNG.getrandbits(128), version=4)
+
+
+def rand_hex(nbytes: int) -> str:
+    """Hex string of ``nbytes`` bytes from the seeded RNG (replaces secrets.token_hex)."""
+    return _rand(_HEX, nbytes * 2)
+
+
 def _rand(charset: str, n: int) -> str:
-    return "".join(secrets.choice(charset) for _ in range(n))
+    return "".join(_RNG.choice(charset) for _ in range(n))
 
 
 # ---- Slack ----
@@ -90,34 +116,34 @@ _DISCORD_EPOCH_MS = 1420070400000  # 2015-01-01T00:00:00Z
 def discord_snowflake(when: Optional[datetime] = None) -> str:
     when = when or datetime.now(timezone.utc)
     ms = int(when.timestamp() * 1000) - _DISCORD_EPOCH_MS
-    rand = secrets.randbits(22)
+    rand = _RNG.getrandbits(22)
     return str((ms << 22) | rand)
+
+
+_B64URL_CHARS = string.ascii_letters + string.digits + "-_"
 
 
 def discord_bot_token() -> str:
     # Real shape: <user_id_b64>.<ts_b64>.<hmac_b64>
-    a = secrets.token_urlsafe(18)[:24]
-    b = secrets.token_urlsafe(4)[:6]
-    c = secrets.token_urlsafe(20)[:27]
-    return f"{a}.{b}.{c}"
+    return f"{_rand(_B64URL_CHARS, 24)}.{_rand(_B64URL_CHARS, 6)}.{_rand(_B64URL_CHARS, 27)}"
 
 
 # ---- GitHub ----
 
 def github_app_id() -> int:
-    return secrets.randbelow(900000) + 100000
+    return _RNG.randrange(100000, 1000000)
 
 
 def github_installation_id() -> int:
-    return secrets.randbelow(90000000) + 10000000
+    return _RNG.randrange(10000000, 100000000)
 
 
 def github_repo_id() -> int:
-    return secrets.randbelow(900000000) + 100000000
+    return _RNG.randrange(100000000, 1000000000)
 
 
 def github_user_id() -> int:
-    return secrets.randbelow(90000000) + 10000000
+    return _RNG.randrange(10000000, 100000000)
 
 
 def github_installation_token() -> str:
@@ -168,8 +194,7 @@ def gcal_ical_uid() -> str:
 
 def notion_id() -> str:
     """Notion object ids are UUIDv4, rendered dashed (8-4-4-4-12)."""
-    import uuid
-    return str(uuid.uuid4())
+    return str(det_uuid())
 
 
 def notion_token() -> str:
@@ -179,6 +204,45 @@ def notion_token() -> str:
 
 def notion_verification_token() -> str:
     return "secret_" + _rand(_LOWER_ALNUM + string.ascii_uppercase, 43)
+
+
+# ---- Google Drive ----
+
+_B64URL = string.ascii_letters + string.digits + "-_"
+
+
+def drive_file_id() -> str:
+    """Drive file ids are ~33 chars, alphanumeric + - and _, starting with a digit."""
+    return "1" + _rand(_B64URL, 32)
+
+
+def drive_shared_drive_id() -> str:
+    """Shared-drive ids look like ``0A`` + base64url."""
+    return "0A" + _rand(_B64URL, 17)
+
+
+def drive_comment_id() -> str:
+    return "AAAA" + _rand(_B64URL, 20)
+
+
+def drive_revision_id() -> str:
+    return _rand(string.digits, 4) + _rand(_B64URL, 20)
+
+
+# ---- Jira (Atlassian Cloud) ----
+
+def jira_account_id() -> str:
+    """Atlassian accountId: a 24-hex object id (older shape; still issued)."""
+    return _rand(_HEX, 24)
+
+
+def jira_api_token() -> str:
+    """Atlassian API token: ``ATATT`` + base64-ish payload."""
+    return "ATATT" + _rand(string.ascii_letters + string.digits + "-_", 40)
+
+
+def jira_cloud_id() -> str:
+    return f"{_rand(_HEX, 8)}-{_rand(_HEX, 4)}-{_rand(_HEX, 4)}-{_rand(_HEX, 4)}-{_rand(_HEX, 12)}"
 
 
 # ---- OAuth code/state ----

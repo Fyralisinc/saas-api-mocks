@@ -23,7 +23,8 @@ import structlog
 
 from spammers.common.clock import get_clock
 from spammers.common.ids import (
-    gcal_event_id, gcal_ical_uid, github_sha, gmail_message_id, gmail_thread_id, notion_id,
+    drive_file_id, gcal_event_id, gcal_ical_uid, github_sha,
+    gmail_message_id, gmail_thread_id, notion_id,
 )
 from spammers.orggen.profiles import resolve
 from spammers.orggen.render import render
@@ -601,6 +602,157 @@ async def inject_calendar_event(
                    NULL,'default',NULL,$9,0,$10,$11,$11,$12)""",
         uuid4(), cal["id"], gid, summary, when, end, organizer["email"], json.dumps(attendees),
         f"https://www.google.com/calendar/event?eid={gid}", gcal_ical_uid(), when, event_id)
+    return event_id
+
+
+async def inject_drive_file(
+    pool: asyncpg.Pool,
+    run_id: UUID,
+    *,
+    handle: Optional[str] = None,
+    title: Optional[str] = None,
+    trash: bool = False,
+    hard: bool = False,
+    at_virtual: Optional[datetime] = None,
+) -> UUID:
+    """Land a live Drive change on the actor's My Drive. Drive is poll-only (no
+    push), so this just bumps ``change_seq`` (= max+1) past the consumer's
+    warm-start token; the next ``changes.list`` surfaces it.
+
+      - default: create a new file (a ``signal`` observation).
+      - ``trash=True``: trash an existing active file → the changes feed reports
+        ``file.trashed=true`` (or ``removed=true`` when ``hard``) → a
+        ``state_change`` observation. Faithful: a removal is only observable
+        incrementally, never in the trashed=false backfill.
+    """
+    inst = await pool.fetchrow("SELECT id FROM app_drive.installations WHERE run_id=$1", run_id)
+    if inst is None:
+        raise LookupError("no drive installation in this run; did you forget `prepare`?")
+    owner = await _live_person(pool, run_id, handle)
+    drive = await pool.fetchrow(
+        "SELECT id FROM app_drive.drives WHERE installation_pk=$1 AND kind='my_drive' AND owner_email=$2",
+        inst["id"], owner["email"])
+    if drive is None:
+        raise LookupError("no My Drive for this person; did you forget `prepare`?")
+    clock = await get_clock(pool, run_id)
+    when = at_virtual or (clock.virtual_now + timedelta(seconds=1))
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+    seq = int(await pool.fetchval(
+        "SELECT COALESCE(MAX(change_seq), 0) FROM app_drive.files WHERE installation_pk=$1",
+        inst["id"])) + 1
+
+    if trash:
+        target = await pool.fetchrow(
+            "SELECT id, file_id, name FROM app_drive.files "
+            "WHERE drive_pk=$1 AND trashed=FALSE ORDER BY change_seq DESC LIMIT 1", drive["id"])
+        if target is None:
+            raise LookupError("no active file on this My Drive to trash")
+        event_id = uuid4()
+        await pool.execute(
+            """INSERT INTO timeline.events
+                (id, run_id, virtual_ts, type, actor_id, payload, cross_refs, is_historical)
+               VALUES ($1,$2,$3,'drive.file',$4,$5::jsonb,'{}'::jsonb,FALSE)""",
+            event_id, run_id, when, owner["id"],
+            json.dumps({"file_id": target["file_id"], "name": target["name"],
+                        "kind": "trash", "removed": bool(hard)}))
+        await pool.execute(
+            "UPDATE app_drive.files SET trashed=TRUE, explicitly_trashed=$2, "
+            "modified_time=$3, change_seq=$4, timeline_event_id=$5 WHERE id=$1",
+            target["id"], bool(hard), when, seq, event_id)
+        return event_id
+
+    name = (title or f"Live doc @ {when.isoformat()}")[:120]
+    text = f"Injected live document by {owner['handle']}."
+    fid = drive_file_id()
+    event_id = uuid4()
+    await pool.execute(
+        """INSERT INTO timeline.events
+            (id, run_id, virtual_ts, type, actor_id, payload, cross_refs, is_historical)
+           VALUES ($1,$2,$3,'drive.file',$4,$5::jsonb,'{}'::jsonb,FALSE)""",
+        event_id, run_id, when, owner["id"],
+        json.dumps({"file_id": fid, "name": name, "kind": "live"}))
+    await pool.execute(
+        """INSERT INTO app_drive.files
+            (id, installation_pk, drive_pk, file_id, name, mime_type, version, trashed,
+             explicitly_trashed, size, web_view_link, owner_email, owner_name,
+             last_modifying_email, last_modifying_name, parents, shared, starred,
+             extracted_text, created_time, modified_time, change_seq, timeline_event_id)
+           VALUES ($1,$2,$3,$4,$5,'application/vnd.google-apps.document',1,FALSE,FALSE,NULL,
+                   $6,$7,$8,$7,$8,'[]'::jsonb,FALSE,FALSE,$9,$10,$10,$11,$12)""",
+        uuid4(), inst["id"], drive["id"], fid, name,
+        f"https://drive.google.com/file/d/{fid}/view", owner["email"], owner["full_name"],
+        text, when, seq, event_id)
+    return event_id
+
+
+async def inject_jira_issue(
+    pool: asyncpg.Pool,
+    run_id: UUID,
+    *,
+    handle: Optional[str] = None,
+    project: Optional[str] = None,
+    summary: Optional[str] = None,
+    at_virtual: Optional[datetime] = None,
+) -> UUID:
+    """Create a live Jira issue + a status-transition changelog on the actor's
+    account, plus a not-historical ``jira.issue`` event that drives the signed
+    (``X-Hub-Signature``) webhook. The issue/changelog also land in the served
+    tables, so the poll-incremental path (``updated >=``) sees it too."""
+    inst = await pool.fetchrow("SELECT id FROM app_jira.installations WHERE run_id=$1", run_id)
+    if inst is None:
+        raise LookupError("no jira installation in this run; did you forget `prepare`?")
+    proj = await pool.fetchrow(
+        "SELECT id, key FROM app_jira.projects WHERE installation_pk=$1 "
+        "AND ($2::text IS NULL OR key=$2) ORDER BY (key=$2) DESC, key LIMIT 1",
+        inst["id"], project)
+    if proj is None:
+        raise LookupError("no jira project in this run")
+    reporter = await _live_person(pool, run_id, handle)
+    ru = await pool.fetchrow(
+        "SELECT account_id FROM app_jira.users WHERE installation_pk=$1 AND person_id=$2",
+        inst["id"], reporter["id"])
+    acct = ru["account_id"] if ru else None
+    clock = await get_clock(pool, run_id)
+    when = at_virtual or (clock.virtual_now + timedelta(seconds=1))
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+
+    import secrets as _secrets
+    n = int(await pool.fetchval(
+        "SELECT COALESCE(MAX((regexp_replace(issue_key,'^.*-','' ))::int), 0) "
+        "FROM app_jira.issues WHERE project_pk=$1", proj["id"])) + 1
+    issue_key = f"{proj['key']}-{n}"
+    issue_id = str(_secrets.randbelow(900000) + 100000)
+    history_id = str(_secrets.randbelow(900000) + 100000)
+    summ = (summary or f"Live issue from {reporter['handle']}")[:200]
+    desc = {"type": "doc", "version": 1, "content": [{"type": "paragraph",
+            "content": [{"type": "text", "text": "Injected live."}]}]}
+    issue_pk = uuid4()
+    event_id = uuid4()
+    await pool.execute(
+        """INSERT INTO timeline.events
+            (id, run_id, virtual_ts, type, actor_id, payload, cross_refs, is_historical)
+           VALUES ($1,$2,$3,'jira.issue',$4,$5::jsonb,'{}'::jsonb,FALSE)""",
+        event_id, run_id, when, reporter["id"],
+        json.dumps({"issue_id": issue_id, "issue_key": issue_key, "history_id": history_id,
+                    "kind": "issue_updated"}))
+    await pool.execute(
+        """INSERT INTO app_jira.issues
+            (id, installation_pk, project_pk, issue_id, issue_key, summary, description,
+             issue_type, status, status_category, priority, resolution, resolution_date,
+             assignee_account_id, reporter_account_id, creator_account_id, labels, components,
+             story_points, created_at, updated_at, timeline_event_id)
+           VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,'Task','In Progress','indeterminate','Medium',
+                   NULL,NULL,$8,$8,$8,'["live"]'::jsonb,'[]'::jsonb,NULL,$9,$9,$10)""",
+        issue_pk, inst["id"], proj["id"], issue_id, issue_key, summ, json.dumps(desc),
+        acct, when, event_id)
+    items = [{"field": "status", "fieldtype": "jira", "fieldId": "status",
+              "from": "1", "fromString": "To Do", "to": "2", "toString": "In Progress"}]
+    await pool.execute(
+        """INSERT INTO app_jira.changelogs (id, issue_pk, history_id, author_account_id, items, created_at, position)
+           VALUES ($1,$2,$3,$4,$5::jsonb,$6,0)""",
+        uuid4(), issue_pk, history_id, acct, json.dumps(items), when)
     return event_id
 
 

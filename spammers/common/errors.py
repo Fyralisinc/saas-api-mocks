@@ -43,6 +43,13 @@ def notion_error(status: int, code: str, message: str) -> dict[str, Any]:
     return {"object": "error", "status": status, "code": code, "message": message}
 
 
+def jira_error(messages: list[str] | str, *, errors: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Jira Cloud returns ``{"errorMessages": [...], "errors": {...}}``."""
+    if isinstance(messages, str):
+        messages = [messages]
+    return {"errorMessages": messages, "errors": errors or {}}
+
+
 def google_error(
     code: int,
     message: str,

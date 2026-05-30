@@ -1,7 +1,7 @@
-"""Gmail mock — FastAPI app factory.
+"""Google Drive mock — FastAPI app factory.
 
 Usage:
-    python -m spammers.gmail run --port 7004
+    python -m spammers.drive run --port 7007
 """
 from __future__ import annotations
 
@@ -12,15 +12,12 @@ from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from spammers.common.errors import google_error
-from spammers.gmail import state as _state
-from spammers.gmail.responses import GoogleJSONResponse
-from spammers.gmail.routes import (
-    directory as _directory,
-    history as _history,
-    jwks as _jwks,
-    mailbox as _mailbox,
-    messages as _messages,
-    threads as _threads,
+from spammers.drive import state as _state
+from spammers.drive.responses import GoogleJSONResponse
+from spammers.drive.routes import (
+    changes as _changes,
+    drives as _drives,
+    files as _files,
     token as _token,
 )
 
@@ -33,18 +30,18 @@ async def _lifespan(app: FastAPI):
 
 
 async def _ratelimit(request, call_next):
-    from spammers.gmail.ratelimit import guard
+    from spammers.drive.ratelimit import guard
     resp = await guard(request)
     return resp if resp is not None else await call_next(request)
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="Gmail mock", lifespan=_lifespan,
+    app = FastAPI(title="Google Drive mock", lifespan=_lifespan,
                   default_response_class=GoogleJSONResponse)
     app.middleware("http")(_ratelimit)
 
     # Unhandled paths/methods/validation return Google's error envelope, not
-    # FastAPI's {"detail":…} (mirrors how real Gmail reports 404/405).
+    # FastAPI's {"detail":…} (mirrors how real Drive v3 reports 404/405).
     @app.exception_handler(StarletteHTTPException)
     async def _http_exc(request, exc: StarletteHTTPException):
         msg = exc.detail if isinstance(exc.detail, str) else "Not Found"
@@ -55,16 +52,13 @@ def create_app() -> FastAPI:
         return GoogleJSONResponse(google_error(400, "Invalid query parameter."), status_code=400)
 
     app.include_router(_token.router)
-    app.include_router(_jwks.router)
-    app.include_router(_messages.router)
-    app.include_router(_threads.router)
-    app.include_router(_history.router)
-    app.include_router(_mailbox.router)
-    app.include_router(_directory.router)
+    app.include_router(_drives.router)
+    app.include_router(_changes.router)
+    app.include_router(_files.router)
 
     @app.get("/_health")
     async def health():
-        return {"ok": True, "service": "gmail-mock"}
+        return {"ok": True, "service": "drive-mock"}
 
     return app
 

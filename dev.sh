@@ -19,9 +19,8 @@ PY="$VENV/bin/python"
 SPAMMER="$VENV/bin/spammer"
 ENV_FILE=.env
 
-# Default port for `serve`. Corpus + as-of are configurable via env overrides
-# in cmd_prepare below.
-PORT="${PORT:-7001}"
+# Optional PORT override for serve/studio/stop — defaults are decided per
+# subcommand (slack:7001 … jira:7008, studio:7000, stop:7001).
 
 # Candidate DB credentials, tried in order during setup.
 # Set SPAMMERS_DB_CREDS=user:pass to use your own.

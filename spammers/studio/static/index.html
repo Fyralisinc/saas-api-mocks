@@ -46,9 +46,7 @@
 
   .label{color:var(--neon);letter-spacing:2px;font-size:12px;margin:14px 0 9px;text-transform:uppercase}
 
-  .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px}
-  @media(max-width:620px){.grid{grid-template-columns:repeat(2,1fr)}}
-  /* boot layout: org grid on the left, live system feed on the right */
+  /* boot layout: target hero on the left, live system feed on the right */
   .bootmain{display:flex;gap:20px;align-items:stretch;flex-wrap:wrap;margin-top:8px}
   .bootleft{flex:1 1 560px;min-width:0}
   .bootleft .label:first-child{margin-top:0}
@@ -67,20 +65,33 @@
   .scope{flex:1;display:block;width:100%;min-height:120px;border-top:1px solid var(--line);
     background:rgba(0,20,8,.20)}
 
-  /* per-company glyphs */
+  /* target glyph (small, used inside the system feed) */
   .chead{display:flex;align-items:center;gap:9px}
   .clogo{width:20px;height:20px;flex:0 0 auto;color:var(--neon);
     filter:drop-shadow(0 0 4px rgba(0,255,102,.5))}
-  .card{border:1px solid var(--line);background:var(--panel);box-shadow:var(--shadow);
-    padding:11px 13px;cursor:pointer;transition:transform .12s, border-color .12s, background .12s}
-  .card:hover{border-color:var(--line-bri);background:var(--panel-2);transform:translateY(-2px)}
-  .card.sel{border-color:var(--neon);box-shadow:0 0 0 1px var(--neon),0 0 18px rgba(0,255,102,.30)}
-  .card.sel::after{content:'▸ SELECTED';position:absolute;margin-top:-13px;margin-left:8px;
-    background:var(--neon);color:#022; font-size:9px;letter-spacing:1px;padding:2px 6px;border-radius:3px}
-  .card .nm{color:var(--head);font-size:15.5px;letter-spacing:.5px}
-  .card .stg{color:var(--amber);font-size:10.5px;letter-spacing:1px;margin-top:2px;text-transform:uppercase}
-  .card .tag{color:var(--ink);opacity:.85;font-size:12.5px;margin-top:6px;line-height:1.45}
-  .card .meta{color:var(--ink-dim);font-size:11.5px;margin-top:7px;border-top:1px solid var(--line);padding-top:6px}
+
+  /* target hero — the single-company boot card */
+  .hero{display:flex;gap:24px;align-items:stretch;border:1px solid var(--line);background:var(--panel);
+    box-shadow:var(--shadow);border-left:3px solid var(--neon);border-radius:6px;padding:24px 26px;
+    position:relative;overflow:hidden}
+  .hero::before{content:"";position:absolute;inset:0;pointer-events:none;
+    background:radial-gradient(circle at 18% 50%, rgba(0,255,102,.06), transparent 55%)}
+  .hero-logo{width:118px;height:118px;flex:0 0 auto;color:var(--neon);position:relative;
+    filter:drop-shadow(0 0 14px rgba(0,255,102,.45));display:flex;align-items:center;justify-content:center}
+  .hero-logo svg, .hero-logo svg.clogo{width:100%;height:100%}
+  .hero-body{flex:1;min-width:0;position:relative;display:flex;flex-direction:column;justify-content:center}
+  .hero-tag{color:var(--neon);font-size:10.5px;letter-spacing:2.5px;text-transform:uppercase;
+    background:rgba(0,255,102,.10);border:1px solid var(--line-bri);display:inline-block;
+    padding:3px 9px;border-radius:3px;align-self:flex-start}
+  .hero-name{margin:11px 0 4px;color:var(--head);font-size:28px;letter-spacing:1px;font-weight:700;line-height:1.1}
+  .hero-stage{color:var(--amber);font-size:11px;letter-spacing:2px;text-transform:uppercase;margin-bottom:12px}
+  .hero-line{color:var(--ink);opacity:.88;font-size:13.5px;line-height:1.55;margin:0 0 16px}
+  .hero-meta{display:flex;gap:28px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:14px}
+  .hero-meta span{color:var(--ink-dim);font-size:10.5px;letter-spacing:1.5px;text-transform:uppercase}
+  .hero-meta b{color:var(--neon);font-size:19px;display:block;line-height:1.1;letter-spacing:.5px;
+    font-weight:700;margin-bottom:2px}
+  @media(max-width:580px){.hero{flex-direction:column;gap:14px;padding:20px}.hero-logo{width:84px;height:84px}
+    .hero-name{font-size:23px}}
 
   .bar{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-top:16px}
   button{font-family:inherit;background:var(--neon);color:#032611;border:1px solid var(--neon);
@@ -175,12 +186,9 @@
   <!-- ===================== BOOT VIEW ===================== -->
   <section id="boot">
     <div class="brief">
-      This console runs <b>Gharelu-Alpen</b> — a homemade high-fidelity simulation of Alpen Labs
-      (BitVM / Strata, ~36 people, ~18 months of replayed history). Eight wire-compatible mocks
-      (Slack, GitHub, Discord, Gmail, Calendar, Notion, Drive, Jira) come up on
-      <code>:7001</code>–<code>:7008</code> backed by a frozen corpus of real-mirror GitHub data
-      and LLM-generated narrative threads. <b>Initialize</b> backfills the corpus into the mock
-      DBs; <b>Terminate</b> wipes everything back to zero.
+      Eight wire-compatible mocks (Slack, GitHub, Discord, Gmail, Calendar, Notion, Drive, Jira)
+      on <code>:7001</code>–<code>:7008</code>, populated by replaying the Gharelu-Alpen corpus
+      into their DBs. <b>Initialize</b> backfills the corpus; <b>Terminate</b> wipes it back to zero.
     </div>
 
     <div class="bootmain">
@@ -262,9 +270,11 @@ const BRAND={
 };
 const brandSvg=(p,cls)=>`<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="${BRAND[p]}"/></svg>`;
 
-// Gharelu-Alpen icon — Bitcoin-orange-vibed angular mountain (Alpen = Alps; Bitcoin protocol)
+// Gharelu-Alpen icon — Alpen Labs's actual mark, two parallelogram wedges
+// forming a stylized "A". Filled with currentColor so the matrix theme picks
+// up the neon glow + drop-shadow defined on .clogo / .hero-logo.
 const ICONS={
-  'gharelu-alpen':'<path d="M3 20l5-9 3 5 4-7 6 11z"/><path d="M3 20h18"/><circle cx="17" cy="6" r="2.2"/>',
+  'gharelu-alpen':'<g fill="currentColor" stroke="none"><polygon points="14,2 22,13 19,15 11,4"/><polygon points="3,10 10,20 7,22 0,12"/></g>',
 };
 const coIcon=k=>`<svg class="clogo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[k]||''}</svg>`;
 
@@ -277,17 +287,26 @@ function toast(msg,bad){const t=$('#toast');t.textContent=msg;t.className='toast
 
 let COMPANIES={};
 async function loadCompanies(){
-  // Only one company now (Gharelu-Alpen). Render its card pre-selected; no picker.
+  // Only one company (Gharelu-Alpen). Hero panel — big logo + dossier + stats.
   const {companies}=await api('/api/companies');
   COMPANIES={};companies.forEach(c=>COMPANIES[c.key]=c);
   const c=companies[0];
   selected=c.key;
   $('#companies').innerHTML=`
-    <div class="card sel" data-key="${c.key}" style="position:relative">
-      <div class="chead">${coIcon(c.key)}<div class="nm">${c.name}</div></div>
-      <div class="stg">${c.stage}</div>
-      <div class="tag">${c.tagline}</div>
-      <div class="meta">${c.headcount} · ${c.span} · ⏱ init ${c.est}</div>
+    <div class="hero" data-key="${c.key}">
+      <div class="hero-logo">${coIcon(c.key)}</div>
+      <div class="hero-body">
+        <div class="hero-tag">▸ TARGET LOADED</div>
+        <h2 class="hero-name">${esc(c.name)}</h2>
+        <div class="hero-stage">${esc(c.stage)}</div>
+        <p class="hero-line">${esc(c.tagline)}</p>
+        <div class="hero-meta">
+          <span><b>36</b> people</span>
+          <span><b>18mo</b> replayed</span>
+          <span><b>~23k</b> events</span>
+          <span><b>8</b> mocks</span>
+        </div>
+      </div>
     </div>`;
   typeFeed(companyBriefing(c));
 }

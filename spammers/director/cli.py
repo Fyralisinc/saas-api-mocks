@@ -62,7 +62,7 @@ async def _cmd_prepare(args: argparse.Namespace) -> int:
     corpus_path = os.path.abspath(args.corpus)
     if not os.path.exists(corpus_path):
         _eprint(f"error: corpus file not found: {corpus_path}")
-        _eprint("  generate it with: (cd gharelu && make corpus)")
+        _eprint("  generate it with: (cd corpus && make corpus)")
         await pool.close()
         return 2
     as_of_str = args.as_of or datetime.now(timezone.utc).date().isoformat()
@@ -304,8 +304,8 @@ def main() -> None:
     p_prep = sub.add_parser("prepare", help="apply migrations, create a run, backfill the corpus")
     p_prep.add_argument("--tenant-id", required=True)
     p_prep.add_argument("--fyralis-base", default="http://localhost:8000")
-    p_prep.add_argument("--corpus", default="./gharelu/build/events.jsonl",
-                        help="path to a corpus events.jsonl (default: ./gharelu/build/events.jsonl)")
+    p_prep.add_argument("--corpus", default="./corpus/build/events.jsonl",
+                        help="path to a corpus events.jsonl (default: ./corpus/build/events.jsonl)")
     p_prep.add_argument("--as-of", default=None,
                         help="YYYY-MM-DD cursor for corpus replay (default: today)")
     p_prep.set_defaults(func=_cmd_prepare)

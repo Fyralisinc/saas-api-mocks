@@ -1,4 +1,4 @@
-# gharelu — Gharelu-Alpen corpus
+# corpus — Gharelu-Alpen corpus
 
 A frozen 4-year corpus derived from public sources for **Gharelu-Alpen**, a
 homemade high-fidelity simulation of Alpen Labs (BitVM / Strata). Consumed

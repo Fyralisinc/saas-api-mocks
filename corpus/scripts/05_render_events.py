@@ -1676,6 +1676,235 @@ def notion_edit_events(facts: dict) -> Iterator[dict]:
 # Main
 # -----------------------------------------------------------------------------
 
+# =============================================================================
+# Discord — small cross-org guild (ZK / Bitcoin protocol professional chatter)
+# =============================================================================
+
+DISCORD_GUILD_ID = "discord:guild:zk-research-roundup"
+DISCORD_GUILD_NAME = "ZK Research Roundup"
+DISCORD_CHANNELS = [
+    ("discord:zk-research:general",       "general",        "Wide-open chatter for everyone in the ZK research community."),
+    ("discord:zk-research:bitvm",         "bitvm",          "BitVM2 / Glock / Mosaic + verifier-on-Bitcoin discussion."),
+    ("discord:zk-research:strata",        "strata",         "Strata rollup design, settlement, bridge."),
+    ("discord:zk-research:starknet",      "starknet-collab","Cross-team work with the Starknet folks."),
+    ("discord:zk-research:announcements", "announcements",  "Major releases + new posts from member orgs."),
+]
+# A handful of Alpen people active in cross-org spaces.
+DISCORD_ALPEN_REGULARS = [
+    "person:delbonis", "person:prajwolrg", "person:voidash",
+    "person:MdTeach", "person:storopoli", "person:bewakes",
+]
+DISCORD_MSGS_BY_KIND = {
+    "general": [
+        "anyone running into the recent slot-zero issue on testnet?",
+        "tldr: skipping ahead — the proof shape we discussed last week works as advertised, going to write it up tonight.",
+        "first take on the gas accounting question — happy to share notes when I'm back online",
+        "the patch landed, ymmv on the older toolchain — open an issue if you hit anything weird",
+        "anyone else's CI flaky after the latest libsecp release? feels like flakes only when the rng pool is cold",
+        "just shipped a workaround for the rollup nonce thing; full RFC coming this week",
+    ],
+    "bitvm": [
+        "took another pass at the round-efficient verifier — surfaced two opt opportunities, will share gist",
+        "the transcript domain-separation patch we merged last sprint isn't picking up the new tag — looks like ordering bug",
+        "merged the glock backend selection helper; behind a feature flag for now until benches stabilize",
+        "anyone wired up the snarknado tracer locally? need a stable reproducer for benchmark variance",
+        "fixture #14 in the shared verifier suite still trips when the curve order is non-prime — opened follow-up",
+    ],
+    "strata": [
+        "checkpoint emission cadence: we settled on dynamic, gated by mempool pressure — note in the design doc",
+        "bridge deposit confirmation policy is going to need another pass before mainnet, flagging early",
+        "split sync/exec/checkpoint into separate tasks landed in main; will write up the boundary doc tomorrow",
+        "reorg test harness is green again after the bitcoind-async-client release; was a reconnection thing",
+    ],
+    "starknet-collab": [
+        "transcript label ambiguity that bit us in shared-glock — turns out same root cause as our internal one, patching both",
+        "happy to review the adapter PR if someone can throw me an invite",
+        "v0 of the shared verifier interface is landed on our side; spec is in the strata doc tree, link in DM",
+        "fixture generator + ci matrix from your side looks great, mirroring some of the shape internally",
+    ],
+    "announcements": [
+        "🚀 Glock public release is live — blog post + repo links in the thread.",
+        "Mosaic v0.3 is out — internal operator focused, breaking changes in the manifest format.",
+        "We've open-sourced the Strata bridge reference implementation. RFC + walkthrough in the thread.",
+        "Today we shipped the Alpen public testnet — readiness brief in the doc tree, public RPC + faucet links above.",
+    ],
+}
+
+
+def discord_events(facts: dict, start: str, end: str) -> Iterator[dict]:
+    """Sparse cross-org chatter in a small ZK / Bitcoin Discord guild.
+
+    Volume target: ~1–2 messages per channel per week, from a rotating set
+    of Alpen regulars. Only Alpen-side messages — outside-org people are
+    implied by the cross-org channel names + content. The mock isn't an
+    actual Discord bot bridge; this is the public footprint of Alpen folks
+    representing the company in a wider community space.
+    """
+    d0 = datetime.fromisoformat(start).replace(tzinfo=timezone.utc)
+    d1 = datetime.fromisoformat(end).replace(tzinfo=timezone.utc)
+
+    # Bootstrap: guild + channels created right after the company starts so
+    # everything downstream has a guild_pk + channel_pk to resolve against.
+    bootstrap_when = d0 + timedelta(days=30)
+    for ch_id, ch_name, topic in DISCORD_CHANNELS:
+        yield {"t": _iso(bootstrap_when), "provider": "discord",
+               "kind": "channel.create",
+               "payload": {"id": ch_id, "name": ch_name,
+                           "guild": DISCORD_GUILD_ID,
+                           "guild_name": DISCORD_GUILD_NAME,
+                           "topic": topic}}
+
+    # Per-channel weekly chatter.
+    cur = bootstrap_when + timedelta(days=2)
+    week = 0
+    while cur < d1:
+        for ci, (ch_id, ch_name, _topic) in enumerate(DISCORD_CHANNELS):
+            # 1–2 messages per channel per week, deterministic.
+            n_msgs = 1 + _hash_int(ch_id, str(week), n=2)
+            for mi in range(n_msgs):
+                actor = DISCORD_ALPEN_REGULARS[
+                    _hash_int(ch_id, str(week), str(mi), n=len(DISCORD_ALPEN_REGULARS))]
+                msg_bank = DISCORD_MSGS_BY_KIND.get(ch_name, DISCORD_MSGS_BY_KIND["general"])
+                text = msg_bank[_hash_int(ch_id, str(week), str(mi), "txt",
+                                          n=len(msg_bank))]
+                # Spread within the week + skew to that person's active hours.
+                when = cur + timedelta(
+                    days=(ci * 2 + mi * 3) % 6,
+                    hours=10 + _hash_int(ch_id, str(week), str(mi), "h", n=8),
+                    minutes=_hash_int(ch_id, str(week), str(mi), "m", n=60),
+                )
+                when = _skew_to_peak(when, actor)
+                if when >= d1:
+                    continue
+                # Same active-window guards we use on Slack messages.
+                if _is_on_pto(actor, when) or _is_departed(actor, when, facts):
+                    continue
+                yield {"t": _iso(when), "provider": "discord", "kind": "message",
+                       "actor": actor,
+                       "payload": {"channel": ch_id, "text": text,
+                                   "category": f"discord:{ch_name}"}}
+        cur += timedelta(days=7)
+        week += 1
+
+
+# =============================================================================
+# Drive — occasional design docs / PDFs (board, investor, audit, whitepapers)
+# =============================================================================
+
+DRIVE_DOCS = [
+    # (cadence, label, mime, body_seed, primary_actor)
+    ("quarterly_first", "Investor Update — Q{q} {y}",        "application/pdf",         "Quarterly numbers + roadmap update for investors.", "person:delbonis"),
+    ("quarterly_mid",   "Board Minutes — Q{q} {y}",          "application/vnd.google-apps.document", "Board meeting minutes + action items.",             "person:delbonis"),
+    ("biannual",        "Strategy Doc — {half} {y}",         "application/vnd.google-apps.document", "Half-year strategy + OKRs.",                        "person:delbonis"),
+    ("annual",          "Annual Report {y}",                 "application/pdf",         "Annual summary for stakeholders.",                  "person:delbonis"),
+]
+DRIVE_WHITEPAPERS = [
+    ("Strata Technical Whitepaper v{rev}",            "person:prajwolrg"),
+    ("Glock Verifier Design Notes — {y}",             "person:voidash"),
+    ("Mosaic Operator Brief — {y}",                   "person:storopoli"),
+    ("Bridge Risk Register — {y} Q{q}",               "person:MdTeach"),
+    ("BitVM2 Survey Notes — {y}",                     "person:delbonis"),
+]
+DRIVE_AUDIT_REPORTS = [
+    ("Audit Report — Strata Bridge — {y}",            "person:delbonis"),
+    ("Audit Report — Glock Verifier — {y}",           "person:delbonis"),
+    ("Audit Report — Settlement Layer — {y}",         "person:delbonis"),
+]
+
+
+def drive_events(facts: dict, start: str, end: str) -> Iterator[dict]:
+    """A small footprint of files in Google Drive: PDFs and Google Docs that
+    sit alongside the Notion-first workflow. Investor decks, audit reports,
+    board minutes, technical whitepaper revisions. Sparse but real."""
+    d0 = datetime.fromisoformat(start).replace(tzinfo=timezone.utc)
+    d1 = datetime.fromisoformat(end).replace(tzinfo=timezone.utc)
+
+    file_seq = [0]
+    def _emit(when: datetime, name: str, mime: str, body: str, actor: str):
+        if when < d0 or when >= d1:
+            return None
+        if _is_on_pto(actor, when) or _is_departed(actor, when, facts):
+            return None
+        file_seq[0] += 1
+        return {"t": _iso(_skew_to_peak(when, actor)),
+                "provider": "drive", "kind": "file.create",
+                "actor": actor,
+                "payload": {
+                    "id": f"drive:file:{file_seq[0]:04d}",
+                    "name": name, "mime_type": mime, "size": 180_000 + file_seq[0] * 1373,
+                    "body": body, "category": "design-doc-or-pdf"}}
+
+    # Quarterly: investor updates + board minutes
+    cur = d0.replace(day=1)
+    while cur < d1:
+        if cur.month in (1, 4, 7, 10):
+            q = ((cur.month - 1) // 3) + 1
+            ev = _emit(cur + timedelta(days=14),
+                       f"Investor Update — Q{q} {cur.year}",
+                       "application/pdf",
+                       f"Q{q} {cur.year} update for the cap table — burn, runway, roadmap.",
+                       "person:delbonis")
+            if ev: yield ev
+            ev = _emit(cur + timedelta(days=20),
+                       f"Board Minutes — Q{q} {cur.year}",
+                       "application/vnd.google-apps.document",
+                       f"Board meeting minutes for Q{q} {cur.year}; action items + next-quarter focus.",
+                       "person:delbonis")
+            if ev: yield ev
+        cur += timedelta(days=31)
+
+    # Biannual strategy docs
+    for y in range(d0.year, d1.year + 1):
+        for half_label, month in (("H1", 2), ("H2", 8)):
+            when = datetime(y, month, 5, tzinfo=timezone.utc)
+            ev = _emit(when,
+                       f"Strategy Doc — {half_label} {y}",
+                       "application/vnd.google-apps.document",
+                       f"{half_label} {y} OKRs and strategic focus areas.",
+                       "person:delbonis")
+            if ev: yield ev
+
+    # Annual reports
+    for y in range(d0.year, d1.year + 1):
+        when = datetime(y, 12, 18, tzinfo=timezone.utc)
+        ev = _emit(when,
+                   f"Annual Report {y}",
+                   "application/pdf",
+                   f"Annual progress summary {y}.",
+                   "person:delbonis")
+        if ev: yield ev
+
+    # Whitepapers — once a year, rotated through the bank
+    for yi, y in enumerate(range(d0.year, d1.year + 1)):
+        for wi, (tmpl, who) in enumerate(DRIVE_WHITEPAPERS):
+            when = datetime(y, 3 + wi, 12,
+                            tzinfo=timezone.utc) if (3 + wi) <= 12 else None
+            if when is None:
+                continue
+            ev = _emit(when,
+                       tmpl.format(rev=f"0.{yi + 1}", y=y, q=((wi % 4) + 1)),
+                       "application/pdf" if wi % 2 == 0 else "application/vnd.google-apps.document",
+                       f"Technical brief — revision tracked in Drive alongside Notion.",
+                       who)
+            if ev: yield ev
+
+    # Audit reports — once per audit window (which we read from office_life).
+    audit_windows = [e for e in (_OFFICE.get("external_events") or [])
+                     if "audit" in (e.get("label") or "").lower()]
+    for wi, win in enumerate(audit_windows):
+        try:
+            evd = datetime.fromisoformat(win["date"]).replace(tzinfo=timezone.utc)
+        except Exception:
+            continue
+        tmpl, who = DRIVE_AUDIT_REPORTS[wi % len(DRIVE_AUDIT_REPORTS)]
+        ev = _emit(evd + timedelta(days=21),
+                   tmpl.format(y=evd.year),
+                   "application/pdf",
+                   f"Final audit report — see corresponding gmail thread.",
+                   who)
+        if ev: yield ev
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--include-mirror", action="store_true",
@@ -1694,6 +1923,10 @@ def main() -> None:
                     help="include Gmail external comms (investor / audit / partner)")
     ap.add_argument("--include-notion-edits", action="store_true",
                     help="include Notion page.update history (edit migration)")
+    ap.add_argument("--include-discord", action="store_true",
+                    help="include small cross-org Discord guild + chatter")
+    ap.add_argument("--include-drive", action="store_true",
+                    help="include occasional Drive PDFs + Google Docs")
     ap.add_argument("--include-all", action="store_true",
                     help="shortcut: turn on every --include-*")
     ap.add_argument("--end", default="2026-05-29",
@@ -1736,6 +1969,10 @@ def main() -> None:
         events.extend(gmail_events(facts, facts["company"]["founded"], args.end))
     if args.include_notion_edits or args.include_all:
         events.extend(notion_edit_events(facts))
+    if args.include_discord or args.include_all:
+        events.extend(discord_events(facts, facts["company"]["founded"], args.end))
+    if args.include_drive or args.include_all:
+        events.extend(drive_events(facts, facts["company"]["founded"], args.end))
 
     # Stable sort by timestamp.
     events.sort(key=lambda e: e["t"])

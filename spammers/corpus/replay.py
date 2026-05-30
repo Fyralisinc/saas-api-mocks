@@ -22,6 +22,7 @@ import asyncpg
 import structlog
 
 from spammers.common.ids import (
+    discord_bot_token, discord_snowflake,
     drive_file_id, gcal_event_id, gcal_ical_uid,
     github_app_id, github_installation_id, github_repo_id, github_user_id,
     github_webhook_secret,
@@ -33,7 +34,7 @@ from spammers.common.ids import (
     slack_client_secret, slack_signing_secret, slack_team_id, slack_ts,
     slack_user_id,
 )
-from spammers.common.signing import generate_rsa_keypair
+from spammers.common.signing import generate_ed25519_keypair, generate_rsa_keypair
 from spammers.corpus.cursor import advance as advance_cursor
 from spammers.corpus.idmap import IdMap
 from spammers.corpus.loader import iter_events
@@ -852,6 +853,212 @@ async def _calendar_event_create(ctx: ReplayContext, event: Event) -> None:
             start, end, person["email"],
             json.dumps(attendee_emails), gcal_ical_uid(), when,
         )
+    except asyncpg.exceptions.UniqueViolationError:
+        pass
+
+
+# =============================================================================
+# discord.* handlers
+# =============================================================================
+
+async def _ensure_discord_application(ctx: ReplayContext, when: datetime) -> UUID:
+    pk = await ctx.idmap.get("discord:app")
+    if pk is not None:
+        return pk
+    pk = uuid4()
+    priv, pub = generate_ed25519_keypair()
+    await ctx.pool.execute(
+        "INSERT INTO app_discord.applications (id, run_id, application_id, "
+        "client_id, client_secret, bot_token, public_key, private_key) "
+        "VALUES ($1,$2,$3,$4,$5,$6,$7,$8)",
+        pk, ctx.run_id, discord_snowflake(when), discord_snowflake(when),
+        rand_hex(16), discord_bot_token(), pub, priv,
+    )
+    await ctx.idmap.put("discord:app", "discord_application", pk)
+    return pk
+
+
+async def _ensure_discord_guild(
+    ctx: ReplayContext, corpus_guild_id: str, name: str, when: datetime,
+) -> UUID:
+    pk = await ctx.idmap.get(corpus_guild_id)
+    if pk is not None:
+        return pk
+    app_pk = await _ensure_discord_application(ctx, when)
+    pk = uuid4()
+    await ctx.pool.execute(
+        "INSERT INTO app_discord.guilds (id, application_pk, guild_id, name, "
+        "owner_user_id, created_at) VALUES ($1,$2,$3,$4,$5,$6)",
+        pk, app_pk, discord_snowflake(when), name,
+        discord_snowflake(when), when,
+    )
+    await ctx.idmap.put(corpus_guild_id, "discord_guild", pk)
+    return pk
+
+
+async def _ensure_discord_user(ctx: ReplayContext, corpus_person_id: str) -> UUID | None:
+    key = f"discord_user:{corpus_person_id}"
+    pk = await ctx.idmap.get(key)
+    if pk is not None:
+        return pk
+    person_pk = await ctx.idmap.get(corpus_person_id)
+    if person_pk is None:
+        return None
+    person = await ctx.pool.fetchrow(
+        "SELECT handle FROM org.people WHERE id = $1", person_pk,
+    )
+    app_pk = await _ensure_discord_application(ctx, datetime.now(timezone.utc))
+    pk = uuid4()
+    await ctx.pool.execute(
+        "INSERT INTO app_discord.users (id, application_pk, person_id, "
+        "discord_user_id, username) VALUES ($1,$2,$3,$4,$5) "
+        "ON CONFLICT (application_pk, person_id) DO NOTHING",
+        pk, app_pk, person_pk, discord_snowflake(), person["handle"],
+    )
+    real_pk = await ctx.pool.fetchval(
+        "SELECT id FROM app_discord.users WHERE application_pk=$1 AND person_id=$2",
+        app_pk, person_pk,
+    )
+    await ctx.idmap.put(key, "discord_user", real_pk)
+    return real_pk
+
+
+@register("discord", "channel.create")
+async def _discord_channel_create(ctx: ReplayContext, event: Event) -> None:
+    p = event["payload"]
+    when = _parse_ts(event["t"])
+    guild_corpus_id = p.get("guild") or "discord:guild:cross-org"
+    guild_name = p.get("guild_name") or "ZK Research Roundup"
+    guild_pk = await _ensure_discord_guild(ctx, guild_corpus_id, guild_name, when)
+    pk = uuid4()
+    try:
+        await ctx.pool.execute(
+            "INSERT INTO app_discord.channels (id, guild_pk, channel_id, name, "
+            "type, topic, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7)",
+            pk, guild_pk, discord_snowflake(when), p["name"], 0,
+            p.get("topic") or "", when,
+        )
+        await ctx.idmap.put(p["id"], "discord_channel", pk)
+    except asyncpg.exceptions.UniqueViolationError:
+        pass
+
+
+@register("discord", "message")
+async def _discord_message(ctx: ReplayContext, event: Event) -> None:
+    p = event["payload"]
+    when = _parse_ts(event["t"])
+    channel_corpus_id = p.get("channel")
+    if not channel_corpus_id:
+        return
+    channel_pk = await ctx.idmap.get(channel_corpus_id)
+    if channel_pk is None:
+        return
+    author_pk = None
+    actor = event.get("actor")
+    if actor and actor.startswith("person:"):
+        author_pk = await _ensure_discord_user(ctx, actor)
+    try:
+        await ctx.pool.execute(
+            "INSERT INTO app_discord.messages (id, channel_pk, message_id, "
+            "author_user_pk, content, type, created_at) "
+            "VALUES ($1,$2,$3,$4,$5,0,$6)",
+            uuid4(), channel_pk, discord_snowflake(when), author_pk,
+            p.get("text") or p.get("content") or "", when,
+        )
+    except asyncpg.exceptions.UniqueViolationError:
+        pass
+
+
+# =============================================================================
+# drive.* handlers
+# =============================================================================
+
+async def _ensure_drive_installation(ctx: ReplayContext) -> UUID:
+    pk = await ctx.idmap.get("drive:installation")
+    if pk is not None:
+        return pk
+    pk = uuid4()
+    priv, pub = generate_rsa_keypair()
+    await ctx.pool.execute(
+        "INSERT INTO app_drive.installations (id, run_id, customer_id, domain, "
+        "service_account_email, service_account_client_id, "
+        "service_account_private_key, service_account_public_key) "
+        "VALUES ($1,$2,$3,$4,$5,$6,$7,$8)",
+        pk, ctx.run_id, "C" + rand_hex(4), "alpenlabs.io",
+        "ingest@alpenlabs-ingest.iam.gserviceaccount.com", rand_hex(10), priv, pub,
+    )
+    await ctx.idmap.put("drive:installation", "drive_installation", pk)
+    return pk
+
+
+async def _ensure_alpen_drive(ctx: ReplayContext) -> UUID:
+    """One shared drive holds all corpus-generated files (PDFs, Google Docs,
+    investor decks, audit reports, whitepapers). Real Drive installs would
+    have a per-user 'my-drive' per oauth token, but the schema's
+    (installation_pk, drive_id) UNIQUE makes us pick one — and a single
+    shared drive matches how a small co. actually organizes docs."""
+    key = "drive:alpen-shared"
+    pk = await ctx.idmap.get(key)
+    if pk is not None:
+        return pk
+    inst_pk = await _ensure_drive_installation(ctx)
+    pk = uuid4()
+    await ctx.pool.execute(
+        "INSERT INTO app_drive.drives (id, installation_pk, drive_id, name, "
+        "kind, owner_email, created_at) "
+        "VALUES ($1,$2,'alpen-shared','Alpen Labs Drive','shared_drive',$3,$4)",
+        pk, inst_pk, "drive-admin@alpenlabs.io", datetime.now(timezone.utc),
+    )
+    await ctx.idmap.put(key, "drive", pk)
+    return pk
+
+
+@register("drive", "file.create")
+async def _drive_file_create(ctx: ReplayContext, event: Event) -> None:
+    p = event["payload"]
+    when = _parse_ts(event["t"])
+    actor = event.get("actor")
+    person_pk = None
+    if actor and actor.startswith("person:"):
+        person_pk = await ctx.idmap.get(actor)
+    if person_pk is None:
+        person_pk = await ctx.pool.fetchval(
+            "SELECT id FROM org.people WHERE run_id=$1 ORDER BY started_at LIMIT 1",
+            ctx.run_id,
+        )
+    if person_pk is None:
+        return
+    person = await ctx.pool.fetchrow(
+        "SELECT email, full_name, handle FROM org.people WHERE id=$1", person_pk,
+    )
+    drive_pk = await _ensure_alpen_drive(ctx)
+    inst_pk = await _ensure_drive_installation(ctx)
+    file_id = drive_file_id()
+    pk = uuid4()
+    # change_seq is Drive's monotone change-tracking cursor (per installation).
+    # Bump it by querying max+1 — fine for backfill volume (~tens of files).
+    change_seq = (await ctx.pool.fetchval(
+        "SELECT COALESCE(MAX(change_seq), 0) + 1 FROM app_drive.files "
+        "WHERE installation_pk=$1", inst_pk,
+    )) or 1
+    try:
+        await ctx.pool.execute(
+            "INSERT INTO app_drive.files (id, installation_pk, drive_pk, file_id, "
+            "name, mime_type, size, web_view_link, owner_email, owner_name, "
+            "last_modifying_email, last_modifying_name, extracted_text, "
+            "created_time, modified_time, change_seq) "
+            "VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$14,$15)",
+            pk, inst_pk, drive_pk, file_id,
+            p.get("name") or p.get("title") or "Untitled",
+            p.get("mime_type") or "application/pdf",
+            p.get("size") or 250_000,
+            f"https://drive.google.com/file/d/{file_id}/view",
+            person["email"], person["full_name"] or person["handle"],
+            person["email"], person["full_name"] or person["handle"],
+            p.get("body") or "",
+            when, change_seq,
+        )
+        await ctx.idmap.put(p["id"], "drive_file", pk)
     except asyncpg.exceptions.UniqueViolationError:
         pass
 

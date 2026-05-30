@@ -1,0 +1,6 @@
+{"t":"2024-01-15T09:00:00Z","provider":"org","kind":"team.create","payload":{"id":"team:protocol","name":"Protocol"}}
+{"t":"2024-01-15T09:00:01Z","provider":"org","kind":"team.create","payload":{"id":"team:research","name":"Research","parent":"team:protocol"}}
+{"t":"2024-01-15T09:00:02Z","provider":"org","kind":"person.create","payload":{"id":"person:alice","handle":"alice","full_name":"Alice Anderson","email":"alice@example.com","role":"Founding Engineer","level":"staff","team":"team:protocol"}}
+{"t":"2024-01-15T09:00:03Z","provider":"org","kind":"person.create","payload":{"id":"person:bob","handle":"bob","full_name":"Bob Briggs","email":"bob@example.com","role":"Research Engineer","level":"senior","team":"team:research"}}
+{"t":"2024-02-01T10:00:00Z","provider":"github","kind":"repo.create","payload":{"id":"repo:strata","name":"strata","owner":"alpenlabs"}}
+{"t":"2024-02-02T11:30:00Z","provider":"slack","kind":"message","actor":"person:alice","payload":{"channel":"channel:general","text":"good morning"}}

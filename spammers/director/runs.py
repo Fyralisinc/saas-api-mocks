@@ -18,6 +18,8 @@ async def create_run(
     fyralis_base_url: str,
     archetype: str = "early_saas",
     virtual_now: Optional[datetime] = None,
+    profile_kind: Literal["profile", "corpus"] = "profile",
+    corpus_path: Optional[str] = None,
 ) -> UUID:
     rid = uuid4()
     vn = virtual_now or datetime.now(timezone.utc)
@@ -27,10 +29,11 @@ async def create_run(
         """
         INSERT INTO org.runs
             (id, size, runtime, seed, archetype, fyralis_tenant_id, fyralis_base_url,
-             virtual_now, mode, speed_multiplier)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'frozen', 1.0)
+             virtual_now, mode, speed_multiplier, profile_kind, corpus_path)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'frozen', 1.0, $9, $10)
         """,
         rid, size, runtime, seed, archetype, fyralis_tenant_id, fyralis_base_url, vn,
+        profile_kind, corpus_path,
     )
     return rid
 

@@ -205,11 +205,14 @@ class Controller:
                     raise RuntimeError(f"some servers failed to start: {healthy}")
 
                 # Start emit: clock ticker + corpus forward-replay + webhook
-                # emission. Default speed 60× so ~11mo of remaining corpus
-                # plays out in ~5.5 real-time days — fast enough to see
-                # counts move in the UI, slow enough not to flush the
-                # corpus end before anyone notices.
-                self._spawn_emit(speed=60.0)
+                # emission. Speed 1800× → 1 virtual day per ~48 real-sec.
+                # The corpus is sparse (~10k slack msgs across 47mo = ~0.3
+                # events/virtual-hour on average), so anything slower means
+                # multi-second stretches of static UI even during workday
+                # hours. At 1800× peak hours land an event per ~1s of real
+                # time and a 24h day finishes in under a minute. The
+                # remaining ~11mo of corpus exhausts in ~5 real hours.
+                self._spawn_emit(speed=1800.0)
 
                 self.state.running = True
                 self.state.phase = "running"

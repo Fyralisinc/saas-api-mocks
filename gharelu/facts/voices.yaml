@@ -1,0 +1,2557 @@
+voices:
+  person:prajwolrg:
+    person: person:prajwolrg
+    voice:
+      style: technical
+      characteristics:
+      - calm, direct protocol shorthand
+      - prefers precise failure modes
+      - terse but not cold
+      - asks for invariants before code
+      typical_concerns:
+      - consensus safety
+      - bridge edge cases
+      - proof verification paths
+      - test vectors and reorg behavior
+      reaction_to_bad_news: owns_and_debugs
+      active_hours: evenings
+    snippets:
+      kickoff:
+      - i’ll map the state transitions first
+      - let’s pin the invariant before we code it
+      - starting with the bridge path, then prover bits
+      - i want one clean repro before touching consensus
+      - scope looks fine, but reorg cases need spelling out
+      design:
+      - this makes the happy path nicer, but widens the trust surface
+      - can we separate liveness from safety here
+      - i’d rather keep this explicit in the state machine
+      - the abstraction is okay if the failure mode stays local
+      - what does the verifier learn in the bad case
+      impl:
+      - pushed the small version, less clever
+      - wired the checks in before the transition
+      - found one stale assumption in the bridge client
+      - keeping this branch boring on purpose
+      - need to add the reorg fixture before i call it done
+      review:
+      - logic looks right, naming hides the edge case a bit
+      - can we assert this instead of documenting it
+      - 'nit: this helper is doing consensus-shaped work'
+      - i’d like one test where the proof is valid but late
+      - this is fine after the boundary check moves up
+      audit:
+      - audit note is real, impact seems bounded
+      - i’m checking whether this can cross epochs
+      - the fix should be smaller than the finding
+      - need a negative vector for that verifier path
+      - don’t think this is exploitable, but proving that now
+      ship:
+      - merged the bridge fix
+      - ship it after the fixtures pass
+      - main path is clean now
+      - released the boring version
+      - i’ll watch logs for the first few runs
+      postmortem:
+      - root cause was an unstated ordering assumption
+      - we tested validity, not arrival order
+      - i should have made the epoch boundary explicit
+      - fix is in, adding the regression now
+      - next time i want the failure table in the design doc
+      retro:
+      - the smaller patches reviewed much faster
+      - we need earlier adversarial cases
+      - good call keeping prover changes separate
+      - handoff was fine, naming was not
+      - i’d like less implicit bridge state next round
+      hiring:
+      - strong signal if they ask about failure modes
+      - i care more about invariants than zk buzzwords
+      - good candidate, but i want to see debugging depth
+      - they explained the protocol tradeoff clearly
+      - let’s ask one reorg question and one proof-system question
+  person:Rajil1213:
+    person: person:Rajil1213
+    voice:
+      style: technical
+      characteristics:
+      - concise but context-aware
+      - prefers invariants over opinions
+      - calm under protocol pressure
+      - uses bridge-specific shorthand
+      typical_concerns:
+      - state machine correctness
+      - bitcoin edge cases
+      - test coverage
+      - p2p failure modes
+      reaction_to_bad_news: owns_and_debugs
+      active_hours: evenings
+    snippets:
+      kickoff:
+      - i can take the bridge side
+      - let's pin the state transitions first
+      - need the bitcoin assumptions written down
+      - i'll sketch the happy path and failure path
+      - before coding, let's agree on finality semantics
+      design:
+      - this should be an explicit state, not a flag
+      - i'd avoid coupling prover timing to bridge liveness
+      - the retry path needs to be deterministic
+      - let's keep the sm boring here
+      - what's the invariant after reorg handling?
+      impl:
+      - pushed the async client cleanup
+      - bridge watcher is less noisy now
+      - i'm wiring the p2p path into the same validation flow
+      - found one stale state update, fixing
+      - tests pass locally, running the heavier suite now
+      review:
+      - left a few nits on naming
+      - logic looks fine, but the error path is under-tested
+      - can we make this match the sm doc?
+      - this branch needs one reorg case
+      - approved after the panic handling tweak
+      audit:
+      - this is probably an invariant note
+      - let's not handwave the timeout behavior
+      - i'll write the repro before changing it
+      - audit wording is fair, fix is small
+      - need to check if this leaks across restart
+      ship:
+      - merged the bridge fix
+      - watcher patch is out
+      - shipping this after one more sync test
+      - deployed the safer retry behavior
+      - bridge side is green now
+      postmortem:
+      - root cause was stale local state after restart
+      - we missed the reorg plus timeout combo
+      - i should have added the regression earlier
+      - fix is in, adding a narrower alert
+      - no protocol issue, but bad operational behavior
+      retro:
+      - state docs helped more than expected
+      - we need fewer implicit bridge assumptions
+      - tests are good, but too slow to run casually
+      - next cycle i'd frontload restart cases
+      - review caught most things, audit caught the weird path
+      hiring:
+      - strong if they reason in states
+      - i'd ask them about reorg handling
+      - good systems instincts, light on bitcoin details
+      - bridge work needs patience for edge cases
+      - hire if they can debug without guessing
+  person:storopoli:
+    person: person:storopoli
+    voice:
+      style: technical
+      characteristics:
+      - precise but informal
+      - spec-first framing
+      - calm under protocol weirdness
+      - uses rust and bitcoin shorthand
+      typical_concerns:
+      - consensus safety
+      - bridge edge cases
+      - serialization correctness
+      - p2p failure modes
+      reaction_to_bad_news: owns_and_debugs
+      active_hours: evenings
+    snippets:
+      kickoff:
+      - i'll map the consensus surface first
+      - let's pin the invariant before coding this
+      - starting with the boring path, then adversarial cases
+      - i can take the bridge side
+      - need to read the spec twice here
+      design:
+      - this feels like protocol state, not app state
+      - prefer explicit encoding over clever inference
+      - what happens on reorg plus delayed gossip?
+      - let's make the invalid state unrepresentable
+      - i'd rather keep this dumb and auditable
+      impl:
+      - wired the parser, tests are next
+      - this is mostly plumbing, but sharp plumbing
+      - found one endian footgun while doing ssz
+      - p2p path is working locally now
+      - cleaned up the bridge state transitions
+      review:
+      - left a few nits, one real concern
+      - can we make this check closer to decode?
+      - this branch makes the invariant harder to see
+      - tests cover happy path, need malformed input too
+      - looks good after the serialization fix
+      audit:
+      - audit note is valid, impact looks bounded
+      - i'm reproducing the finding before patching
+      - this needs a regression test, not just a guard
+      - threat model says peer can absolutely do this
+      - i'll write up the consensus angle
+      ship:
+      - merged the bridge fix
+      - shipping once ci goes green
+      - release notes should mention the wire change
+      - this is ready from protocol side
+      - tagged the ssz cleanup for the next batch
+      postmortem:
+      - root cause was too much implicit state
+      - we missed the reorg interaction
+      - my bad on not testing malformed gossip earlier
+      - fix is small, lesson is bigger
+      - let's add the invariant to the docs
+      retro:
+      - spec review earlier would have saved time
+      - the p2p tests paid for themselves
+      - we should kill ambiguous naming in bridge code
+      - less cleverness, more invariants
+      - overall good, but review load got spiky
+      hiring:
+      - strong rust is good, protocol taste matters more
+      - ask them about failure modes, not syntax
+      - i want someone who reads specs patiently
+      - bitcoin context is a real multiplier here
+      - good signal if they test adversarial cases
+  person:MdTeach:
+    person: person:MdTeach
+    voice:
+      style: technical
+      characteristics:
+      - lowercase, direct, low-drama
+      - thinks in invariants and edge cases
+      - pragmatic about proofs and bridge safety
+      - short asks, precise followups
+      typical_concerns:
+      - bridge correctness
+      - proof assumptions
+      - consensus edge cases
+      - test vectors
+      reaction_to_bad_news: owns_and_debugs
+      active_hours: late_night
+    snippets:
+      kickoff:
+      - i'll take the bridge side first
+      - let's pin the invariant before we touch code
+      - sounds fine, but need the failure mode written down
+      - i can start with the verifier path
+      - main question is what state we trust here
+      design:
+      - this leaks too much protocol detail into callers
+      - i'd rather keep the transition explicit
+      - we need one source of truth for that root
+      - does this hold across reorg depth changes?
+      - the happy path is clear, edge path less so
+      impl:
+      - pushed the small refactor, tests still local
+      - bridge fix is in, checking vectors now
+      - i split the proof plumbing from state updates
+      - this was mostly a bounds issue
+      - need to clean one unwrap before merge
+      review:
+      - logic looks right, naming is hiding the invariant
+      - can you add the malformed proof case?
+      - small nit, but this branch should be impossible
+      - i don't think this clone is needed
+      - please make the trust assumption obvious here
+      audit:
+      - this one is worth treating as real until disproven
+      - audit note maps to the bridge timeout path
+      - i'll write the minimal repro
+      - not exploitable as-is, but the invariant is weak
+      - let's answer with code and a test
+      ship:
+      - merged the bridge fix
+      - ship it after ci goes green
+      - release notes should mention the state check
+      - i'm good with this version
+      - deployed locally, no vector drift
+      postmortem:
+      - root cause was us assuming monotonic state
+      - i missed that reorg branch
+      - the test covered valid inputs only
+      - we need fuzz coverage around that boundary
+      - fix is simple, prevention is the important part
+      retro:
+      - design doc helped, but invariants came late
+      - reviews were good once tests were concrete
+      - we should write adversarial cases earlier
+      - less implicit protocol context in code please
+      - handoffs were okay, specs lagged behind
+      hiring:
+      - strong candidate if they can reason from first principles
+      - i'd ask more about consensus failure cases
+      - good rust, weaker on protocol assumptions
+      - need someone comfortable being wrong in review
+      - zk depth is teachable, rigor is harder
+  person:krsnapaudel:
+    person: person:krsnapaudel
+    voice:
+      style: technical
+      characteristics:
+      - calm infra pragmatist
+      - short, precise updates
+      - names failure modes directly
+      - prefers observability over guessing
+      typical_concerns:
+      - dashboard accuracy
+      - faucet reliability
+      - deploy safety
+      - stale state and bad metrics
+      reaction_to_bad_news: owns_and_debugs
+      active_hours: normal
+    snippets:
+      kickoff:
+      - i can take the infra side here
+      - first pass, let's map the failure path
+      - need metrics before we tune anything
+      - i'll start with faucet and dashboard state
+      - let's keep the scope boring for v1
+      design:
+      - i'd avoid coupling this to the ui state
+      - can we make the retry path explicit?
+      - this should be idempotent from day one
+      - metrics need labels we can actually query
+      - prefer a small worker over clever request logic
+      impl:
+      - pushed the faucet cleanup
+      - wired the dashboard query through the new path
+      - added backoff, logs, and a sane timeout
+      - this is mostly plumbing now
+      - i'm checking the edge case around stale checkpoints
+      review:
+      - looks fine, one nit on error handling
+      - can we avoid swallowing this error?
+      - the happy path is clear, retry path less so
+      - please add a metric for this branch
+      - i'd rather not make config implicit here
+      audit:
+      - this needs a tighter invariant
+      - not seeing how we recover after partial failure
+      - logs won't be enough during an incident
+      - let's document the trust boundary here
+      - rate limits should fail closed
+      ship:
+      - merged the bridge fix
+      - deploy is green from my side
+      - faucet is stable after the rollout
+      - dashboards are updated with the new metric
+      - i'll watch logs for a bit after deploy
+      postmortem:
+      - root cause was stale cache plus weak alerting
+      - we should have paged on queue depth earlier
+      - i missed the timeout interaction there
+      - 'action item: add synthetic checks for faucet'
+      - the fix is simple, detection was the gap
+      retro:
+      - infra work was fine, handoff was fuzzy
+      - we need clearer owners for dashboards
+      - less async guessing next time
+      - the rollout plan helped
+      - we should write down operational assumptions earlier
+      hiring:
+      - strong infra sense, asked good failure questions
+      - i'd probe more on production debugging
+      - good signal on ownership, less on systems depth
+      - seems practical, not over-frameworked
+      - hire if references confirm execution speed
+  person:delbonis:
+    person: person:delbonis
+    voice:
+      style: technical
+      characteristics:
+      - terse but not cryptic
+      - precise protocol language
+      - calm under ambiguity
+      - favors invariants over vibes
+      typical_concerns:
+      - consensus edge cases
+      - zk circuit constraints
+      - bridge correctness
+      - test vectors
+      reaction_to_bad_news: owns_and_debugs
+      active_hours: evenings
+    snippets:
+      kickoff:
+      - i'll take the state transition path first
+      - let's pin the invariant before code shape
+      - i can start with the boring correctness bit
+      - need the threat model before this gets too real
+      - i'll sketch the protocol boundary and we can argue from there
+      design:
+      - this leaks too much policy into consensus
+      - i'd rather make the invalid state unrepresentable
+      - the circuit wants the simpler shape here
+      - can we separate verification from persistence
+      - feels fine if the l1 view stays explicit
+      impl:
+      - wiring this through strata-common now
+      - ckt changes are mostly mechanical after this
+      - found the annoying serialization mismatch
+      - i'm keeping the proof inputs dumb on purpose
+      - bridge path compiles, tests are still catching up
+      review:
+      - 'nit: name this after the invariant, not the type'
+      - this branch makes the happy path harder to audit
+      - can we get a regression test for that case
+      - looks right, but i want one more malformed proof case
+      - the abstraction is fine, docs need one sentence
+      audit:
+      - this is probably harmless, but let's prove it
+      - audit note is fair, the bound is implicit
+      - i'll make the check loud instead of clever
+      - need a test where the witness lies
+      - let's not depend on caller discipline here
+      ship:
+      - merged the bridge fix
+      - alpen side is green now
+      - ckt followup is in, no behavior change
+      - shipping this once the vectors regenerate
+      - that should unblock moho integration
+      postmortem:
+      - root cause was a stale assumption about ordering
+      - i missed the empty batch case
+      - we need the invariant in the test name next time
+      - the code did what we asked, sadly
+      - i'll write the regression before touching the fix
+      retro:
+      - design review helped, but too late
+      - we should keep protocol notes closer to code
+      - less cleverness in the bridge layer would help
+      - test vectors paid for themselves again
+      - i want smaller slices around consensus changes
+      hiring:
+      - ask them to reason from invariants
+      - good signal if they notice the trust boundary
+      - i care less about rust trivia than debugging taste
+      - give them a broken proof flow and watch
+      - protocol empathy matters here
+  person:sapinb:
+    person: person:sapinb
+    voice:
+      style: technical
+      characteristics:
+      - calm ops shorthand
+      - direct status updates
+      - infra-first framing
+      - dry but helpful
+      typical_concerns:
+      - deploy safety
+      - ci reliability
+      - monitoring gaps
+      - access and secrets hygiene
+      reaction_to_bad_news: owns_and_debugs
+      active_hours: normal
+    snippets:
+      kickoff:
+      - i'll wire up the env bits first
+      - need the deploy shape before i touch runners
+      - starting with ci since that blocks everyone
+      - let me check what prod actually needs here
+      - i can take the ops side of this
+      design:
+      - prefer fewer moving parts for this one
+      - where does this fail when the runner is cold
+      - we should keep staging close to prod
+      - secret rotation needs to be boring here
+      - can we avoid another bespoke deploy path
+      impl:
+      - pushed the workflow cleanup
+      - dashboards are reading the new labels now
+      - bridge env is synced, testing the deploy path
+      - runner image is rebuilt and cached
+      - added the missing alert route
+      review:
+      - mostly fine, one env var name worries me
+      - can you keep the old path for rollback
+      - this needs a staging run before merge
+      - 'nit: logs should include the chain id'
+      - approving once the secret name is fixed
+      audit:
+      - checking access drift now
+      - this alert is too quiet for bridge traffic
+      - need logs for the failed handoff window
+      - i found one stale token, rotating it
+      - audit trail is there, retention is the gap
+      ship:
+      - merged the bridge fix
+      - deploy is green in staging
+      - prod rollout started, watching metrics
+      - shipped the dashboard patch
+      - all checks green, no runner weirdness
+      postmortem:
+      - root cause was the stale secret
+      - we missed the alert because labels changed
+      - i'll add a guardrail for that deploy step
+      - rollback worked, detection was the weak part
+      - next time this should page earlier
+      retro:
+      - ci was noisy but the fix was small
+      - we need fewer manual prod toggles
+      - staging caught the right thing this time
+      - handoff docs are still too tribal
+      - ops load was ok, alerts need tuning
+      hiring:
+      - good ops sense, asked about failure modes
+      - strong on infra basics, light on zk context
+      - i'd want a practical ci exercise
+      - seems calm under vague deploy problems
+      - hire if we need someone hands-on fast
+  person:Zk2u:
+    person: person:Zk2u
+    voice:
+      style: terse
+      characteristics:
+      - lowercase, clipped updates
+      - infra-first, research-aware
+      - dry confidence, low ceremony
+      - names systems directly
+      typical_concerns:
+      - reproducibility
+      - bridge reliability
+      - faucet edge cases
+      - proof/job plumbing
+      reaction_to_bad_news: owns_and_debugs
+      active_hours: late_night
+    snippets:
+      kickoff:
+      - i can take the infra side
+      - need the shape of the interface first
+      - let's keep this boring if possible
+      - i'll wire ckt and report back
+      - assume bridge path is the risky bit
+      design:
+      - this wants a smaller boundary
+      - state should live closer to the worker
+      - i don't love another config knob here
+      - make the failure mode explicit
+      - if mosaic depends on this, keep it stable
+      impl:
+      - pushed the worker plumbing
+      - faucet path is less cursed now
+      - bridge retry logic is in
+      - still cleaning the ckt harness
+      - alpen env defaults were drifting, fixed locally
+      review:
+      - mostly fine, one sharp edge
+      - can we avoid the implicit unwrap here
+      - this test only covers the happy path
+      - naming is doing too much work
+      - ship after the timeout case lands
+      audit:
+      - i'll trace the failure path
+      - logs need to prove what happened
+      - this is probably harmless, still worth tightening
+      - repro first, then patch
+      - bridge assumptions should be written down
+      ship:
+      - merged the bridge fix
+      - faucet-api is live with the new guard
+      - ckt changes are in
+      - rolled it, watching metrics
+      - shipped the boring version
+      postmortem:
+      - root cause was config drift
+      - we missed the empty queue case
+      - i should've made the retry visible
+      - added logs where the gap was
+      - next time we gate on a repro test
+      retro:
+      - less clever infra, more invariants
+      - handoffs need concrete commands
+      - the late review saved us there
+      - we should document the bridge assumptions
+      - good week, too many invisible states
+      hiring:
+      - ask them about debugging prod weirdness
+      - i care more about taste than tool trivia
+      - good infra people remove choices
+      - give them a broken service and logs
+      - research context helps, panic debugging matters more
+  person:uncomputable:
+    person: person:uncomputable
+    voice:
+      style: technical
+      characteristics:
+      - precise, low-drama wording
+      - asks for invariants before opinions
+      - terse but not brusque
+      - bridge/security vocabulary
+      typical_concerns:
+      - trust assumptions
+      - withdrawal edge cases
+      - proof/model consistency
+      - bitcoin consensus constraints
+      reaction_to_bad_news: owns_and_debugs
+      active_hours: evenings
+    snippets:
+      kickoff:
+      - i'll sketch the model first, then we can argue details
+      - main question is what we're assuming about honest watchers
+      - starting with the withdrawal path, deposits are less weird
+      - let me write down the invariants before implementation drifts
+      - i think this needs one clean spec pass first
+      design:
+      - this adds a trust assumption unless i'm missing something
+      - the happy path is fine; failure semantics need more work
+      - can we separate liveness from safety here
+      - this should be stated as an invariant, not prose
+      - bitcoin side constraints make the nicer design unavailable
+      impl:
+      - i pushed the boring version, fewer moving parts
+      - model and code agree now, at least on the cases i checked
+      - need to tighten the timeout handling before this is useful
+      - the bridge state machine is less angry now
+      - i'm wiring the proof checks into the withdrawal flow
+      review:
+      - logic looks right, naming makes the invariant harder to see
+      - can we add the adversarial case here
+      - i don't love this branch; it hides a protocol assumption
+      - small nit, but this should be impossible by construction
+      - approved modulo the test for delayed finality
+      audit:
+      - this is probably an audit note if we leave it implicit
+      - worth documenting why this cannot steal funds
+      - i'd like a concrete exploit attempt, not just intuition
+      - the bound is doing real work here
+      - let's not make auditors reverse-engineer the bridge model
+      ship:
+      - merged the bridge fix
+      - spec update is in
+      - shipped the withdrawal cleanup
+      - this should unblock the next bridge pass
+      - docs and model are consistent again
+      postmortem:
+      - root cause was an unstated liveness assumption
+      - we tested the normal delay, not the pathological one
+      - i should have forced this into the spec earlier
+      - the code was faithful to the wrong model
+      - fix is small; lesson is mostly process
+      retro:
+      - more invariants, fewer vibes
+      - design reviews were useful when we kept them concrete
+      - we need to catch model/code divergence earlier
+      - bridge work gets expensive when assumptions stay verbal
+      - i'd like tighter handoff between research and implementation
+      hiring:
+      - strong candidate if they can reason adversarially
+      - i care less about zk buzzwords than precision
+      - ask them where the trust assumption moved
+      - 'good sign: they noticed the bitcoin constraint unprompted'
+      - i'd want one more protocol design round
+  person:purusang:
+    person: person:purusang
+    voice:
+      style: technical
+      characteristics:
+      - lowercase, direct, low-drama
+      - infra-first framing
+      - asks for repros and logs
+      - prefers small patches
+      typical_concerns:
+      - deploy reliability
+      - dashboard correctness
+      - rpc and indexer behavior
+      - faucet edge cases
+      reaction_to_bad_news: owns_and_debugs
+      active_hours: evenings
+    snippets:
+      kickoff:
+      - i'll take the infra side here
+      - let me map the moving parts first
+      - starting with the logs, then config
+      - can we keep the first version narrow?
+      - i'll wire the boring bits
+      design:
+      - this should stay config-driven imo
+      - what's the failure mode if rpc lags?
+      - i'd rather not couple this to dashboards
+      - can we make the indexer state explicit?
+      - small api surface, easier to operate
+      impl:
+      - pushed the env cleanup
+      - faucet path is handling retries now
+      - added the missing health check
+      - checkpoint explorer is indexing locally
+      - need to tighten the timeout here
+      review:
+      - looks fine, one naming nit
+      - can we avoid swallowing this error?
+      - please add the unhappy path test
+      - this log line will save us later
+      - lgtm after the config default
+      audit:
+      - checking if this can fail open
+      - logs don't show leakage, but verifying
+      - this needs a clearer invariant
+      - i'll trace it through the deploy path
+      - not exploitable from what i see
+      ship:
+      - merged the bridge fix
+      - dashboard update is live
+      - faucet deploy finished cleanly
+      - shipped the health endpoint
+      - watching metrics for a bit
+      postmortem:
+      - root cause was stale config
+      - i missed the retry interaction there
+      - adding an alert so we catch this earlier
+      - the deploy was green but state was not
+      - we need better rpc lag visibility
+      retro:
+      - less manual env drift next time
+      - alerts were too noisy to trust
+      - small releases worked well here
+      - docs need the actual runbook steps
+      - we should test against slow indexers
+      hiring:
+      - strong infra sense, asked good failure questions
+      - would pair well on dashboards and ops
+      - good signal on debugging under ambiguity
+      - i'd like to see more production judgment
+      - solid, but needs deeper protocol context
+  person:bewakes:
+    person: person:bewakes
+    voice:
+      style: technical
+      characteristics:
+      - concise but not brusque
+      - defaults to protocol specifics
+      - calm debugging tone
+      - careful about edge cases
+      typical_concerns:
+      - consensus assumptions
+      - bridge correctness
+      - storage invariants
+      - test coverage
+      reaction_to_bad_news: owns_and_debugs
+      active_hours: evenings
+    snippets:
+      kickoff:
+      - i'll take the bridge side first
+      - let's pin down the invariant before coding
+      - starting with the happy path, then failure modes
+      - i need one pass through the state transitions
+      - will map the protocol bits before touching storage
+      design:
+      - this leaks too much policy into consensus
+      - i'd rather keep the transition explicit here
+      - the encoding is fine, the boundary feels fuzzy
+      - can we make the failure case impossible instead
+      - this should be boring for the verifier
+      impl:
+      - wired the sled path, tests still pending
+      - the bridge fix is smaller than expected
+      - i'm splitting decode from validation
+      - found one off-by-one in the epoch handling
+      - mostly plumbing now, no protocol change
+      review:
+      - left a few notes on naming and invariants
+      - logic looks ok, tests need the bad path
+      - can we avoid cloning this payload twice
+      - this helper hides a state transition
+      - approved once the panic path is covered
+      audit:
+      - this is audit-sensitive, let's keep it explicit
+      - need a test for malformed proof input
+      - the assumption is valid, but please write it down
+      - i don't like implicit trust at this boundary
+      - checking whether this can desync the bridge
+      ship:
+      - merged the bridge fix
+      - shipped the storage cleanup
+      - this is in, watching CI now
+      - release branch has the protocol patch
+      - done, no migration needed
+      postmortem:
+      - root cause was validation happening too late
+      - i missed the retry interaction there
+      - we should have had a regression test
+      - the state machine allowed one weird edge
+      - fix is small, lesson is stricter boundaries
+      retro:
+      - less implicit context would help
+      - reviews caught real issues this cycle
+      - we should write invariants next to code
+      - too much protocol knowledge stayed in chat
+      - testing got better after we split modules
+      hiring:
+      - i'd look for protocol debugging depth
+      - rust is table stakes, judgment matters more
+      - good signal if they ask about failure modes
+      - i care how they reason about invariants
+      - bridge experience is useful, paranoia is better
+  person:voidash:
+    person: person:voidash
+    voice:
+      style: technical
+      characteristics:
+      - lowercase and direct
+      - terse but not brusque
+      - protocol-first phrasing
+      - flags edge cases early
+      typical_concerns:
+      - consensus correctness
+      - bridge invariants
+      - checkpoint semantics
+      - test coverage around reorgs
+      reaction_to_bad_news: owns_and_debugs
+      active_hours: evenings
+    snippets:
+      kickoff:
+      - i'll take the protocol side of this
+      - 'first pass: define invariants, then wire it'
+      - can we pin the failure mode before coding
+      - i want the checkpoint path explicit here
+      - scope looks fine if bridge state stays isolated
+      design:
+      - this leaks too much consensus detail upward
+      - prefer the boring state machine here
+      - what happens across a shallow reorg
+      - we should make finality assumptions visible
+      - i'd rather not encode policy in the parser
+      impl:
+      - pushing the common bits into strata-common
+      - i have the happy path wired locally
+      - need one more reorg test before i trust it
+      - bridge sync is mostly done, cleaning edges
+      - the explorer path needed less glue than expected
+      review:
+      - logic looks right, naming is doing too much
+      - can we split validation from mutation here
+      - this should probably fail closed
+      - left a small comment on the checkpoint check
+      - tests cover the main path, need the weird one
+      audit:
+      - this is an invariant question, not style
+      - i'll trace the bridge state transition again
+      - audit note seems valid under delayed finality
+      - we need a regression test for that case
+      - not exploitable as written, but too implicit
+      ship:
+      - merged the bridge fix
+      - checkpoint explorer change is out
+      - faucet api patch is live
+      - shipping after the sync test passes
+      - this is ready from protocol side
+      postmortem:
+      - root cause was stale checkpoint assumptions
+      - i missed the reorg interaction there
+      - fix is small, test gap was the real issue
+      - we should document the finality boundary
+      - i'll own the regression coverage
+      retro:
+      - handoff was fine, spec was too soft
+      - less implicit protocol context next time
+      - reviews caught useful stuff late
+      - common crate changes need earlier notice
+      - i'd keep the same scope, add sharper tests
+      hiring:
+      - good signal if they ask about invariants
+      - i'd want to see how they debug state
+      - rust depth matters, protocol taste matters more
+      - strong on zk basics, light on systems
+      - worth a loop if they can reason from specs
+  person:mukeshdroid:
+    person: person:mukeshdroid
+    voice:
+      style: technical
+      characteristics:
+      - precise but low-drama
+      - research-first, implementation-aware
+      - asks for assumptions before conclusions
+      - uses zk and crypto shorthand naturally
+      typical_concerns:
+      - soundness gaps
+      - bridge threat model
+      - circuit constraints
+      - proof costs
+      reaction_to_bad_news: owns_and_debugs
+      active_hours: evenings
+    snippets:
+      kickoff:
+      - i’ll sanity check the proof shape first
+      - let’s pin assumptions before we bikeshed the api
+      - starting from the adversary model, then code
+      - i can take the garbling side
+      - need one pass on constraints before estimates
+      design:
+      - this works if we keep the verifier boundary small
+      - i’d rather not hide trust in naming
+      - can we make the leakage explicit here
+      - the bridge flow needs one less implicit assumption
+      - this is probably fine, but prove the invariant
+      impl:
+      - wiring this now, tests after the relation is stable
+      - the constraint count moved less than expected
+      - i’m keeping the interface boring on purpose
+      - found the mismatch, it’s in encoding not crypto
+      - garbling path is cleaner with fixed labels
+      review:
+      - logic looks fine, but the comment overclaims
+      - can we add the negative case here
+      - this needs a threat-model note
+      - 'nit: call this witness, not input'
+      - i don’t see a soundness issue, just ergonomics
+      audit:
+      - marking this as real until disproven
+      - need to separate exploitability from weirdness
+      - i’ll reduce it to a minimal trace
+      - the finding is fair, wording is a bit broad
+      - let’s not patch around the invariant
+      ship:
+      - merged the bridge fix
+      - docs are synced with the current construction
+      - this is shippable from research side
+      - proof notes landed, no new assumptions
+      - shipping with the conservative bound
+      postmortem:
+      - root cause was unclear ownership of the encoding
+      - we should have written the invariant earlier
+      - no blame, but the interface invited misuse
+      - missed test was the malformed witness path
+      - next time we freeze terminology first
+      retro:
+      - research/code handoff was better this cycle
+      - too much context lived in calls
+      - the design doc saved us twice
+      - we need smaller review chunks
+      - less cleverness, more executable specs
+      hiring:
+      - strong if they can reason from assumptions
+      - i’d ask them to break a toy bridge
+      - good zk intuition, needs more systems taste
+      - they noticed the trust boundary quickly
+      - hire if they’re comfortable being precise
+  person:Hakkush-07:
+    person: person:Hakkush-07
+    voice:
+      style: technical
+      characteristics:
+      - precise, low-drama research tone
+      - lowercase, compact explanations
+      - careful about assumptions
+      - prefers invariants over vibes
+      typical_concerns:
+      - proof soundness
+      - edge cases in algebra
+      - spec clarity
+      - reproducible benchmarks
+      reaction_to_bad_news: owns_and_debugs
+      active_hours: normal
+    snippets:
+      kickoff:
+      - i'll map the assumptions first
+      - starting with the security model
+      - need the exact statement before coding
+      - i can take the proof sketch
+      - let me sanity check the construction
+      design:
+      - this needs a cleaner invariant
+      - the reduction is doing too much work
+      - i'd separate protocol logic from encoding
+      - sounds fine if the transcript is fixed
+      - we should write the failure condition explicitly
+      impl:
+      - wired the g16 path locally
+      - field arithmetic looks okay now
+      - i'm keeping this close to the spec
+      - added the missing constraint check
+      - this is probably a serialization issue
+      review:
+      - left a few comments on assumptions
+      - the math is fine, naming is confusing
+      - can we avoid implicit modulus here
+      - i want one negative test for this
+      - looks correct after the transcript change
+      audit:
+      - audit note is valid, fixing
+      - this edge case was under-specified
+      - i'll produce a minimal trace
+      - not exploitable as written, but unclear
+      - we should document the trust boundary
+      ship:
+      - merged the constraint fix
+      - g16 changes are in
+      - ready from research side
+      - shipped the updated proof notes
+      - bench numbers are attached in the thread
+      postmortem:
+      - root cause was an unstated assumption
+      - i missed the degenerate case
+      - the spec and implementation diverged here
+      - we need a smaller test vector
+      - i'll add this to the checklist
+      retro:
+      - more examples would have saved time
+      - research handoff needs sharper definitions
+      - bench setup should be reproducible by default
+      - less ambiguity around transcript format
+      - the review loop worked well after spec freeze
+      hiring:
+      - strong candidate if they reason carefully
+      - i care more about rigor than speed
+      - ask them about soundness failure modes
+      - good signal on finite field intuition
+      - would pair them with protocol work first
+  person:evgenyzdanovich:
+    person: person:evgenyzdanovich
+    voice:
+      style: technical
+      characteristics:
+      - concise and implementation-first
+      - precise about protocol invariants
+      - calm, low-drama debugging
+      - uses zk and rust shorthand naturally
+      typical_concerns:
+      - correctness before cleanup
+      - proof constraints
+      - serialization boundaries
+      - edge-case tests
+      reaction_to_bad_news: owns_and_debugs
+      active_hours: evenings
+    snippets:
+      kickoff:
+      - i'll take the state transition path first
+      - let's pin the invariant before touching code
+      - starting with a small repro, then patch
+      - i need the exact consensus assumption here
+      - will map the serde boundary today
+      design:
+      - this should stay explicit, no hidden protocol magic
+      - can we avoid coupling this to prover internals
+      - the type shape is ok, but the invariant is implicit
+      - i'd rather encode this once at the boundary
+      - we need a failure mode that is boring
+      impl:
+      - pushed the parser cleanup locally
+      - the constraint path is smaller than expected
+      - i'm splitting validation from conversion
+      - this compiles, tests still need the negative case
+      - found the off-by-one in the range check
+      review:
+      - left notes on the unchecked unwraps
+      - logic looks right, naming hides the important bit
+      - please add the malformed input case
+      - this should be deterministic across platforms
+      - i think this branch can be unreachable
+      audit:
+      - audit concern is real, but bounded
+      - we should document the assumption, not handwave it
+      - checking whether this can cross the trust boundary
+      - this needs a regression test before closeout
+      - i'll trace the witness values again
+      ship:
+      - merged the bridge fix
+      - release branch has the protocol patch now
+      - shipped the serde guard
+      - prover path is green on my side
+      - i'm ok shipping with the explicit check
+      postmortem:
+      - root cause was validation happening too late
+      - i missed the empty vector case
+      - the fix is simple, the test was missing
+      - we trusted the caller more than intended
+      - next time i'll start from adversarial input
+      retro:
+      - spec drift cost us time here
+      - the smaller diff was easier to reason about
+      - we need earlier review on consensus-facing changes
+      - tests caught the easy path only
+      - good outcome, but too much implicit context
+      hiring:
+      - strong rust is useful, but protocol judgment matters more
+      - i'd ask them to debug a bad proof trace
+      - good signal if they question the invariant
+      - need someone comfortable with boring correctness work
+      - i care how they handle ambiguous specs
+  person:bbist:
+    person: person:bbist
+    voice:
+      style: technical
+      characteristics:
+      - concise bridge-focused updates
+      - calm, practical debugging
+      - lowercase, minimal punctuation
+      - names edge cases directly
+      typical_concerns:
+      - bridge correctness
+      - proof and state transitions
+      - retry paths
+      - integration test coverage
+      reaction_to_bad_news: owns_and_debugs
+      active_hours: normal
+    snippets:
+      kickoff:
+      - i’ll take the bridge side
+      - starting with the state path first
+      - need to confirm the failure mode before touching impl
+      - i’ll map the handoff points today
+      - keeping this scoped to bridge logic for now
+      design:
+      - this should probably fail closed
+      - i’d rather make the transition explicit here
+      - the retry semantics need to be boring
+      - can we separate validation from submission
+      - this path needs one owner of truth
+      impl:
+      - wired the bridge check locally
+      - still cleaning up the state wrapper
+      - the happy path is done, testing reorg-ish cases now
+      - found one annoying mismatch in the payload shape
+      - pushing after i add the missing guard
+      review:
+      - left a few bridge comments
+      - mostly looks right, one ordering issue
+      - can we add the negative test here
+      - this branch handles retry but not duplicate submit
+      - naming is a little overloaded in this file
+      audit:
+      - this is worth treating as real
+      - i’m checking if the invariant actually holds
+      - the report is vague but the edge case is plausible
+      - need a test that proves the bad transition fails
+      - i’ll trace it against the bridge state machine
+      ship:
+      - merged the bridge fix
+      - bridge path is green now
+      - shipped the validation cleanup
+      - i’ll watch logs after deploy
+      - the risky bit is covered by the new test
+      postmortem:
+      - root cause was stale state assumptions
+      - we accepted a path we should have rejected
+      - i missed the duplicate submission case
+      - fix is small, test gap was the bigger issue
+      - we need clearer boundaries around bridge state
+      retro:
+      - integration tests caught too little here
+      - handoff between components was underspecified
+      - i’d like fewer implicit state assumptions
+      - bridge review should include failure paths by default
+      - the fix was fine, the process was noisy
+      hiring:
+      - i’d ask them to reason through failure modes
+      - good sign if they care about invariants
+      - bridge experience helps, but correctness mindset matters more
+      - i want to see how they debug partial state
+      - strong candidate if they make edge cases concrete
+  person:AaronFeickert:
+    person: person:AaronFeickert
+    voice:
+      style: technical
+      characteristics:
+      - precise and dry
+      - caveats assumptions early
+      - prefers math over vibes
+      - short, careful replies
+      typical_concerns:
+      - proof soundness
+      - threat models
+      - parameter choices
+      - reviewable specs
+      reaction_to_bad_news: owns_and_debugs
+      active_hours: normal
+    snippets:
+      kickoff:
+      - i'll sketch the assumptions first
+      - let's separate protocol intent from implementation detail
+      - happy to own the proof side
+      - before coding, i want the security claim written down
+      - i'll start with the minimal model
+      design:
+      - this needs a cleaner adversary statement
+      - the construction is fine if that binding assumption holds
+      - i'd rather not hide this in notation
+      - can we make the transcript boundary explicit
+      - this is probably overfitted to the current circuit
+      impl:
+      - pushed the parameter cleanup
+      - i made the verifier checks more boring
+      - the edge case was in serialization, not the proof
+      - left the slow path readable for now
+      - this should be deterministic now
+      review:
+      - mostly looks right, one assumption is implicit
+      - can you spell out why this cannot rewind
+      - the naming makes the invariant harder to see
+      - i'd like one negative test here
+      - this diff is easier to review than the last shape
+      audit:
+      - flagging this as a soundness question
+      - not exploitable yet, but the argument is incomplete
+      - we need to answer the auditor's exact claim
+      - i'll write the reduction more explicitly
+      - this is where the spec should do more work
+      ship:
+      - merged the verifier cleanup
+      - this is ready from my side
+      - shipped the proof note
+      - i'm comfortable shipping with that caveat documented
+      - the remaining risk is operational, not cryptographic
+      postmortem:
+      - root cause was an unstated encoding assumption
+      - i should have asked for the invariant earlier
+      - the tests matched the happy proof too closely
+      - we need a shorter path from spec to checks
+      - i'll add the missing failure case
+      retro:
+      - the design review helped, but came late
+      - we should write fewer clever specs
+      - clearer notation would have saved time
+      - the handoff worked once the claims were explicit
+      - next time i'd pin parameters before implementation
+      hiring:
+      - strong candidate if they can reason from assumptions
+      - i'd ask them to break a toy protocol
+      - good signal on cryptographic hygiene
+      - less interested in buzzwords, more in careful arguments
+      - they explained tradeoffs without overselling
+  person:nakkstar123:
+    person: person:nakkstar123
+    voice:
+      style: technical
+      characteristics:
+      - precise but low-drama
+      - thinks in assumptions and reductions
+      - short async updates
+      - careful about proof details
+      typical_concerns:
+      - soundness gaps
+      - constraint costs
+      - edge cases in protocols
+      - reproducible benchmarks
+      reaction_to_bad_news: owns_and_debugs
+      active_hours: evenings
+    snippets:
+      kickoff:
+      - i'll sanity check the construction first
+      - starting with the threat model here
+      - let me pin down assumptions before impl
+      - i can take the proof sketch pass
+      - will write notes as i go
+      design:
+      - this works if we keep the randomness scoped
+      - i think the reduction is doing too much
+      - can we separate protocol logic from encoding here
+      - constraint count may dominate this path
+      - the invariant should be stated more explicitly
+      impl:
+      - pushed the first cut locally
+      - encoding is cleaner now
+      - still need to handle the degenerate case
+      - bench looks noisy, rerunning with fixed seeds
+      - i'm folding the verifier checks together
+      review:
+      - left a few proof-level comments
+      - mostly fine, one soundness question
+      - can we avoid relying on ordering there
+      - the api shape seems ok to me
+      - i'd like one negative test for this
+      audit:
+      - this is probably benign but worth documenting
+      - i'll trace the failure mode
+      - assumption mismatch is the real issue
+      - we should not leave this implicit
+      - adding this to the audit notes
+      ship:
+      - merged the constraint cleanup
+      - bridge fix is in
+      - this is ready from research side
+      - shipped the verifier notes
+      - i think we can unblock now
+      postmortem:
+      - root cause was underspecified inputs
+      - i should have caught that case earlier
+      - the test missed invalid witnesses
+      - fix is straightforward, docs need updating
+      - let's add the invariant to the spec
+      retro:
+      - spec drift cost us time
+      - benchmarks need to be easier to reproduce
+      - research review should happen one step earlier
+      - less ambiguity around assumptions would help
+      - overall process was ok, handoff was rough
+      hiring:
+      - strong candidate if the proof writing holds up
+      - i care more about rigor than speed here
+      - good instincts on zk details
+      - would like to see them debug a broken protocol
+      - ask them about soundness, not just familiarity
+  person:sistemd:
+    person: person:sistemd
+    voice:
+      style: technical
+      characteristics:
+      - lowercase, compact, precise
+      - bridge-focused and protocol-aware
+      - prefers invariants over vibes
+      - calm when things break
+      typical_concerns:
+      - withdrawal safety
+      - proof assumptions
+      - edge cases around reorgs
+      - bridge observability
+      reaction_to_bad_news: owns_and_debugs
+      active_hours: evenings
+    snippets:
+      kickoff:
+      - i'll trace the bridge path first
+      - starting with invariants, then wiring
+      - need to pin the failure mode
+      - let's keep scope to withdrawals
+      - i'll write down assumptions before coding
+      design:
+      - this needs a sharper trust boundary
+      - what happens under a short reorg?
+      - i'd rather make the state transition explicit
+      - proof path looks ok, watcher path less so
+      - let's separate liveness from safety here
+      impl:
+      - pushed the bridge plumbing
+      - adding the missing state check now
+      - the parser was accepting too much
+      - i'm tightening this before tests
+      - watcher retry logic is the noisy bit
+      review:
+      - left comments on the edge case
+      - this needs one negative test
+      - naming is hiding the actual invariant
+      - looks right after the guard moves
+      - can we avoid duplicating that encoding logic?
+      audit:
+      - this is worth treating as real
+      - i can repro the unsafe path locally
+      - impact depends on finality assumptions
+      - patch should be small, tests less small
+      - let's write the exploit condition clearly
+      ship:
+      - bridge fix is merged
+      - deploy notes are updated
+      - i'd like one more watcher run
+      - shipped the withdrawal guard
+      - prod looks quiet after the rollout
+      postmortem:
+      - root cause was state drift
+      - we missed the retry interaction
+      - logs were not enough here
+      - i should have added that assertion earlier
+      - next time we simulate the reorg path
+      retro:
+      - less implicit state would help
+      - tests caught the easy part only
+      - review needs more protocol context
+      - the bridge code is still too coupled
+      - good outcome, but detection was late
+      hiring:
+      - i'd look for protocol debugging depth
+      - ask them about reorg handling
+      - bridge intuition matters more than framework fluency
+      - strong yes if they reason from invariants
+      - i want someone comfortable owning weird failures
+  person:irnb:
+    person: person:irnb
+    voice:
+      style: technical
+      characteristics:
+      - quiet, precise, low-drama
+      - asks for invariants before code
+      - terse but not cold
+      - prefers concrete failure cases
+      typical_concerns:
+      - protocol edge cases
+      - serialization correctness
+      - consensus safety
+      - test vectors
+      reaction_to_bad_news: owns_and_debugs
+      active_hours: evenings
+    snippets:
+      kickoff:
+      - i'll trace the state transition first
+      - need the invariant written down before touching this
+      - starting with the boring path, then edge cases
+      - i can take the protocol side
+      - let me map the data flow once
+      design:
+      - this seems fine if the encoding is canonical
+      - i'd rather make the invalid state unrepresentable
+      - where does this get checked on reorg?
+      - we should separate consensus logic from plumbing here
+      - the boundary feels too implicit
+      impl:
+      - pushed the parser cleanup
+      - added the missing roundtrip tests
+      - i'm keeping this dumb on purpose
+      - found one unwrap in the bad path
+      - the ssz bit is less annoying now
+      review:
+      - left a few nits, mostly naming
+      - logic looks right, tests need one adversarial case
+      - can we avoid cloning here?
+      - this should probably fail closed
+      - i don't trust this default
+      audit:
+      - this finding is real, impact looks bounded
+      - checking whether this crosses consensus
+      - need a regression test for the exact shape
+      - the mitigation should be smaller than the bug
+      - i'll write up the failing trace
+      ship:
+      - merged the bridge fix
+      - this is ready from my side
+      - shipped with the extra vector
+      - i'd like one more node run before release
+      - no blockers left in protocol
+      postmortem:
+      - root cause was a missing validity check
+      - we assumed canonical input too early
+      - i should have tested the malformed branch
+      - fix is small, coverage was the gap
+      - let's add this to the checklist
+      retro:
+      - spec drift cost us time again
+      - reviews were good, handoff was fuzzy
+      - i want fewer implicit assumptions next round
+      - test vectors helped more than mocks
+      - we should write down the weird cases sooner
+      hiring:
+      - strong systems sense, asked good failure questions
+      - i'd probe more on consensus boundaries
+      - good rust, a bit handwavy on specs
+      - seems careful, which matters here
+      - hire if references match the signal
+  person:ProofOfKeags:
+    person: person:ProofOfKeags
+    voice:
+      style: technical
+      characteristics:
+      - lowercase and direct
+      - bridge-first mental model
+      - prefers concrete failure modes
+      - calm under messy debugging
+      typical_concerns:
+      - withdrawal edge cases
+      - p2p message handling
+      - verifier assumptions
+      - testnet observability
+      reaction_to_bad_news: owns_and_debugs
+      active_hours: evenings
+    snippets:
+      kickoff:
+      - i'll take the bridge side of this
+      - first pass is just mapping the failure cases
+      - let me trace the happy path before we split work
+      - i want the p2p assumptions written down early
+      - starting with the withdrawal flow, that's where bugs hide
+      design:
+      - this needs one less implicit trust assumption
+      - can we make the timeout semantics boring here
+      - i'd rather encode that state than infer it later
+      - the bridge should fail closed on this path
+      - p2p retry behavior probably belongs in the design doc
+      impl:
+      - wired the bridge check, adding the ugly test now
+      - this compiles but i don't trust the edge path yet
+      - found the missing state transition, patching it
+      - p2p handler is cleaner after splitting decode from validate
+      - i'm keeping this dumb until the verifier path settles
+      review:
+      - logic looks right, want one test for stale messages
+      - can we name this after the bridge state, not the caller
+      - 'small nit: this hides the failure reason'
+      - i think this needs a negative test before merge
+      - looks good modulo the timeout comment
+      audit:
+      - this is the kind of thing auditors will poke
+      - need to prove we don't accept replayed bridge messages
+      - i'm checking the invariant against malformed p2p input
+      - let's document why this can't bypass finality
+      - this assumption should be explicit in the audit notes
+      ship:
+      - merged the bridge fix
+      - testnet has the new message checks now
+      - shipped the safer timeout handling
+      - bridge path is green, watching logs for a bit
+      - p2p cleanup landed, no protocol behavior change intended
+      postmortem:
+      - root cause was state getting inferred from timing
+      - we missed the stale message case in tests
+      - i should've added logs around that transition earlier
+      - fix is small, coverage gap was the real issue
+      - next time we make the bridge state explicit
+      retro:
+      - more invariant tests would have saved time
+      - handoff was fine, docs lagged the implementation
+      - i want fewer implicit bridge assumptions next cycle
+      - debugging got easier once logs had state names
+      - p2p work needs earlier integration testing
+      hiring:
+      - strong signal if they ask about failure modes
+      - i'd probe how they reason about bridge safety
+      - good candidate, practical and not hand-wavy
+      - they were solid on networking, weaker on zk context
+      - i care more about debugging instincts than perfect syntax
+  person:manishbista28:
+    person: person:manishbista28
+    voice:
+      style: technical
+      characteristics:
+      - precise but low-key
+      - prefers math terms over product words
+      - asks for assumptions explicitly
+      - short caveats before conclusions
+      typical_concerns:
+      - soundness
+      - constraint counts
+      - proof details
+      - edge cases in circuits
+      reaction_to_bad_news: owns_and_debugs
+      active_hours: evenings
+    snippets:
+      kickoff:
+      - i'll first pin down the statement we actually need to prove
+      - starting with the simpler circuit, then we can optimize
+      - need to check the assumptions before coding this
+      - i can take the proof sketch and circuit mapping
+      - let me write the invariant cleanly first
+      design:
+      - this works if the witness relation is exactly this
+      - we should avoid hiding that assumption in the gadget
+      - constraint-wise this is fine, but soundness needs care
+      - i think the cleaner split is prover logic vs circuit logic
+      - can we state the lemma before choosing the encoding
+      impl:
+      - implemented the naive version first, no optimizations yet
+      - the gadget is passing small vectors now
+      - i'm keeping the witness generation boring for now
+      - found one off-by-one in the limb decomposition
+      - constraint count moved a bit, will measure after cleanup
+      review:
+      - the code is fine, but the comment overclaims the proof
+      - can we name this after the relation, not the encoding
+      - i'd like one test where the carry actually overflows
+      - this branch assumes normalized limbs, worth asserting
+      - mostly good, just need the boundary case covered
+      audit:
+      - this is exactly the kind of implicit assumption auditors will ask about
+      - let's write the failure mode down, even if it's unreachable
+      - i don't think this is exploitable, but the proof text is thin
+      - the circuit enforces it, the docs don't say it clearly
+      - i'll trace the witness path once more before calling it done
+      ship:
+      - merged the circuit cleanup
+      - proof notes are updated now
+      - shipped the small-vector tests with the fix
+      - this is ready from my side
+      - landed the relation rename, no logic change
+      postmortem:
+      - root cause was an unstated normalization assumption
+      - i missed the edge case because tests only used small limbs
+      - fix is simple, but we should document the invariant
+      - next time i'll add the negative witness earlier
+      - the implementation followed the sketch too literally
+      retro:
+      - the research-to-circuit handoff was better this time
+      - we still need clearer definitions before implementation starts
+      - tests caught more than expected, which is good
+      - constraint tracking should be part of the normal loop
+      - i'd prefer fewer clever gadgets unless we really need them
+      hiring:
+      - strong candidate if they can reason from first principles
+      - i care more about proof hygiene than zk buzzwords
+      - ask them to find the missing assumption in a small protocol
+      - 'good sign: they simplify before optimizing'
+      - i'd like to see how they explain a failed proof
+  person:john-light:
+    person: person:john-light
+    voice:
+      style: technical
+      characteristics:
+      - clear and patient
+      - bitcoin-first framing
+      - practical protocol context
+      - low-drama corrections
+      typical_concerns:
+      - docs accuracy
+      - user mental models
+      - bitcoin assumptions
+      - bridge edge cases
+      reaction_to_bad_news: owns_and_debugs
+      active_hours: normal
+    snippets:
+      kickoff:
+      - i'll start with the user path and work backward
+      - let's make the bitcoin assumption explicit upfront
+      - i can take the docs pass after the api settles
+      - worth separating protocol facts from product interpretation here
+      - i'll draft the explainer, then we can tighten terminology
+      design:
+      - this needs one fewer abstraction for readers
+      - can we name the trust boundary directly?
+      - the diagram should show what bitcoin actually verifies
+      - i'd avoid saying final until we define finality
+      - let's keep the happy path boring and the edge cases visible
+      impl:
+      - pushed a docs cleanup for the bridge flow
+      - i'm wiring the examples to the current client shape
+      - this wording matches the code now
+      - fixed the stale alpen references in the archive
+      - i'll add the missing setup step before review
+      review:
+      - 'small wording nit: this implies custody when we mean verification'
+      - can we avoid zk shorthand in the first paragraph?
+      - looks right, but the bitcoin side needs one more sentence
+      - i'd rather link the spec than paraphrase it loosely
+      - this is good once the failure case is documented
+      audit:
+      - flagging this because readers will treat it as a guarantee
+      - we should not blur assumption and implementation here
+      - audit wording needs to be narrower than launch wording
+      - can we cite the invariant instead of describing it casually?
+      - this is fine if we explicitly scope it to bridge withdrawals
+      ship:
+      - docs are live with the bridge fix
+      - merged the terminology pass
+      - site is updated, cache may take a minute
+      - shipped the examples after the client change
+      - release notes now mention the bitcoin confirmation caveat
+      postmortem:
+      - i missed the stale wording during the first pass
+      - root cause was docs drifting from the bridge implementation
+      - we should add this to the release checklist
+      - next time i'll wait for the interface to stabilize
+      - the confusing part was our term, not the user's reading
+      retro:
+      - docs got better when we pulled examples from real flows
+      - still too much assumed bitcoin context in a few places
+      - handoff was smooth once owners were explicit
+      - we should keep the glossary closer to the spec
+      - less launch copy, more operational clarity next cycle
+      hiring:
+      - i'd look for someone who can explain tradeoffs without flattening them
+      - bitcoin intuition matters more than generic devrel polish here
+      - strong candidate if they can write for builders and reviewers
+      - i want to see how they handle a wrong docs assumption
+      - ask them to explain the bridge without using buzzwords
+  person:just-erray:
+    person: person:just-erray
+    voice:
+      style: technical
+      characteristics:
+      - terse but careful
+      - math-first framing
+      - asks for threat models
+      - prefers precise invariants
+      typical_concerns:
+      - soundness assumptions
+      - proof constraints
+      - edge cases
+      - spec drift
+      reaction_to_bad_news: owns_and_debugs
+      active_hours: evenings
+    snippets:
+      kickoff:
+      - i can take the constraint pass
+      - let me restate the invariant first
+      - probably worth pinning assumptions before coding
+      - i'll write the model and sanity checks
+      - can we separate protocol risk from impl risk
+      design:
+      - this only works if the witness is canonical
+      - the spec needs one more precondition here
+      - i don't like relying on ordering implicitly
+      - let's make the failure mode explicit
+      - the argument is fine, but the boundary case is underspecified
+      impl:
+      - pushed the boring version first
+      - i'm keeping this close to the spec
+      - constraint count moved less than expected
+      - found one encoding mismatch, checking callers
+      - this should be deterministic now
+      review:
+      - can you name the assumption in the comment
+      - 'nit: this hides the actual domain separator'
+      - looks right modulo the unwrap path
+      - i want one negative test here
+      - the proof path is readable now
+      audit:
+      - this is an audit note, not a blocker
+      - i'll trace the soundness angle
+      - the finding depends on malformed public inputs
+      - we should document why this is unreachable
+      - need a smaller repro before escalating
+      ship:
+      - merged the g16 cleanup
+      - ship it after the vectors pass
+      - i'm okay with this version
+      - tag me if the prover numbers move
+      - spec and impl agree now
+      postmortem:
+      - root cause was a missing normalization step
+      - i should have caught the non-canonical case
+      - the test fixture was too friendly
+      - we need adversarial vectors, not just examples
+      - i'll add the invariant to the spec
+      retro:
+      - research handoff was a bit too implicit
+      - more written assumptions would help
+      - the review loop worked once examples existed
+      - we should freeze notation earlier
+      - less slack reasoning, more checked artifacts
+      hiring:
+      - strong if they ask about failure modes
+      - i care more about rigor than polish
+      - 'good signal: they found the hidden assumption'
+      - they need comfort with specs and code
+      - would pair them on a proof review
+  person:cyphersnake:
+    person: person:cyphersnake
+    voice:
+      style: technical
+      characteristics:
+      - terse, research-first
+      - careful with assumptions
+      - prefers invariants over vibes
+      - dry but collaborative
+      typical_concerns:
+      - proof soundness
+      - edge cases
+      - specs matching code
+      - review latency
+      reaction_to_bad_news: owns_and_debugs
+      active_hours: late_night
+    snippets:
+      kickoff:
+      - i'll sanity check the construction first
+      - before coding, let's pin the invariant
+      - need the exact threat model here
+      - i can take the proof-path bits
+      - let's keep this scoped to g16 for now
+      design:
+      - this works if the transcript ordering is fixed
+      - i don't love implicit domain separation
+      - can we make the assumption explicit in the spec?
+      - the interface is fine, the invariant is underspecified
+      - would rather pay a small complexity cost here
+      impl:
+      - pushed the parser cleanup
+      - locally green, but i want one more edge case
+      - this is mostly plumbing now
+      - i'm replacing the ad hoc check with the lemma version
+      - found a weird serialization corner
+      review:
+      - left comments, mostly nits plus one real issue
+      - the bounds check should move earlier
+      - looks correct modulo the transcript question
+      - can you add the failing case as a test?
+      - i'm not convinced this preserves ordering
+      audit:
+      - audit note is valid, fix is small
+      - this is a soundness concern, not just hygiene
+      - i'll write the minimal repro
+      - need to trace this through aggregation
+      - let's not handwave the malformed input path
+      ship:
+      - merged the bridge fix
+      - this is ready from my side
+      - ship it after ci settles
+      - no blocker, just watch the proof timing
+      - tag me if the benchmark moves
+      postmortem:
+      - root cause was an unstated ordering assumption
+      - we missed the negative test
+      - i should have caught this in review
+      - fix is in, spec still needs the note
+      - next time let's make the invariant executable
+      retro:
+      - research/code handoff got fuzzy
+      - less slack archaeology would help
+      - spec diffs should land with impl diffs
+      - review bandwidth was the bottleneck
+      - the smaller batches worked better
+      hiring:
+      - strong signal if they ask about assumptions
+      - i care more about rigor than speed here
+      - give them a broken proof sketch
+      - good candidate, but light on systems context
+      - would pair them with someone implementation-heavy
+  person:barakshani:
+    person: person:barakshani
+    voice:
+      style: technical
+      characteristics:
+      - concise but not cold
+      - protocol-first framing
+      - asks for exact failure modes
+      - prefers small diffs
+      typical_concerns:
+      - bridge correctness
+      - zk assumptions
+      - edge-case tests
+      - operational visibility
+      reaction_to_bad_news: owns_and_debugs
+      active_hours: normal
+    snippets:
+      kickoff:
+      - i can take the protocol side here
+      - let's pin down the invariant first
+      - happy to start with the bridge path
+      - scope looks fine if we keep it narrow
+      - i'll map the failure cases before coding
+      design:
+      - this needs a clearer trust boundary
+      - can we make the state transition explicit?
+      - i'd rather avoid implicit bridge behavior
+      - the happy path is easy, reorgs are not
+      - let's write the invariant in plain terms
+      impl:
+      - pushing a small version first
+      - added the edge case test
+      - this is mostly plumbing now
+      - found one awkward serialization bit
+      - i'm keeping the diff boring
+      review:
+      - left a couple protocol nits
+      - can we add the negative case?
+      - logic looks right, naming is fuzzy
+      - i want one more test around rollback
+      - this reads fine after the helper split
+      audit:
+      - worth treating this as audit-facing
+      - the assumption should be documented here
+      - i don't think this is exploitable, but checking
+      - let's not handwave the bridge edge case
+      - added notes for the weird path
+      ship:
+      - merged the bridge fix
+      - this is good to roll out
+      - shipped the faucet cleanup
+      - dashboards should show it now
+      - protocol patch is in, watching metrics
+      postmortem:
+      - i missed the retry interaction
+      - root cause was state getting ahead of proof
+      - we need a test for that exact sequence
+      - i'll write up the bridge timeline
+      - fix is simple, lesson is not
+      retro:
+      - small diffs helped here
+      - we found this later than i'd like
+      - more invariant tests would have caught it
+      - handoff was clear, monitoring was thin
+      - next time i'd spec the rollback path earlier
+      hiring:
+      - strong protocol instincts matter here
+      - i'd ask them about adversarial cases
+      - good signal if they simplify the model
+      - zk depth is useful, bridge paranoia is required
+      - i like candidates who test failure paths
+  person:chhetri22:
+    person: person:chhetri22
+    voice:
+      style: technical
+      characteristics:
+      - concise but context-heavy
+      - careful with protocol wording
+      - asks for invariants first
+      - calm, direct slack tone
+      typical_concerns:
+      - spec correctness
+      - edge cases
+      - reviewer clarity
+      - security assumptions
+      reaction_to_bad_news: owns_and_debugs
+      active_hours: evenings
+    snippets:
+      kickoff:
+      - i'll start from the spec and map gaps from there
+      - first pass is mostly assumptions + invariants
+      - let me pin down the exact statement before code
+      - i can take the whitepaper side of this
+      - will write the rough model first, then we can bikeshed
+      design:
+      - the construction is fine, the wording is doing too much
+      - we should separate protocol assumption from implementation detail
+      - i'd rather make this explicit in the spec
+      - what is the adversary allowed to observe here?
+      - this needs one clean invariant, not three partial ones
+      impl:
+      - pushing a small cleanup for the notation drift
+      - i'm keeping this boring so review is easier
+      - patched the edge case, adding the note now
+      - this is mostly plumbing around the state transition
+      - i'll avoid cleverness here unless perf says otherwise
+      review:
+      - left comments, mostly precision issues
+      - the logic checks out, but the naming hides the constraint
+      - can we make the failure mode obvious here?
+      - minor nit, but this term is overloaded elsewhere
+      - approved after the assumption note lands
+      audit:
+      - i want one more pass on the trust boundary
+      - this reads audit-sensitive, let's not compress it too much
+      - is this covered by the existing soundness argument?
+      - the attack surface is small but worth spelling out
+      - let's document why this cannot fork state
+      ship:
+      - merged the bridge wording fix
+      - spec update is in, nothing fancy
+      - shipped the cleanup after review
+      - this is ready from my side
+      - landed the note, should unblock the next pass
+      postmortem:
+      - i missed the implicit assumption there
+      - root cause was unclear ownership of the invariant
+      - we should have caught that at spec review
+      - fix is simple, prevention is better wording
+      - i'll add the missing case to the checklist
+      retro:
+      - spec review was useful, but too late
+      - we need fewer vague TODOs in protocol docs
+      - handoff was okay, context was scattered
+      - i'd like tighter definitions before implementation starts
+      - the process worked once reviewers had the model
+      hiring:
+      - strong signal if they ask about assumptions early
+      - i care more about clarity than theorem name-dropping
+      - good candidate, very careful with definitions
+      - they reasoned through edge cases without prompting
+      - would like one more protocol-heavy interview
+  person:ceyhunsen:
+    person: person:ceyhunsen
+    voice:
+      style: technical
+      characteristics:
+      - careful, low-noise research tone
+      - concise but not abrupt
+      - prefers assumptions stated explicitly
+      - checks math before implementation
+      typical_concerns:
+      - proof constraints
+      - soundness assumptions
+      - benchmarks
+      - spec ambiguity
+      reaction_to_bad_news: owns_and_debugs
+      active_hours: normal
+    snippets:
+      kickoff:
+      - i'll read the spec path first
+      - starting with the constraint shape
+      - let me pin the assumption before coding
+      - i can take the proving side
+      - will compare against the g16 baseline
+      design:
+      - this works if the witness stays fixed-size
+      - i'd rather keep the verifier logic boring
+      - the edge case is in the aggregation step
+      - we should separate protocol intent from implementation detail
+      - sounds ok, but let's write the invariant down
+      impl:
+      - pushed the small circuit cleanup
+      - i'm removing the duplicate constraint now
+      - bench is a little noisy, rerunning locally
+      - the change is smaller than expected
+      - i kept the serialization path unchanged
+      review:
+      - left a note on the assumption there
+      - looks right modulo the boundary case
+      - can we make the failure mode explicit
+      - i'd like one test for malformed public inputs
+      - 'nit: this name hides the algebra a bit'
+      audit:
+      - this finding is valid, but scoped
+      - i'm checking whether this affects soundness
+      - the mitigation should live in the spec too
+      - no issue if the transcript binding holds
+      - let's not handwave the random oracle step
+      ship:
+      - merged the bridge fix
+      - this is ready from my side
+      - bench stayed within expected range
+      - shipped the verifier cleanup
+      - i'll watch the proving job after deploy
+      postmortem:
+      - root cause was an unstated assumption
+      - we missed the non-canonical encoding case
+      - i should have added the negative test
+      - fix is simple, coverage was the gap
+      - next time let's make the invariant executable
+      retro:
+      - spec clarity helped a lot
+      - review latency was the main drag
+      - we had too many implicit protocol assumptions
+      - bench setup should be easier to reproduce
+      - i'd keep the smaller research checkpoints
+      hiring:
+      - strong signal if they ask about assumptions
+      - i'd give them a small circuit exercise
+      - look for careful reasoning, not speed only
+      - zk background helps, but rigor matters more
+      - good candidate if they debug from first principles
+  person:sampkaALP:
+    person: person:sampkaALP
+    voice:
+      style: terse
+      characteristics:
+      - lowercase and direct
+      - ops-first, low ceremony
+      - asks for concrete state
+      - prefers dashboards over debate
+      typical_concerns:
+      - alert noise
+      - dashboard correctness
+      - deploy visibility
+      - incident handoff
+      reaction_to_bad_news: owns_and_debugs
+      active_hours: normal
+    snippets:
+      kickoff:
+      - i'll get the dashboard view cleaned up first
+      - need current status before we pick a path
+      - i can take ops side on this
+      - let's make sure alerts won't spam everyone
+      - starting with what we can observe
+      design:
+      - can we make the failure mode visible?
+      - this needs a boring ops path
+      - dashboard should answer this without asking around
+      - fine with this if rollback is clear
+      - i'd rather keep the labels stable
+      impl:
+      - pushed the dashboard tweak
+      - checking the explorer metrics now
+      - i'll wire the alert after deploy
+      - fixed the stale panel query
+      - this is mostly config, keeping it small
+      review:
+      - looks ok, one naming nit
+      - can we avoid another alert variant here?
+      - query seems heavier than needed
+      - please add the empty state
+      - ship after the panel refresh looks sane
+      audit:
+      - checking logs against the dashboard numbers
+      - this alert would have missed the slow case
+      - need a clearer owner on this runbook
+      - metrics don't line up yet
+      - marking this as ops followup
+      ship:
+      - deployed the dashboard update
+      - alerts are quiet after rollout
+      - merged the bridge fix from ops side
+      - watching panels for a bit
+      - ship looks clean from here
+      postmortem:
+      - root cause was visibility gap
+      - we noticed too late, that's on ops
+      - adding a dashboard check for this
+      - runbook needs the exact recovery step
+      - alert fired, but not usefully
+      retro:
+      - handoff was too implicit
+      - less chat, more status in the board
+      - dashboards helped once labels were fixed
+      - we should prune old alerts
+      - next time, define owner before deploy
+      hiring:
+      - need someone calm during incidents
+      - dashboard sense matters here
+      - good ops taste beats tool trivia
+      - ask how they debug noisy alerts
+      - i'd screen for ownership and follow-through
+  person:alexhui01:
+    person: person:alexhui01
+    voice:
+      style: technical
+      characteristics:
+      - concise, protocol-first
+      - careful about edge cases
+      - asks for concrete invariants
+      - low-drama debugging tone
+      typical_concerns:
+      - consensus correctness
+      - proving assumptions
+      - review clarity
+      - test vectors
+      reaction_to_bad_news: owns_and_debugs
+      active_hours: normal
+    snippets:
+      kickoff:
+      - i'll trace the state transition path first
+      - what invariant do we actually need here?
+      - can take the protocol side of this
+      - starting with the minimal change
+      - let me map the failure case before coding
+      design:
+      - this feels like it should be explicit in the state machine
+      - i'd rather not hide consensus behavior behind helpers
+      - what happens if the proof arrives one slot late?
+      - the interface is fine, but the invariant needs wording
+      - can we separate validation from mutation here?
+      impl:
+      - wired the check in, adding vectors now
+      - this path was less isolated than expected
+      - found one annoying edge around empty batches
+      - keeping the patch small for review
+      - i'm making the error case deterministic
+      review:
+      - left a couple comments on state ordering
+      - looks mostly right, want one negative test
+      - can we name this after the protocol action?
+      - i think this helper hides too much context
+      - approved once the panic path is covered
+      audit:
+      - audit note seems valid, reproducing locally
+      - this is only reachable with malformed input, still worth fixing
+      - we should write down the trust assumption
+      - checking whether this affects finalized state
+      - i'll turn the finding into a regression test
+      ship:
+      - merged the validation fix
+      - ship looks clean from my side
+      - tests pass, no protocol diff beyond the intended check
+      - i'm good with cutting this now
+      - landed the small cleanup before release
+      postmortem:
+      - root cause was ordering, not the verifier
+      - we missed the empty case in tests
+      - i should have made the invariant explicit earlier
+      - fix is in, regression covers the old path
+      - next time let's test the boundary slots
+      retro:
+      - review was faster once the invariant was written down
+      - we should keep protocol changes smaller
+      - test vectors paid for themselves here
+      - handoff was fine, naming could be clearer
+      - less implicit state would make this easier
+      hiring:
+      - strong signal if they reason in invariants
+      - i'd ask them to debug a state transition
+      - good candidate, careful with assumptions
+      - they explained tradeoffs without handwaving
+      - want to see more low-level protocol work
+  person:pramodkandel:
+    person: person:pramodkandel
+    voice:
+      style: casual
+      characteristics:
+      - clear and practical
+      - docs-first framing
+      - calm async tone
+      - protocol-aware but accessible
+      typical_concerns:
+      - reader confusion
+      - whitepaper accuracy
+      - terminology drift
+      - launch messaging
+      reaction_to_bad_news: owns_and_debugs
+      active_hours: normal
+    snippets:
+      kickoff:
+      - i'll draft the first pass and we can tighten from there
+      - let's anchor this around what builders actually need
+      - i'll map the current docs gaps before we write more
+      - starting with the narrative, then i'll backfill details
+      - can we agree on the vocabulary before this spreads
+      design:
+      - this reads right technically, but the entry point is too steep
+      - i'd rather explain the why before the mechanism
+      - we need one clean mental model here
+      - can we avoid introducing a new term for the same thing
+      - this section needs fewer branches and more sequence
+      impl:
+      - pushed the docs update, mostly wording and structure
+      - i'm cleaning up the whitepaper references now
+      - added the missing context around the bridge flow
+      - this is in decent shape, still smoothing the intro
+      - i'll sync the archived docs so people stop finding stale bits
+      review:
+      - left notes where the wording could mislead people
+      - technical content looks fine, explanation order still feels off
+      - i'd cut that paragraph, it repeats the same claim
+      - small wording nits, mostly consistency
+      - can we make the assumption explicit there
+      audit:
+      - flagging this because auditors may read it more literally
+      - the docs should not imply guarantees we do not make
+      - this phrasing feels stronger than the protocol actually says
+      - let's align this with the threat model text
+      - i'll update the public wording once eng confirms
+      ship:
+      - docs are live now
+      - shipped the whitepaper cleanup
+      - merged the terminology pass
+      - launch copy is updated, same links as before
+      - i'll watch for confused questions after this goes out
+      postmortem:
+      - we had the right facts, just not in the right order
+      - the gap was mostly expectation setting
+      - i should have caught the stale docs path earlier
+      - next time i'll add a review pass just for terminology
+      - people followed the old guide because it still looked current
+      retro:
+      - docs need to be closer to the implementation timeline
+      - the best feedback came from confused first readers
+      - we should retire old pages more aggressively
+      - more examples would have saved us a few support loops
+      - the core message was fine, the path to it was noisy
+      hiring:
+      - i'd look for someone who can translate without flattening
+      - strong writing matters, but protocol curiosity matters more
+      - ask them to explain a hard thing simply
+      - i care less about polish than judgment
+      - good devrel here means knowing when to ask eng twice
+  person:aunth:
+    person: person:aunth
+    voice:
+      style: technical
+      characteristics:
+      - quiet protocol engineer
+      - precise about p2p edges
+      - short, matter-of-fact updates
+      - asks for repros and traces
+      typical_concerns:
+      - peer behavior
+      - message ordering
+      - network reliability
+      - test reproducibility
+      reaction_to_bad_news: owns_and_debugs
+      active_hours: normal
+    snippets:
+      kickoff:
+      - i can take the p2p side
+      - first step is getting a clean repro
+      - let's pin the expected peer behavior before coding
+      - i'll start with logs around the dial path
+      - sounds fine, assuming no protocol surface changes
+      design:
+      - i'd keep this explicit in the wire path
+      - implicit retries make this harder to reason about
+      - the peer state machine needs one clear owner
+      - can we define the disconnect case here
+      - i don't love coupling this to transport details
+      impl:
+      - pushed the handshake cleanup
+      - still checking the timeout path
+      - this is mostly plumbing, no consensus changes
+      - i found one ordering issue in peer events
+      - local p2p tests pass now
+      review:
+      - left a few comments on edge cases
+      - looks reasonable, want one test for dropped peers
+      - can we avoid cloning this message twice
+      - the naming is slightly confusing here
+      - approved after the retry test lands
+      audit:
+      - this needs a failure-mode pass
+      - i'm checking whether malformed peers can hold state
+      - no obvious issue, but the timeout behavior is subtle
+      - we should document this assumption for audit
+      - attack surface is mostly resource exhaustion here
+      ship:
+      - merged the bridge fix
+      - p2p cleanup is in
+      - shipping after ci goes green
+      - deployed the peer scoring tweak
+      - that should unblock the sync tests
+      postmortem:
+      - root cause was stale peer state
+      - we missed the reconnect ordering case
+      - i should have added the dropped-connection test earlier
+      - logs were too thin around handshake failure
+      - fix is small, coverage gap was the real issue
+      retro:
+      - more deterministic network tests would help
+      - the interface got fuzzier than needed
+      - i'd split protocol and transport work sooner
+      - debugging was slower because traces were inconsistent
+      - next time let's write the peer cases first
+      hiring:
+      - strong rust and networking fundamentals matter most
+      - i'd ask about async failure modes
+      - good sign if they reason from invariants
+      - p2p experience is useful, but clarity matters more
+      - i want someone comfortable reading protocol code
+  person:madan-oss:
+    person: person:madan-oss
+    voice:
+      style: technical
+      characteristics:
+      - precise and proof-oriented
+      - cautious about assumptions
+      - short async notes
+      - prefers invariants over vibes
+      typical_concerns:
+      - security assumptions
+      - protocol edge cases
+      - proof complexity
+      - spec drift
+      reaction_to_bad_news: owns_and_debugs
+      active_hours: evenings
+    snippets:
+      kickoff:
+      - i'll first pin down the assumptions here
+      - let me write the model before we bikeshed impl
+      - starting with the failure cases, then happy path
+      - i can take the research pass on this
+      - need one clean statement of what we're proving
+      design:
+      - this works if the bridge assumption is explicit
+      - i'd separate liveness from safety here
+      - the spec is doing two jobs right now
+      - can we make the adversary model less implicit?
+      - this invariant should live closer to the protocol text
+      impl:
+      - i'm translating the proof sketch into checks now
+      - small diff, mostly naming around the state transition
+      - this edge case needs a real assertion
+      - i think the code path matches the spec now
+      - leaving the optimization out until correctness is boring
+      review:
+      - logic looks right, but the naming hides the precondition
+      - can you add the negative case too?
+      - i don't follow this branch under reorgs
+      - 'nit: this comment says protocol, code says bridge'
+      - approved once the assumption is written down
+      audit:
+      - this is probably low risk, but worth spelling out
+      - audit note maps to the same missing invariant
+      - i'll check whether the attack needs synchrony
+      - we should not answer this with implementation folklore
+      - the mitigation is fine if the bound is real
+      ship:
+      - merged the bridge fix after the last check
+      - research notes are updated with the final assumption
+      - this is ready from my side
+      - shipped the spec cleanup
+      - i'd call this good, pending downstream tests
+      postmortem:
+      - root cause was underspecified state, not the patch
+      - we missed the case because the model was too narrow
+      - i should have pushed harder on the assumption
+      - next time let's encode the invariant earlier
+      - no drama, but the spec needs to be executable enough
+      retro:
+      - more explicit threat models helped a lot
+      - handoff got easier once the notation stabilized
+      - we lost time to ambiguous terms
+      - i'd like fewer parallel definitions next cycle
+      - the research loop was good, just a bit late
+      hiring:
+      - i'd ask them to reason through a broken proof
+      - strong candidate if they notice hidden assumptions
+      - less interested in buzzwords, more in clean models
+      - can they explain the protocol without handwaving?
+      - 'good signal: they changed their mind carefully'
+  person:ali-rezai:
+    person: person:ali-rezai
+    voice:
+      style: technical
+      characteristics:
+      - terse but careful
+      - spec-first wording
+      - low-drama debugging
+      - asks for concrete vectors
+      typical_concerns:
+      - ssz encoding correctness
+      - consensus compatibility
+      - edge-case test vectors
+      - generated code shape
+      reaction_to_bad_news: owns_and_debugs
+      active_hours: normal
+    snippets:
+      kickoff:
+      - i’ll trace the ssz path first
+      - can we pin the expected bytes?
+      - starting from the spec text
+      - i want vectors before touching gen
+      - let me map the type cases
+      design:
+      - this should stay deterministic
+      - prefer explicit bounds here
+      - generator magic gets risky fast
+      - i’d keep the schema shape boring
+      - what does the spec say for empty lists?
+      impl:
+      - added the container case
+      - cleaned up the offset math
+      - this now emits stable ordering
+      - handling variable-size fields separately
+      - need one more vector for nested lists
+      review:
+      - the branch looks mostly fine
+      - can we avoid inferring this?
+      - this needs a malformed input test
+      - offset calc is a little subtle here
+      - i’d rather not hide this in a helper
+      audit:
+      - checking consensus-visible behavior
+      - this is worth fuzzing
+      - bounds check should happen earlier
+      - invalid ssz should fail closed
+      - i’m looking for decode ambiguity
+      ship:
+      - merged the generator fix
+      - ssz output is stable now
+      - shipping once vectors pass
+      - that should unblock protocol tests
+      - released the small encode cleanup
+      postmortem:
+      - i missed the variable-size nesting
+      - root cause was offset accounting
+      - we need fixtures for that shape
+      - the spec path was correct, impl drifted
+      - i’ll add regression vectors today
+      retro:
+      - more vectors earlier would help
+      - the generator needs less implicit state
+      - review should include raw bytes
+      - we caught it before consensus impact
+      - i’d document the tricky cases inline
+      hiring:
+      - ask them to reason from the spec
+      - i care about careful debugging
+      - ssz familiarity is useful, not required
+      - give them a serialization edge case
+      - look for patience with boring correctness
+  person:arminsabouri:
+    person: person:arminsabouri
+    voice:
+      style: technical
+      characteristics:
+      - quiet infra shorthand
+      - precise about failure modes
+      - asks small clarifying questions
+      - prefers logs over speculation
+      typical_concerns:
+      - rpc behavior
+      - async edge cases
+      - retry/backoff paths
+      - clean observability
+      reaction_to_bad_news: owns_and_debugs
+      active_hours: normal
+    snippets:
+      kickoff:
+      - i can take the rpc side
+      - let me map the failure cases first
+      - probably worth starting with the client boundary
+      - i'll sketch the async path quickly
+      - need one pass over timeouts before impl
+      design:
+      - where do we want cancellation to land?
+      - this should stay boring at the interface
+      - i'd rather not hide rpc errors here
+      - backoff policy should be explicit imo
+      - can we keep retries outside the transport?
+      impl:
+      - wired the client path locally
+      - adding the timeout guard now
+      - this is mostly plumbing, nothing fancy
+      - need to clean up the error mapping
+      - got the async bit behaving under disconnects
+      review:
+      - 'small nit: this drops the original rpc error'
+      - can we add the timeout case?
+      - looks fine, just want one reconnect test
+      - this branch makes cancellation a little implicit
+      - i'd keep the log line closer to the call
+      audit:
+      - checking if this can hang on partial reads
+      - rpc retry loops are the interesting part here
+      - i don't see a safety issue, mostly liveness
+      - need to verify the shutdown path
+      - this deserves a test with a stuck bitcoind
+      ship:
+      - merged the bridge fix
+      - client change is in
+      - shipped the timeout cleanup
+      - rpc path should be quieter now
+      - rolled the retry tweak, watching logs
+      postmortem:
+      - root cause was an uncapped wait
+      - we missed the disconnect during in-flight rpc
+      - logs were too vague to catch this fast
+      - fix is small, test is the important bit
+      - i'll add a regression around the stuck call
+      retro:
+      - async shutdown needs more attention
+      - we should name timeout assumptions earlier
+      - tests caught less than i expected here
+      - infra changes need better log affordances
+      - next time i'd isolate rpc behavior first
+      hiring:
+      - strong signal if they ask about failure modes
+      - i'd bias toward someone comfortable with boring infra
+      - async experience matters more than framework trivia
+      - good debugging habits are the main thing
+      - give them a small rpc edge case exercise
+  person:Arniiiii:
+    person: person:Arniiiii
+    voice:
+      style: technical
+      characteristics:
+      - lowercase, compact, protocol-first
+      - cautious around p2p edge cases
+      - asks for concrete repros
+      - prefers simple fixes over clever ones
+      typical_concerns:
+      - peer behavior
+      - network assumptions
+      - integration test coverage
+      - failure modes
+      reaction_to_bad_news: owns_and_debugs
+      active_hours: normal
+    snippets:
+      kickoff:
+      - i can take the p2p side
+      - let me trace the peer flow first
+      - starting with the smallest repro here
+      - need to understand the failure boundary
+      - i'll map the happy path then poke it
+      design:
+      - that assumes peers behave nicely
+      - can we make the state transition explicit?
+      - i'd rather keep this dumb and observable
+      - what happens when the peer disconnects mid-flight?
+      - the interface feels fine, the retry semantics less so
+      impl:
+      - wired the basic path, testing churn now
+      - found one weird timeout case
+      - this is mostly plumbing, not much magic
+      - adding logs around peer selection
+      - the fix is smaller than i expected
+      review:
+      - left a few nits on naming
+      - logic looks right, tests need one unhappy path
+      - can we avoid hiding the error here?
+      - i'd split the peer bookkeeping out
+      - this branch made the state harder to follow
+      audit:
+      - checking this against adversarial peers
+      - the dos angle is the interesting bit
+      - we should document that assumption
+      - not exploitable yet, but too implicit
+      - i want one test for malformed messages
+      ship:
+      - merged the bridge fix
+      - p2p patch is in
+      - shipped the timeout cleanup
+      - watching logs for peer churn
+      - looks stable on my side
+      postmortem:
+      - root cause was stale peer state
+      - i missed the reconnect path
+      - we need better visibility before retry
+      - the code did what we asked, unfortunately
+      - i'll add the regression test today
+      retro:
+      - earlier repro would have saved time
+      - more logs, fewer guesses
+      - the simple version aged better
+      - we should write down the network assumptions
+      - handoff was okay, test plan was thin
+      hiring:
+      - strong systems instincts matter here
+      - i'd ask them to debug a flaky peer test
+      - good signal if they ask about failure modes
+      - less trivia, more reasoning through state
+      - they should be comfortable reading protocol code

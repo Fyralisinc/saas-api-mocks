@@ -1,0 +1,73 @@
+# Wallet setup
+
+To send transactions on Alpen, we need an Alpen-compatible wallet. Generally speaking, any wallet that supports adding a custom EVM network will work. For this tutorial, we are going to use [Frame](https://frame.sh/), a desktop-native EVM wallet.
+
+{% hint style="info" %}
+This tutorial assumes you are using a desktop or laptop computer. You can also use any mobile wallet that supports adding a custom EVM network.
+{% endhint %}
+
+## Step 1. Install the Frame desktop app <a href="#step-1-install-the-frame-desktop-app" id="step-1-install-the-frame-desktop-app"></a>
+
+Go to [https://frame.sh](https://frame.sh/) then download and install the Frame desktop app for your operating system.
+
+<figure><img src="/files/fxg7uvBXhzjQS75oItAU" alt="Install Frame desktop app" width="800"><figcaption></figcaption></figure>
+
+## Step 2. Install the Frame Companion browser extension <a href="#step-2-install-the-frame-companion-browser-extension" id="step-2-install-the-frame-companion-browser-extension"></a>
+
+Scroll down on [https://frame.sh](https://frame.sh/) until you see the "Companion Extension" section. Click the button for the extension that works with your browser. The extension works with Chromium-based browsers and Firefox-based browsers.
+
+<figure><img src="/files/seq9tuKSQgNHVb9NVpea" alt="Install Frame extension" width="600"><figcaption></figcaption></figure>
+
+## Step 3. Generate your Alpen address <a href="#step-3-generate-your-strata-address" id="step-3-generate-your-strata-address"></a>
+
+To generate your Alpen address, you will need to either have an existing testnet seed phrase on hand or you can connect one of the supported hardware wallets. For this guide we will enter a seed phrase that we generated using [this BIP39 tool](https://iancoleman.io/bip39/). If you also use a web tool like this to generate your seed phrase, for the security of your funds, we recommend only using that seed phrase on testnet, never on mainnet.
+
+{% hint style="info" %}
+If you want to use a Ledger device, you should connect it to Frame using the Ledger Ethereum app.
+{% endhint %}
+
+Click "Add New Account".
+
+<figure><img src="/files/oyDftyzXhR843fk4Il0L" alt="Add new account" width="600"><figcaption></figcaption></figure>
+
+Then click "Seed Phrase", enter your seed phrase, and choose a password to protect the wallet.
+
+<figure><img src="/files/yk3rtBUmiC0a8ZiuBfru" alt="Enter seed phrase" width="400"><figcaption></figcaption></figure>
+
+Your Alpen address is now ready to use. You can click the address (starting with `0x…`) to copy it to your computer's clipboard if needed.
+
+<figure><img src="/files/54On0zm6KyASLlIWlnek" alt="Copy address" width="400"><figcaption></figcaption></figure>
+
+### Step 4. Add the Alpen chain to your wallet <a href="#step-4-add-the-strata-chain-to-your-wallet" id="step-4-add-the-strata-chain-to-your-wallet"></a>
+
+Open the menu then click "Chains".
+
+<figure><img src="/files/7rDUmmLd7PoaNfTE9lXd" alt="Chains" width="600"><figcaption></figcaption></figure>
+
+Then click "Add New Chain".
+
+<figure><img src="/files/OfDJ8NuqVJPgQFY787Ej" alt="Add new chain" width="400"><figcaption></figcaption></figure>
+
+Enter the Alpen chain details from the [Get started](/welcome/get-started.md#network-details) document, then toggle the "Testnet" switch "on" (on = green) and click "Add chain".
+
+<figure><img src="/files/SC2zcJvuiUtRPF0SUK4z" alt="Add chain" width="400"><figcaption></figcaption></figure>
+
+Now your wallet is set up to send and receive transactions on Alpen.
+
+
+---
+
+# Agent Instructions: Querying This Documentation
+
+If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
+
+Perform an HTTP GET request on the current page URL with the `ask` query parameter:
+
+```
+GET https://docs.alpenlabs.io/welcome/wallet-setup.md?ask=<question>
+```
+
+The question should be specific, self-contained, and written in natural language.
+The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
+
+Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.

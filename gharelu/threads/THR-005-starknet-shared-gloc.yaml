@@ -1,0 +1,176 @@
+id: THR-005-starknet-shared-gloc
+title: Starknet Shared Glock Verifier Collaboration
+window:
+  start: 2025-10-15
+  end: 2026-01-13
+driver: person:AaronFeickert
+cast:
+- person:AaronFeickert
+- person:Hakkush-07
+- person:cyphersnake
+- person:ceyhunsen
+- person:Zk2u
+- person:prajwolrg
+- person:storopoli
+- person:john-light
+linked_anchors:
+- milestone:starknet-shared-glock-verifier
+linked_products:
+- product:glock
+- product:strata
+linked_repos:
+- repo:verifiable-garbling
+- repo:garbled-circuits
+- repo:g16
+- repo:zkaleido
+- repo:Technical-Whitepaper
+beats:
+- id: B1
+  start: 2025-10-15
+  end: 2025-10-24
+  kind: kickoff
+  summary: Aaron scopes the Starknet collaboration around a shared Glock verifier interface, with the first plan assuming
+    a thin adapter over existing garbling verifier code.
+  participants:
+  - person:AaronFeickert
+  - person:Hakkush-07
+  - person:cyphersnake
+  - person:ceyhunsen
+  - person:john-light
+  tensions:
+  - unclear ownership boundary with external Starknet reviewers
+  - verifier API still research-shaped
+  - public messaging ahead of engineering certainty
+- id: B2
+  start: 2025-10-27
+  end: 2025-11-07
+  kind: design
+  summary: Hakkush drafts the verifier compatibility RFC while cyphersnake prototypes calldata and proof-shape mappings against
+    the current Glock verifier assumptions.
+  participants:
+  - person:Hakkush-07
+  - person:cyphersnake
+  - person:AaronFeickert
+  - person:ceyhunsen
+  tensions:
+  - field encoding mismatch
+  - transcript domain separation debate
+  - RFC review queue grows around notation details
+- id: B3
+  start: 2025-11-10
+  end: 2025-11-21
+  kind: impl
+  summary: cyphersnake lands the first shared verifier trait in verifiable-garbling, but the Starknet-facing adapter stalls
+    while Ceyhun rewrites serialization tests twice.
+  participants:
+  - person:cyphersnake
+  - person:ceyhunsen
+  - person:Hakkush-07
+  - person:Zk2u
+  tensions:
+  - test vectors not reproducible across repos
+  - adapter PR waits on trait naming review
+  - local benchmark harness flakes on CI
+- id: B4
+  start: 2025-11-24
+  end: 2025-12-05
+  kind: review
+  summary: Aaron and Prajwol pull protocol engineering into review after the prototype exposes an assumption about verifier
+    determinism that would affect Strata proof aggregation later.
+  participants:
+  - person:AaronFeickert
+  - person:prajwolrg
+  - person:storopoli
+  - person:cyphersnake
+  - person:Hakkush-07
+  tensions:
+  - protocol review interrupts research sprint
+  - determinism requirement changes adapter surface
+  - two competing fixture formats
+- id: B5
+  start: 2025-12-08
+  end: 2025-12-19
+  kind: design
+  summary: The team replaces the thin-adapter plan with a shared verifier package plus versioned transcript fixtures, documented
+    as an RFC amendment rather than a new spec.
+  participants:
+  - person:AaronFeickert
+  - person:Hakkush-07
+  - person:cyphersnake
+  - person:ceyhunsen
+  - person:prajwolrg
+  tensions:
+  - initial milestone estimate slips by two weeks
+  - external collaborator wants stable interface sooner
+  - old examples become misleading
+- id: B6
+  start: 2025-12-22
+  end: 2026-01-02
+  kind: impl
+  summary: Ceyhun and Zk2u push the shared fixture generator and CI matrix while cyphersnake keeps the verifier package compiling
+    across garbled-circuits and zkaleido.
+  participants:
+  - person:ceyhunsen
+  - person:Zk2u
+  - person:cyphersnake
+  - person:Hakkush-07
+  tensions:
+  - holiday availability makes review bursty
+  - CI time doubles on full vectors
+  - generated fixtures trigger repo-size concerns
+- id: B7
+  start: 2026-01-05
+  end: 2026-01-09
+  kind: audit
+  summary: Aaron runs a narrow soundness and integration audit, finding one transcript-label ambiguity and one non-blocking
+    performance regression in the Starknet path.
+  participants:
+  - person:AaronFeickert
+  - person:Hakkush-07
+  - person:storopoli
+  - person:cyphersnake
+  tensions:
+  - late audit finding reopens merged code
+  - performance regression accepted with follow-up
+  - reviewer bandwidth split with Strata work
+- id: B8
+  start: 2026-01-12
+  end: 2026-01-13
+  kind: ship
+  summary: The shared verifier collaboration ships as an integration-ready package with frozen v0 fixtures, a short public
+    recap, and two follow-up tickets for batching and benchmark cleanup.
+  participants:
+  - person:AaronFeickert
+  - person:cyphersnake
+  - person:ceyhunsen
+  - person:john-light
+  - person:prajwolrg
+  tensions:
+  - batching deferred from milestone
+  - docs merge after code freeze
+  - launch note carefully avoids mainnet readiness claims
+artifacts:
+- kind: rfc
+  title: Shared Glock Verifier Interface for Starknet Collaboration
+  beat: B2
+  author: person:Hakkush-07
+- kind: design_doc
+  title: Versioned Transcript Fixtures and Deterministic Verifier Inputs
+  beat: B5
+  author: person:AaronFeickert
+- kind: design_doc
+  title: Starknet Adapter Fixture Generator and CI Matrix
+  beat: B6
+  author: person:ceyhunsen
+- kind: postmortem
+  title: Transcript Label Ambiguity in Shared Glock Verifier v0
+  beat: B7
+  author: person:AaronFeickert
+- kind: all_hands_recap
+  title: Starknet Shared Glock Verifier v0 Integration Recap
+  beat: B8
+  author: person:john-light
+tensions:
+- original thin-adapter estimate replaced by a shared package design
+- research notation and protocol integration expectations moved at different speeds
+- external collaboration pressure made interface stability more important than benchmark polish

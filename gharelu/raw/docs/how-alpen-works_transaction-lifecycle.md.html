@@ -1,0 +1,74 @@
+# Transaction lifecycle
+
+This document describes the journey of Alpen transactions from initiation to finalization.
+
+## Transaction initiation and propagation <a href="#transaction-initiation-and-propagation" id="transaction-initiation-and-propagation"></a>
+
+Alpen supports both Externally Owned Account (EOA) transactions and account abstraction transactions (referred to as UserOperations) as defined in ERC-4337. EOA transactions can be initiated by users through any EVM-compatible wallet that is connected to an Alpen full node. For account abstraction, we provide a bundler that accepts UserOperations and relays them to a full node we have deployed. On testnet, each full node is directly connected to a full node run by Alpen Labs, which in turn is connected to the sequencer (also run by Alpen Labs). This setup helps reduce propagation time, given the relatively small number of full nodes expected. Ultimately, all user transactions reach the sequencer through this full node.
+
+A Deposit Transaction is initiated on bitcoin, and more details of its lifecycle are described in the [bitcoin bridge documentation](/how-alpen-works/bitcoin-bridge.md#deposit).
+
+## Block building <a href="#block-building" id="block-building"></a>
+
+The sequencer orders the EVM transactions received based on the default algorithm used by Reth, which is to prioritize the transactions with higher effective gas price, respecting the account nonce ordering (ascending). A block is constructed every 5 seconds, and it includes:
+
+* A header with metadata (timestamp, block number, etc.)
+* An L1 segment (information about the currently visible bitcoin chain. It is only included in the last block of a batch.)
+* An execution segment (includes the actual EVM transactions and related info.)
+
+The block is executed against the current Alpen chain state, during which the pending withdrawals and deposits are processed and the chain state is updated. The chain state primarily includes:
+
+* EVM state
+* Alpen’s view of the bitcoin state
+* List of current bridge operators
+* Pending deposit and withdrawal info
+* Auxiliary info about the Alpen chain e.g. latest Alpen block, checkpoint period, etc.
+
+After the block is executed and verified, the block is added to the blockchain and is relayed to full nodes that are polling for new blocks.
+
+## Batch building <a href="#batch-building" id="batch-building"></a>
+
+A batch is a collection of Alpen blocks associated with a single [checkpoint](#batch-checkpoint). When the sequencer detects on bitcoin the checkpoint for the previous batch, it builds a new batch with all the blocks since the last batch. The first block of the new batch immediately follows the final block of the previous batch. The final block in the new batch includes the information about Alpen's view of L1 (bitcoin), the range of L1 blocks whose deposits are included in this batch, and the information about the deposits themselves.
+
+Once the sequencer builds the batch, the prover begins constructing a proof of state transition for that batch. When the proof is ready, it is prepared to be written to bitcoin, along with the batch information and the new state commitment.
+
+## Proving <a href="#proving" id="proving"></a>
+
+The prover polls the sequencer for new batches. When a new batch is ready, the prover retrieves the relevant witness information from the execution layer, orchestration layer, and bitcoin, and generates a proof that proves the following statements:
+
+* The current batch starts immediately after the last block of the previous batch.
+* The bitcoin blocks to be scanned for this batch are no older than the block containing the previous checkpoint. The blocks are in a valid bitcoin chain.
+* Every transaction in the bitcoin blocks was scanned in correct order and all the relevant transactions (such as the previous checkpoint transaction and deposit transactions) are properly extracted.
+* All deposits initiated on bitcoin are included in the Alpen batch.
+* Execution of the Alpen blocks in this batch produces a valid state transition.
+* The previous batch proof in the extracted checkpoint is valid.
+
+The batch proof is recursive, so by verifying the latest batch proof a client can verify that the Alpen state transitions from genesis to the latest block included in the batch are valid. This batch proof is passed to the sequencer.
+
+## Batch checkpoint <a href="#batch-checkpoint" id="batch-checkpoint"></a>
+
+Once the batch proof is ready, it is included in a batch checkpoint -- a compressed data structure that contains the batch information, state commitment, and the proof. The sequencer then signs the checkpoint and includes it a bitcoin transaction using an [envelope](https://docs.ordinals.com/inscriptions.html). The envelope also contains additional Alpen chain information such as the blockchain name and version. To reveal the checkpoint data on-chain, two transactions are required -- a commit transaction that commits to the checkpoint, and a reveal transaction that reveals the checkpoint data as its witness when spending the commit transaction. The reveal transaction is called the checkpoint transaction. Colloquially, a "checkpoint" may refer either to the compressed batch or the checkpoint transaction.
+
+The commit and reveal transactions are broadcast to the bitcoin network and eventually confirmed in a bitcoin block.
+
+### Batch finalization <a href="#batch-finalization" id="batch-finalization"></a>
+
+Once the bitcoin block containing the checkpoint transaction is sufficiently buried in the blockchain (six confirmations), full nodes consider the Alpen batch committed to in the checkpoint, and all transactions in that batch, to be finalized.
+
+
+---
+
+# Agent Instructions: Querying This Documentation
+
+If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
+
+Perform an HTTP GET request on the current page URL with the `ask` query parameter:
+
+```
+GET https://docs.alpenlabs.io/how-alpen-works/transaction-lifecycle.md?ask=<question>
+```
+
+The question should be specific, self-contained, and written in natural language.
+The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
+
+Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.

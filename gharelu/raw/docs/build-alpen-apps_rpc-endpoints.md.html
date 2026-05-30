@@ -1,0 +1,440 @@
+# RPC endpoints
+
+Our RPC endpoints adhere to the [JSON-RPC 2.0 specification](https://www.jsonrpc.org/specification).
+
+* A public Alpen RPC server is located at: `https://rpc.testnet.alpenlabs.io`
+
+For example, to call the [`strata_protocolVersion`](#strata_protocolversion) method, you can use `curl`:
+
+```sh
+curl --location 'https://rpc.testnet.alpenlabs.io' \
+--header 'Content-Type: application/json' \
+--data '{
+  "jsonrpc":"2.0",
+  "method":"strata_protocolVersion",
+  "params":[],
+  "id": 1
+}'
+```
+
+## Strata client methods <a href="#client-methods" id="client-methods"></a>
+
+In addition to the [standard Reth API methods](https://reth.rs/jsonrpc/intro), Alpen full nodes make available the following Strata-related client methods:
+
+| RPC method                        | Description                                                                               | Link                                                                 |
+| --------------------------------- | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `strata_protocolVersion`          | The protocol version of the node.                                                         | [strata\_protocolVersion](#strata_protocolversion)                   |
+| `strata_blockTime`                | Strata's block time in milliseconds.                                                      | [strata\_blockTime](#strata_blocktime)                               |
+| `strata_l1connected`              | Checks if the node is connected to the bitcoin network.                                   | [strata\_l1connected](#strata_l1connected)                           |
+| `strata_l1status`                 | Provides the status of the L1 (Bitcoin) network connection and sync state.                | [strata\_l1status](#strata_l1status)                                 |
+| `strata_getL1blockHash`           | Retrieves the L1 (Bitcoin) block hash at a specific height.                               | [strata\_getL1blockHash](#strata_getl1blockhash)                     |
+| `strata_clientStatus`             | Returns the current status of the Strata client.                                          | [strata\_clientStatus](#strata_clientstatus)                         |
+| `strata_getRecentBlockHeaders`    | Retrieves the most recent Strata block headers.                                           | [strata\_getRecentBlockHeaders](#strata_getrecentblockheaders)       |
+| `strata_getHeadersAtIdx`          | Retrieves the Strata block headers starting from a specific index.                        | [strata\_getHeadersAtIdx](#strata_getheadersatidx)                   |
+| `strata_getHeaderById`            | Retrieves a Strata block header by its ID.                                                | [strata\_getHeaderById](#strata_getheaderbyid)                       |
+| `strata_getExecUpdateById`        | Retrieves the execution update for a specific Strata block.                               | [strata\_getExecUpdateById](#strata_getexecupdatebyid)               |
+| `strata_getEpochCommitments`      | Retrieves the list of epoch commitments for a specific epoch.                             | [strata\_getEpochCommitments](#strata_getepochcommitments)           |
+| `strata_getEpochSummary`          | Retrieves the summary for a specific epoch.                                               | [strata\_getEpochSummary](#strata_getepochsummary)                   |
+| `strata_getChainstateRaw`         | Retrieves the raw data for chainstate at a specific slot.                                 | [strata\_getChainstateRaw](#strata_getchainstateraw)                 |
+| `strata_getCLBlockWitness`        | Retrieves the client layer (CL) raw block witness data for a specific Strata block index. | [strata\_getCLBlockWitness](#strata_getclblockwitness)               |
+| `strata_getCurrentDeposits`       | Retrieves the current list of deposit IDs.                                                | [strata\_getCurrentDeposits](#strata_getcurrentdeposits)             |
+| `strata_getCurrentDepositById`    | Retrieves details of a deposit by its ID.                                                 | [strata\_getCurrentDepositById](#strata_getcurrentdepositbyid)       |
+| `strata_syncStatus`               | Retrieves the current synchronization status of the Strata node.                          | [strata\_syncStatus](#strata_syncstatus)                             |
+| `strata_getRawBundles`            | Retrieves raw data bundles between a range of Strata block heights.                       | [strata\_getRawBundles](#strata_getrawbundles)                       |
+| `strata_getRawBundleById`         | Retrieves the raw data bundle for a specific Strata block.                                | [strata\_getRawBundleById](#strata_getrawbundlebyid)                 |
+| `strata_getCheckpointInfo`        | Gets nth checkpoint info if any                                                           | [strata\_getCheckpointInfo](#strata_getcheckpointinfo)               |
+| `strata_getLatestCheckpointIndex` | Gets index of the latest checkpoint.                                                      | [strata\_getLatestCheckpointIndex](#strata_getlatestcheckpointindex) |
+| `strata_getCheckpointConfStatus`  | Gets confirmation status of nth checkpoint if exists.                                     | [strata\_getCheckpointConfStatus](#strata_getcheckpointconfstatus)   |
+| `strata_getL2BlockStatus`         | Gets the L2 (Strata) block status from its height.                                        | [strata\_getL2BlockStatus](#strata_getl2blockstatus)                 |
+| `strata_getSyncEvent`             | Gets the sync even by index.                                                              | [strata\_getSyncEvent](#strata_getsyncevent)                         |
+| `strata_getLastSyncEventIdx`      | Gets the index of the last written sync event.                                            | [strata\_getLastSyncEventIdx](#strata_getlastsynceventidx)           |
+| `strata_getClientUpdateOutput`    | Gets the client update output produced as a result of the sync event idx given.           | [strata\_getClientUpdateOutput](#strata_getclientupdateoutput)       |
+
+### `strata_protocolVersion` <a href="#strata_protocolversion" id="strata_protocolversion"></a>
+
+The protocol version of the node.
+
+* **Parameters**: This method takes *no* parameters.
+* **Returns**: A standalone 64-bit unsigned integer representing the protocol version.
+
+### `strata_blockTime` <a href="#strata_blocktime" id="strata_blocktime"></a>
+
+Strata's block time in milliseconds.
+
+* **Parameters**: This method takes *no* parameters.
+* **Returns**: A standalone 64-bit unsigned integer representing the block time in milliseconds.
+
+### `strata_l1connected` <a href="#strata_l1connected" id="strata_l1connected"></a>
+
+If the node is connected to the bitcoin network.
+
+* **Parameters**: This method takes *no* parameters.
+* **Returns**: A standalone Boolean variable (`true` if connected, `false` otherwise).
+
+### `strata_l1status` <a href="#strata_l1status" id="strata_l1status"></a>
+
+The status of the bitcoin network connection, including sync state and other relevant information.
+
+* **Parameters**: This method takes *no* parameters.
+* **Returns**: A JSON object containing the following fields:
+  * `bitcoin_rpc_connected` (Boolean): If the last time the node tried to poll the bitcoin client were successful.
+  * `last_rpc_error` (optional string): The last error message received when trying to poll the bitcoin client, if there was one.
+  * `cur_height` (64-bit unsigned integer): Current block height.
+  * `cur_tip_blkid` (string): Current tip block ID as string.
+  * `last_published_txid` (optional string): Last published txid where a Strata blob was present
+  * `published_envelope_count` (64-bit unsigned integer): number of published transactions in current run
+  * `last_update` (64-bit unsigned integer): UNIX millis time of the last time we got a new update from the L1 connector.
+  * `network` (string): The underlying (bitcoin) network type, e.g. `"signet"`.
+
+### `strata_getL1blockHash` <a href="#strata_getl1blockhash" id="strata_getl1blockhash"></a>
+
+The bitcoin block hash at a certain height.
+
+* **Parameters**:
+  * `"height"`: A 64-bit unsigned integer representing the block height.
+* **Returns**: A string representing the block hash, or `null` if the block hash is unavailable.
+
+### `strata_clientStatus` <a href="#strata_clientstatus" id="strata_clientstatus"></a>
+
+The current status of the Strata client.
+
+* **Parameters**: This method takes *no* parameters.
+* **Returns**: A JSON object containing the following fields:
+  * `finalized_epoch` Commitment to the last finalized epoch, which is a JSON object containing the following fields if a finalized epoch exists, or null:
+    * `"epoch"` (64-bit unsigned integer): The index of the epoch.
+    * `"last_slot"` (64-bit unsigned integer): The last slot of the epoch.
+    * `"last_blkid"` (hex-encoded string): The last strata block ID of the epoch.
+  * `confirmed_epoch` Commitment to the last confirmed epoch, which is a JSON object containing the following fields if a confirmed epoch exists, or null:
+    * `"epoch"` (64-bit unsigned integer): The index of the epoch.
+    * `"last_slot"` (64-bit unsigned integer): The last slot of the epoch.
+    * `"last_blkid"` (hex-encoded string): The last strata block ID of the epoch.
+  * `tip_l1_block` Commitment to the Bitcoin chain tip being followed by the strata node, which is a JSON object containing the following fields, if one exists.
+    * `height` (64-bit unsigned integer): The height of the Bitcoin block.
+    * `blkid` (hex-encoded string): The Bitcoin block id.
+  * `buried_l1_block` Commitment to the Bitcoin block treated as being "buried" and without possibility of being reorg'ed which is a JSON object containing the following fields, if one exists.
+    * `height` (64-bit unsigned integer): The height of the Bitcoin block.
+    * `blkid` (hex-encoded string): The Bitcoin block id.
+  * (deprecated) `chain_tip` (hex-encoded string): Blockchain tip.
+  * (deprecated) `chain_tip_slot` (64-bit unsigned integer): Bitcoin chain tip slot.
+  * (deprecated) `finalized_blkid` (hex-encoded string): Strata block that's been finalized and proven on L1 (Bitcoin).
+  * (deprecated) `last_l1_block` (hex-encoded string): Recent bitcoin block that might still suffer a reorg.
+  * (deprecated) `buried_l1_height` (64-bit unsigned integer): Bitcoin block index treated as being "buried" and without possibility of being reorg'ed.
+
+### `strata_getRecentBlockHeaders` <a href="#strata_getrecentblockheaders" id="strata_getrecentblockheaders"></a>
+
+Retrieves the most recent Strata block headers.
+
+* **Parameters**:
+  * `"count"`: A 64-bit unsigned integer representing the number of block headers to retrieve.
+* **Returns**: An array of JSON objects containing the following fields:
+  * `block_idx` (64-bit unsigned integer): The index of the block representing height.
+  * `timestamp` (64-bit unsigned integer): The timestamp of when the block was created in UNIX epoch format.
+  * `block_id` (hex-encoded string): Hash of the block's contents.
+  * `prev_block` (hex-encoded string): Previous block.
+  * `l1_segment_hash` (hex-encoded string): Bitcoin segment hash.
+  * `exec_segment_hash` (hex-encoded string): Hash of the execution segment.
+  * `state_root` (hex-encoded string): The root hash of the state tree.
+
+### `strata_getHeadersAtIdx` <a href="#strata_getheadersatidx" id="strata_getheadersatidx"></a>
+
+Retrieves the Strata block headers starting from a specific index.
+
+* **Parameters**:
+  * `"index"`: A 64-bit unsigned integer representing the starting index.
+* **Returns**: An array of JSON objects containing the following fields, or `null` if the Strata block headers at the desired index cannot be found:
+  * `block_idx` (64-bit unsigned integer): The index of the block representing height.
+  * `timestamp` (64-bit unsigned integer): The timestamp of when the block was created in UNIX epoch format.
+  * `block_id` (hex-encoded string): Hash of the block's contents.
+  * `prev_block` (hex-encoded string): Previous block.
+  * `l1_segment_hash` (hex-encoded string): Bitcoin segment hash.
+  * `exec_segment_hash` (hex-encoded string): Hash of the execution segment.
+  * `state_root` (hex-encoded string): The root hash of the state tree.
+
+### `strata_getHeaderById` <a href="#strata_getheaderbyid" id="strata_getheaderbyid"></a>
+
+Retrieves a Strata block header by its ID.
+
+* **Parameters**:
+  * `"block_id"`: An identifier for the Strata block as a 32-byte array.
+* **Returns**: A JSON object containing the following fields, or `null` if the desired Strata block cannot be found:
+  * `block_idx` (64-bit unsigned integer): The index of the block representing height.
+  * `timestamp` (64-bit unsigned integer): The timestamp of when the block was created in UNIX epoch format.
+  * `block_id` (hex-encoded string): Hash of the block's contents.
+  * `prev_block` (hex-encoded string): Previous block.
+  * `l1_segment_hash` (hex-encoded string): Bitcoin segment hash.
+  * `exec_segment_hash` (hex-encoded string): Hash of the execution segment.
+  * `state_root` (hex-encoded string): The root hash of the state tree.
+
+### `strata_getExecUpdateById` <a href="#strata_getexecupdatebyid" id="strata_getexecupdatebyid"></a>
+
+Retrieves the execution update for a specific Strata block.
+
+* **Parameters**:
+  * `"block_id"`: An identifier for the Strata block as a 32-byte array.
+* **Returns**: A JSON object containing the following fields, or `null` if the execution update for the desired Strata block cannot be found:
+  * `update_idx` (64-bit unsigned integer): The index of the update, used to track or sequence updates.
+  * `entries_root` (hex-encoded string): Merkle tree root of the contents of the EL (execution layer) payload, in the order it was "strata'ed" in the block.
+  * `extra_payload` (hex-encoded string): Buffer of any other payload data.
+  * `new_state` (hex-encoded string): New state root for the update.
+  * `withdrawals`: Bridge withdrawals intents, which is a vector of JSON objects containing the following fields:
+    * `amt` (64-bit unsigned integer): bitcoin amount in sats.
+    * `destination`: destination bitcoin address for withdrawal.
+    * `withdrawal_txid`(hex-encoded string): Txid of withdrawal transaction in Alpen chain.
+  * `da_blobs`: Bitcoin DA (data availability) blobs, which is vector of JSON objects containing the following fields:
+    * `dest` (8-bit unsigned integer): destination or identifier for the blob.
+    * `blob-commitment` (32-byte hex-encoded string): commitment hash for the blob.
+
+### `strata_getEpochCommitments` <a href="#strata_getepochcommitments" id="strata_getepochcommitments"></a>
+
+Retrieves the list of epoch commitments for a specific epoch.
+
+* **Parameters**:
+  * `"epoch"`: A 64-bit unsigned integer representing the epoch index.
+* **Returns**: An array of JSON objects containing the following fields:
+  * `"epoch"` (64-bit unsigned integer): The index of the epoch.
+  * `"last_slot"` (64-bit unsigned integer): The last slot of the epoch.
+  * `"last_blkid"` (hex-encoded string): The Id of the last strata block of the epoch.
+
+### `strata_getEpochSummary` <a href="#strata_getepochsummary" id="strata_getepochsummary"></a>
+
+Retrieves the summary for a specific epoch. The inputs correspond to the returns from [`strata_getEpochCommitments`](#strata_getepochcommitments).
+
+* **Parameters**:
+  * `"epoch"` (64-bit unsigned integer): The epoch index.
+  * `"slot"` (64-bit unsigned integer): The last slot of the epoch.
+  * `"terminal"` (hex-encoded string): The last block ID of the epoch.
+* **Returns**: A JSON object containing the following fields, or `null` if the epoch summary the desired Strata epoch cannot be found:
+  * `"epoch"` (64-bit unsigned integer): The index of the epoch.
+  * `"terminal"` Commitment to the last block of the checkpoint, which is a JSON object containing the following fields:
+    * `"slot"` (64-bit unsigned integer): The index of the block.
+    * `"blkid"` (hex-encoded string): The ID of the block.
+  * `"prev_terminal"` Commitment to the last block of the previous checkpoint, which is a JSON object containing the following fields:
+    * `"slot"` (64-bit unsigned integer): The index of the block.
+    * `"blkid"` (hex-encoded string): The ID of the block.
+  * `"new_l1"` Commitment to the final L1 block included in the checkpoint, which is a JSON object containing the following fields:
+    * `"height"` (64-bit unsigned integer): The height of the L1 block.
+    * `"blkid"` (hex-encoded string): The ID of the L1 block.
+  * `"final_state"` (hex-encoded string): The final state root of the epoch.
+
+### `strata_getChainstateRaw` <a href="#strata_getchainstateraw" id="strata_getchainstateraw"></a>
+
+Retrieves the raw data for chainstate at a specific slot.
+
+* **Parameters**:
+  * `"slot"`: A 64-bit unsigned integer representing the slot.
+* **Returns**: Raw bytes, or error if the chainstate for the desired Strata block cannot be found.
+
+### `strata_getCLBlockWitness` <a href="#strata_getclblockwitness" id="strata_getclblockwitness"></a>
+
+Retrieves the client layer (CL) raw block witness data for a specific Strata block index.
+
+* **Parameters**:
+  * `"block_id"`: An identifier for the Strata block as a 32-byte array.
+* **Returns**: Raw bytes, or `null` if the block witness data for the desired Strata block cannot be found.
+
+### `strata_getCurrentDeposits` <a href="#strata_getcurrentdeposits" id="strata_getcurrentdeposits"></a>
+
+Retrieves the current list of deposit IDs.
+
+* **Parameters**: This method takes *no* parameters.
+* **Returns**: An array of 32-bit unsigned integers representing the active deposit IDs.
+
+### `strata_getCurrentDepositById` <a href="#strata_getcurrentdepositbyid" id="strata_getcurrentdepositbyid"></a>
+
+Retrieves details of a deposit by its ID.
+
+* **Parameters**:
+  * `"deposit_id"`: A 32-bit unsigned integer representing the deposit ID.
+* **Returns**: A JSON object containing the following fields, or `null` if the deposit cannot be found:
+  * `deposit_idx` (32-bit unsigned integer): The index of the deposit, used to identify or track the deposit within the system.
+  * `output` (string): The outpoint (`txid:vout`) that this deposit entry references.
+  * `notary_operators` (vector of `u32`): list of notary operators, by their indexes.
+  * `amt` (64-bit unsigned integer): The amount of currency deposited.
+  * `state` (string): The deposit state:
+    * `"Created"`
+    * `"Accepted"`
+    * `"Dispatched"`
+    * `"Executed"`
+  * `withdrawal_request_txid` (optional 32-byte hex-encoded string): Txid of withdrawal request transaction in Alpen chain if assined to this deposit, or `null` if unassigned.
+
+### `strata_syncStatus` <a href="#strata_syncstatus" id="strata_syncstatus"></a>
+
+Retrieves the current synchronization status of the Strata node.
+
+* **Parameters**: This method takes *no* parameters.
+* **Returns**: A JSON object containing the following fields:
+  * `tip_height` (64-bit unsigned integer): Current head Strata slot known to this node
+  * `tip_block_id` (32-byte array): Last Strata block chosen as the current tip.
+  * `cur_epoch` (64-bit unsigned integer): Current epoch index.
+  * `prev_epoch`: Commitment to the previous epoch, which is a JSON object containing the following fields:
+    * `"epoch"` (64-bit unsigned integer): The index of the epoch.
+    * `"last_slot"` (64-bit unsigned integer): The last slot of the epoch.
+    * `"last_blkid"` (hex-encoded string): The last strata block ID of the epoch.
+  * `observed_finalized_epoch`: Commitment to the last finalized epoch observed in chainstate, which is a JSON object containing the following fields:
+    * `"epoch"` (64-bit unsigned integer): The index of the epoch.
+    * `"last_slot"` (64-bit unsigned integer): The last slot of the epoch.
+    * `"last_blkid"` (hex-encoded string): The last strata block ID of the epoch.
+  * safe\_l1\_block: Commitment to the last Bitcoin block processed on the strata chain.
+    * `height` (64-bit unsigned integer): The height of the Bitcoin block.
+    * `blkid` (hex-encoded string): The Bitcoin block id.
+  * (deprecated)`finalized_block_id` (32-byte array): Strata block that's been finalized and proven on L1 (Bitcoin).
+
+### `strata_getRawBundles` <a href="#strata_getrawbundles" id="strata_getrawbundles"></a>
+
+Retrieves raw data bundles between a range of Strata block heights.
+
+* **Parameters**:
+  * `"start_height"`: A 64-bit unsigned integer representing the starting block height.
+  * `"end_height"`: A 64-bit unsigned integer representing the ending block height.
+* **Returns**: A hex-encoded string representing the raw data bundles for the given block height range.
+
+### `strata_getRawBundleById` <a href="#strata_getrawbundlebyid" id="strata_getrawbundlebyid"></a>
+
+Retrieves the raw data bundle for a specific Strata block.
+
+* **Parameters**:
+  * `"block_id"`: The Strata block identifier.
+* **Returns**: A hex-encoded string representing the raw data bundle, or `null` if the bundle is not found.
+
+### `strata_getCheckpointInfo` <a href="#strata_getcheckpointinfo" id="strata_getcheckpointinfo"></a>
+
+Gets nth checkpoint info.
+
+* **Parameters**:
+  * `"idx"`: A 64-bit unsigned integer representing the checkpoint index.
+* **Returns**: A JSON object containing the following fields, or `null` if no checkpoints could be found:
+  * `"idx"`: A 64-bit unsigned integer representing the checkpoint index.
+  * `"l1_range"`: A tuple of commitments to start and end bitcoin blocks in the range of the checkpoint, which is a JSON object containing the following fields:
+    * `"height"` (64-bit unsigned integer): The height of the L1 block.
+    * `"blkid"` (hex-encoded string): The ID of the L1 block.
+  * `"l2_range"`: A tuple of commitments to start and end strata blocks in the range of the checkpoint, which is a JSON object containing the following fields:
+    * `"slot"` (64-bit unsigned integer): The slot of the Strata block.
+    * `"blkid"` (hex-encoded string): The ID of the Strata block.
+  * `"l1_reference"`: A JSON object containing the following fields representing the bitcoin block and tx where the checkpoint is posted.
+    * `"block_height"` (64-bit unsigned integer): The height of the L1 block.
+    * `"block_id"` (hex-encoded string): The ID of the L1 block.
+    * `"txid"` (hex-encoded string): The txid of the Bitcoin transaction containing the envelope with the checkpoint.
+    * `"wtxid"` (hex-encoded string): The wtxid of the Bitcoin transaction containing the envelope with the checkpoint..
+  * `"confirmation_status"` (string): The status of the checkpoint, one of:
+    * `"pending"`
+    * `"confirmed"`
+    * `"finalized"`
+
+### `strata_getLatestCheckpointIndex` <a href="#strata_getlatestcheckpointindex" id="strata_getlatestcheckpointindex"></a>
+
+Gets index of the latest checkpoint.
+
+* **Parameters**:
+  * `"finalized"` An optional Boolean. Default false. Only relevant for sequencer nodes.
+* **Returns**: A 64-bit unsigned integer representing the latest checkpoint index.
+
+### `strata_getCheckpointConfStatus` <a href="#strata_getcheckpointconfstatus" id="strata_getcheckpointconfstatus"></a>
+
+Gets confirmation status of nth checkpoint if exists.
+
+* **Parameters**:
+  * `"idx"` A 64-bit unsigned integer representing the checkpoint index.
+* **Returns**: (string): The status of the checkpoint, or `null` if the checkpoint could not be found:
+  * `"pending"`
+  * `"confirmed"`
+  * `"finalized"`
+
+### `strata_getL2BlockStatus` <a href="#strata_getl2blockstatus" id="strata_getl2blockstatus"></a>
+
+Gets the Strata block status from its height.
+
+* **Parameters**:
+  * `"block_height"`: A 64-bit unsigned integer representing the Strata block height that the checkpoint covers.
+* **Returns** The status of the Strata block:
+  * `"Unknown"`
+  * `"Confirmed"`
+  * `"Verified"`
+  * `"Finalized"`
+
+### `strata_getSyncEvent` <a href="#strata_getsyncevent" id="strata_getsyncevent"></a>
+
+Gets the sync even by index.
+
+* **Parameters**: a 64-bit unsigned integer representing the sync event index.
+* **Returns**: A JSON object being one of the following variants, or `null` if no sync event could be found:
+  * `"L1Block"`: In the case of a valid L1 (bitcoin) block.
+  * `"L1Revert"`: In the case of a valid L1 (bitcoin) revert.
+
+### `strata_getLastSyncEventIdx` <a href="#strata_getlastsynceventidx" id="strata_getlastsynceventidx"></a>
+
+Gets the index of the last written sync event.
+
+* **Parameters**: This method takes *no* parameters.
+* **Returns**: A 64-bit unsigned integer representing the last written sync event index.
+
+### `strata_getClientUpdateOutput` <a href="#strata_getclientupdateoutput" id="strata_getclientupdateoutput"></a>
+
+Gets the client update output produced as a result of the sync event index given.
+
+* **Parameters**: a 64-bit unsigned integer representing the sync event index.
+* **Returns**: A JSON object containing the following fields, or `null` if no sync event could be found:
+  * `"state"`: a JSON object representing the client state after applying the sync event.
+  * `"actions"`: a vector of JSON objects, each representing an action to be taken by the client.
+    * `"FinalizeEpoch"`: Finalizes an epoch, indicating that it won't be reverted.
+    * `"L2Genesis"`: Indicates to the worker that it's safe to perform the L2 (Strata) genesis operations and start the chain sync work, using a particular L1 block as the genesis lock-in block.
+    * `"UpdateCheckpointInclusion"`: Checkpoint is included in L1 at given L1 reference.
+
+## Account abstraction <a href="#account-abstraction" id="account-abstraction"></a>
+
+Alpen includes support for account abstraction (AA) following the [ERC-4337](https://eips.ethereum.org/EIPS/eip-4337) standard. In our implementation we deployed EntryPoint contracts and a Bundler.
+
+**EntryPoint Contract**
+
+Developers can access it using the following addresses:
+
+| Version | Contract Address                           |
+| ------- | ------------------------------------------ |
+| v0.6    | 0x5ff137d4b0fdcd49dca30c7cf57e578a026d2789 |
+| v0.7    | 0x0000000071727De22E5E9d8BAf0edAc6f37da032 |
+| v0.8    | 0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108 |
+| v0.9    | 0x433709009B8330FDa32311DF1C2AFA402eD8D009 |
+
+**Bundler**
+
+Alpen is offering a [Rundler v.0.11.0](https://github.com/alchemyplatform/rundler/releases/tag/v0.11.0) public bundler RPC at `https://bundler.testnet.alpenlabs.io` .
+
+For example, to call the `eth_supportedEntryPoints` method, we can use `curl`:
+
+```sh
+curl --location 'https://bundler.testnet.alpenlabs.io' \
+--header 'Content-Type: application/json' \
+--data '{
+  "jsonrpc":"2.0",
+  "method":"eth_supportedEntryPoints",
+  "params":[],
+  "id": 1
+}'
+```
+
+These RPC endpoints follow the [EIP-7769](https://eips.ethereum.org/EIPS/eip-7769) specification:
+
+| Endpoint                                                                                               | Description                                            |
+| ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------ |
+| [`eth_sendUserOperation`](https://eips.ethereum.org/EIPS/eip-7769#eth_senduseroperation)               | Sends a `UserOperation` to the bundler for inclusion.  |
+| [`eth_estimateUserOperationGas`](https://eips.ethereum.org/EIPS/eip-7769#eth_estimateuseroperationgas) | Estimates gas usage for a given `UserOperation`.       |
+| [`eth_getUserOperationByHash`](https://eips.ethereum.org/EIPS/eip-7769#eth_getuseroperationbyhash)     | Fetches a `UserOperation` by its `userOpHash`.         |
+| [`eth_getUserOperationReceipt`](https://eips.ethereum.org/EIPS/eip-7769#eth_getuseroperationreceipt)   | Retrieves the receipt for a submitted `UserOperation`. |
+| [`eth_supportedEntryPoints`](https://eips.ethereum.org/EIPS/eip-7769#eth_supportedentrypoints)         | Lists supported `EntryPoint` addresses.                |
+
+
+---
+
+# Agent Instructions: Querying This Documentation
+
+If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
+
+Perform an HTTP GET request on the current page URL with the `ask` query parameter:
+
+```
+GET https://docs.alpenlabs.io/build-alpen-apps/rpc-endpoints.md?ask=<question>
+```
+
+The question should be specific, self-contained, and written in natural language.
+The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
+
+Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.

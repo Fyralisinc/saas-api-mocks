@@ -1,0 +1,732 @@
+people:
+- id: person:Rajil1213
+  github_handle: Rajil1213
+  full_name: Rajil Bajracharya
+  email: imrb1213@gmail.com
+  role: engineer
+  level: senior
+  team: team:bridge
+  started_at: '2024-07-26'
+  last_active: '2026-05-22'
+  twitter: ''
+  blog_url: ''
+  bio: Building @ Alpen Labs
+  commits: 907
+  top_repos:
+  - strata-bridge
+  - alpen
+  - bridge-sm-design-docs
+  - strata-p2p
+  - bitcoind-async-client
+  company_self_reported: Alpen Labs
+  location: Kathmandu, Nepal
+  likely_external: false
+- id: person:prajwolrg
+  github_handle: prajwolrg
+  full_name: Prajwol Gyawali
+  email: prajwolrg@alpenlabs.io
+  role: engineer
+  level: senior
+  team: team:protocol
+  started_at: '2024-05-24'
+  last_active: '2026-05-27'
+  twitter: ''
+  blog_url: ''
+  bio: ''
+  commits: 618
+  top_repos:
+  - alpen
+  - strata-bridge
+  - moho
+  - zkaleido
+  - asm
+  company_self_reported: ''
+  location: ''
+  likely_external: false
+- id: person:storopoli
+  github_handle: storopoli
+  full_name: Jose Storopoli
+  email: jose@storopoli.com
+  role: engineer
+  level: senior
+  team: team:protocol
+  started_at: '2024-12-18'
+  last_active: '2026-05-27'
+  twitter: storopoli
+  blog_url: storopoli.com
+  bio: "\"Cypherpunks write code\"\r\n\r\n\U0001F511  0x1BD38BE8D0653A7A"
+  commits: 534
+  top_repos:
+  - alpen
+  - strata-bridge
+  - strata-p2p
+  - bitcoin-bosd
+  - ssz-gen
+  company_self_reported: '@AlpenLabs'
+  location: localhost
+  likely_external: false
+- id: person:MdTeach
+  github_handle: MdTeach
+  full_name: Abishek Bashyal
+  email: abishek_bashyal@outlook.com
+  role: engineer
+  level: senior
+  team: team:protocol
+  started_at: '2024-06-17'
+  last_active: '2026-05-27'
+  twitter: ''
+  blog_url: ''
+  bio: "A nice guy\r\n"
+  commits: 530
+  top_repos:
+  - strata-bridge
+  - alpen
+  - zkaleido
+  - asm
+  - moho
+  company_self_reported: ''
+  location: ''
+  likely_external: false
+- id: person:krsnapaudel
+  github_handle: krsnapaudel
+  full_name: Dilli Raj Paudel
+  email: krsnapaudel@alpenlabs.io
+  role: engineer
+  level: senior
+  team: team:infra
+  started_at: '2025-01-30'
+  last_active: '2026-05-26'
+  twitter: ''
+  blog_url: ''
+  bio: ''
+  commits: 440
+  top_repos:
+  - alpen-dashboards
+  - alpen-faucet
+  - alpen
+  - checkpoint-explorer
+  - faucet-api
+  company_self_reported: Alpen Labs
+  location: ''
+  likely_external: false
+- id: person:delbonis
+  github_handle: delbonis
+  full_name: Trey Del Bonis
+  email: delbonis@alpenlabs.io
+  role: engineer
+  level: ic
+  team: team:protocol
+  started_at: '2024-05-03'
+  last_active: '2026-05-27'
+  twitter: ''
+  blog_url: https://tr3y.io/
+  bio: "I use GitLab for almost everything: https://gitlab.com/treyzania\r\n\r\nbc1q9z2vngl0gwuj3l6exv7stt5j52sdmdeeu35k4j"
+  commits: 325
+  top_repos:
+  - alpen
+  - ckt
+  - mosaic
+  - strata-common
+  - moho
+  company_self_reported: ''
+  location: Boston, MA
+  likely_external: false
+- id: person:sapinb
+  github_handle: sapinb
+  full_name: needs:review
+  email: sapinb@alpenlabs.io
+  role: ops
+  level: ic
+  team: team:ops
+  started_at: '2024-06-05'
+  last_active: '2026-05-13'
+  twitter: ''
+  blog_url: ''
+  bio: ''
+  commits: 269
+  top_repos:
+  - alpen
+  - mosaic
+  - strata-bridge
+  - .github
+  - alpen-dashboards
+  company_self_reported: ''
+  location: ''
+  likely_external: false
+- id: person:Zk2u
+  github_handle: Zk2u
+  full_name: azz
+  email: Zk2u@alpenlabs.io
+  role: infra
+  level: ic
+  team: team:research
+  started_at: '2024-09-11'
+  last_active: '2026-05-20'
+  twitter: ''
+  blog_url: https://zk2u.com
+  bio: systems engineer
+  commits: 235
+  top_repos:
+  - ckt
+  - faucet-api
+  - strata-bridge
+  - mosaic
+  - alpen
+  company_self_reported: '@alpenlabs '
+  location: ''
+  likely_external: false
+- id: person:uncomputable
+  github_handle: uncomputable
+  full_name: Christian Lewe
+  email: uncomputable@alpenlabs.io
+  role: research
+  level: ic
+  team: team:bridge
+  started_at: '2025-08-06'
+  last_active: '2026-05-07'
+  twitter: ''
+  blog_url: ''
+  bio: Computer science, mathematics, logic, cryptography, complexity theory, philosophy, languages.
+  commits: 223
+  top_repos:
+  - strata-bridge
+  - bridge-sm-design-docs
+  - alpen
+  - bitcoin-bosd
+  company_self_reported: Alpenlabs
+  location: America
+  likely_external: false
+- id: person:purusang
+  github_handle: purusang
+  full_name: needs:review
+  email: purusang@alpenlabs.io
+  role: engineer
+  level: ic
+  team: team:infra
+  started_at: '2024-10-02'
+  last_active: '2026-05-28'
+  twitter: ''
+  blog_url: ''
+  bio: ''
+  commits: 222
+  top_repos:
+  - checkpoint-explorer
+  - alpen
+  - alpen-dashboards
+  - faucet-api
+  - alpen-faucet
+  company_self_reported: ''
+  location: ''
+  likely_external: false
+- id: person:bewakes
+  github_handle: bewakes
+  full_name: Bibek Pandey
+  email: bewakes@alpenlabs.io
+  role: engineer
+  level: ic
+  team: team:protocol
+  started_at: '2024-05-20'
+  last_active: '2026-05-19'
+  twitter: ''
+  blog_url: https://bewakes.com
+  bio: 'Miles to go before I sleep.. '
+  commits: 186
+  top_repos:
+  - alpen
+  - typed-sled
+  - strata-bridge
+  - strata-common
+  - bitcoin-bosd
+  company_self_reported: ''
+  location: Lalitpur, Nepal
+  likely_external: false
+- id: person:voidash
+  github_handle: voidash
+  full_name: needs:review
+  email: voidash@alpenlabs.io
+  role: engineer
+  level: ic
+  team: team:protocol
+  started_at: '2024-07-01'
+  last_active: '2026-05-27'
+  twitter: ''
+  blog_url: https://voidash.github.io/blog/archives/
+  bio: ''
+  commits: 180
+  top_repos:
+  - alpen
+  - strata-common
+  - checkpoint-explorer
+  - strata-bridge
+  - faucet-api
+  company_self_reported: ''
+  location: ''
+  likely_external: false
+- id: person:mukeshdroid
+  github_handle: mukeshdroid
+  full_name: Mukesh Tiwari
+  email: mukeshdroid@alpenlabs.io
+  role: research
+  level: ic
+  team: team:research
+  started_at: '2025-02-20'
+  last_active: '2026-05-26'
+  twitter: ''
+  blog_url: ''
+  bio: ''
+  commits: 117
+  top_repos:
+  - strata-bridge
+  - bridge-sm-design-docs
+  - garbled-circuits
+  - verifiable-garbling
+  - g16
+  company_self_reported: '@alpenlabs '
+  location: Kathmandu
+  likely_external: false
+- id: person:Hakkush-07
+  github_handle: Hakkush-07
+  full_name: Hakan Karakuş
+  email: Hakkush-07@alpenlabs.io
+  role: research
+  level: ic
+  team: team:research
+  started_at: '2025-05-15'
+  last_active: '2025-09-18'
+  twitter: ''
+  blog_url: ''
+  bio: Mathematician
+  commits: 113
+  top_repos:
+  - g16
+  company_self_reported: ''
+  location: Turkey
+  likely_external: false
+- id: person:evgenyzdanovich
+  github_handle: evgenyzdanovich
+  full_name: Evgeny Zdanovich
+  email: zdanovichevgeny@gmail.com
+  role: engineer
+  level: ic
+  team: team:protocol
+  started_at: '2024-11-18'
+  last_active: '2026-05-22'
+  twitter: ''
+  blog_url: ''
+  bio: ''
+  commits: 111
+  top_repos:
+  - alpen
+  - asm
+  - strata-common
+  - zkaleido
+  - moho
+  company_self_reported: ''
+  location: ''
+  likely_external: false
+- id: person:bbist
+  github_handle: bbist
+  full_name: needs:review
+  email: bbist@alpenlabs.io
+  role: engineer
+  level: ic
+  team: team:bridge
+  started_at: '2024-10-28'
+  last_active: '2024-11-23'
+  twitter: ''
+  blog_url: ''
+  bio: ''
+  commits: 93
+  top_repos:
+  - strata-bridge
+  company_self_reported: ''
+  location: ''
+  likely_external: false
+- id: person:AaronFeickert
+  github_handle: AaronFeickert
+  full_name: Aaron Feickert
+  email: AaronFeickert@alpenlabs.io
+  role: research
+  level: ic
+  team: team:research
+  started_at: '2024-10-09'
+  last_active: '2026-05-15'
+  twitter: ''
+  blog_url: https://www.alpenlabs.io/
+  bio: Cryptographer. Mathematician. Physicist.
+  commits: 90
+  top_repos:
+  - alpen
+  - mosaic
+  - ckt
+  - bitcoin-bosd
+  - g16
+  company_self_reported: '@alpenlabs'
+  location: United States
+  likely_external: false
+- id: person:nakkstar123
+  github_handle: nakkstar123
+  full_name: Nakul Khambhati
+  email: nakulkhambhati@g.ucla.edu
+  role: research
+  level: ic
+  team: team:research
+  started_at: '2025-11-11'
+  last_active: '2026-05-07'
+  twitter: ''
+  blog_url: ''
+  bio: CS Ph.D. @ UCLA. Researching garbled circuits.
+  commits: 73
+  top_repos:
+  - ckt
+  - mosaic
+  - duty-free-bits
+  - g16
+  company_self_reported: ''
+  location: ''
+  likely_external: false
+- id: person:sistemd
+  github_handle: sistemd
+  full_name: needs:review
+  email: sistemd@alpenlabs.io
+  role: engineer
+  level: ic
+  team: team:bridge
+  started_at: '2025-11-14'
+  last_active: '2025-12-15'
+  twitter: ''
+  blog_url: ''
+  bio: ''
+  commits: 43
+  top_repos:
+  - strata-bridge
+  - alpen
+  company_self_reported: ''
+  location: ''
+  likely_external: false
+- id: person:irnb
+  github_handle: irnb
+  full_name: Hamid
+  email: irnb@alpenlabs.io
+  role: engineer
+  level: ic
+  team: team:protocol
+  started_at: '2025-05-08'
+  last_active: '2026-05-25'
+  twitter: ''
+  blog_url: ''
+  bio: ''
+  commits: 37
+  top_repos:
+  - alpen
+  - strata-common
+  - moho
+  - asm
+  - ssz-gen
+  company_self_reported: ''
+  location: ''
+  likely_external: false
+- id: person:ProofOfKeags
+  github_handle: ProofOfKeags
+  full_name: Keags
+  email: keagan.mcclelland@gmail.com
+  role: engineer
+  level: ic
+  team: team:bridge
+  started_at: '2025-01-01'
+  last_active: '2025-08-21'
+  twitter: ProofOfKeags
+  blog_url: proofofkeags.com
+  bio: Pursuing the purity of thought
+  commits: 35
+  top_repos:
+  - strata-bridge
+  - strata-p2p
+  company_self_reported: ''
+  location: Denver, CO
+  likely_external: false
+- id: person:manishbista28
+  github_handle: manishbista28
+  full_name: needs:review
+  email: manishbista28@alpenlabs.io
+  role: research
+  level: ic
+  team: team:research
+  started_at: '2025-08-19'
+  last_active: '2026-05-27'
+  twitter: manishbista28
+  blog_url: ''
+  bio: ''
+  commits: 34
+  top_repos:
+  - g16
+  - mosaic
+  - ckt
+  - dv-pari
+  - dv-pari-circuit
+  company_self_reported: ''
+  location: ''
+  likely_external: false
+- id: person:john-light
+  github_handle: john-light
+  full_name: John Light
+  email: john-light@alpenlabs.io
+  role: devrel
+  level: ic
+  team: team:devrel
+  started_at: '2024-10-01'
+  last_active: '2025-08-19'
+  twitter: ''
+  blog_url: https://www.lightco.in
+  bio: ''
+  commits: 19
+  top_repos:
+  - docs-archive
+  - alpen
+  - bitcoind-async-client
+  - strata-bridge
+  company_self_reported: ''
+  location: ''
+  likely_external: false
+- id: person:just-erray
+  github_handle: just-erray
+  full_name: erray
+  email: just-erray@alpenlabs.io
+  role: research
+  level: ic
+  team: team:research
+  started_at: '2025-06-13'
+  last_active: '2025-10-03'
+  twitter: ''
+  blog_url: ''
+  bio: ''
+  commits: 17
+  top_repos:
+  - g16
+  company_self_reported: ''
+  location: ''
+  likely_external: false
+- id: person:cyphersnake
+  github_handle: cyphersnake
+  full_name: cyphersnake
+  email: cyphersnake@alpenlabs.io
+  role: engineer
+  level: ic
+  team: team:research
+  started_at: '2025-07-02'
+  last_active: '2025-10-03'
+  twitter: cypherserpent
+  blog_url: ''
+  bio: '🦀 ProgCrypto Developer '
+  commits: 13
+  top_repos:
+  - g16
+  company_self_reported: ''
+  location: ''
+  likely_external: false
+- id: person:barakshani
+  github_handle: barakshani
+  full_name: needs:review
+  email: barakshani@alpenlabs.io
+  role: engineer
+  level: ic
+  team: team:protocol
+  started_at: '2025-05-21'
+  last_active: '2026-01-16'
+  twitter: ''
+  blog_url: ''
+  bio: ''
+  commits: 11
+  top_repos:
+  - alpen
+  - strata-bridge
+  - alpen-faucet
+  - alpen-dashboards
+  company_self_reported: ''
+  location: ''
+  likely_external: false
+- id: person:chhetri22
+  github_handle: chhetri22
+  full_name: Abishkar Chhetri
+  email: chhetri22@alpenlabs.io
+  role: engineer
+  level: ic
+  team: needs:review
+  started_at: '2023-02-01'
+  last_active: '2024-06-06'
+  twitter: ''
+  blog_url: ''
+  bio: ''
+  commits: 9
+  top_repos:
+  - Technical-Whitepaper
+  company_self_reported: ''
+  location: ''
+  likely_external: false
+- id: person:ceyhunsen
+  github_handle: ceyhunsen
+  full_name: Ceyhun Şen
+  email: ceyhuusen@gmail.com
+  role: engineer
+  level: ic
+  team: team:research
+  started_at: '2025-06-10'
+  last_active: '2025-06-10'
+  twitter: ceyhusen
+  blog_url: ''
+  bio: Low level software engineer
+  commits: 9
+  top_repos:
+  - g16
+  company_self_reported: ''
+  location: İstanbul
+  likely_external: false
+- id: person:sampkaALP
+  github_handle: sampkaALP
+  full_name: needs:review
+  email: sampkaALP@alpenlabs.io
+  role: ops
+  level: ic
+  team: team:ops
+  started_at: '2025-05-05'
+  last_active: '2025-08-14'
+  twitter: ''
+  blog_url: ''
+  bio: ''
+  commits: 7
+  top_repos:
+  - alpen-dashboards
+  - alpen
+  - checkpoint-explorer
+  company_self_reported: ''
+  location: ''
+  likely_external: false
+- id: person:alexhui01
+  github_handle: alexhui01
+  full_name: Alex Yang
+  email: alexhui01@alpenlabs.io
+  role: engineer
+  level: ic
+  team: team:protocol
+  started_at: '2026-03-27'
+  last_active: '2026-05-14'
+  twitter: ''
+  blog_url: ''
+  bio: ''
+  commits: 5
+  top_repos:
+  - alpen
+  company_self_reported: ''
+  location: ''
+  likely_external: false
+- id: person:pramodkandel
+  github_handle: pramodkandel
+  full_name: Pramod Kandel
+  email: pramodkandel@alpenlabs.io
+  role: devrel
+  level: ic
+  team: team:devrel
+  started_at: '2023-02-01'
+  last_active: '2024-10-07'
+  twitter: ''
+  blog_url: ''
+  bio: Trying to build useful things
+  commits: 5
+  top_repos:
+  - Technical-Whitepaper
+  - docs-archive
+  company_self_reported: ''
+  location: ''
+  likely_external: false
+- id: person:aunth
+  github_handle: aunth
+  full_name: Vlad Maslianko
+  email: aunth@alpenlabs.io
+  role: engineer
+  level: ic
+  team: team:protocol
+  started_at: '2025-09-04'
+  last_active: '2025-09-29'
+  twitter: ''
+  blog_url: ''
+  bio: 'Write code for rockets to bomb russian federation '
+  commits: 5
+  top_repos:
+  - strata-p2p
+  company_self_reported: ''
+  location: ''
+  likely_external: false
+- id: person:madan-oss
+  github_handle: madan-oss
+  full_name: needs:review
+  email: madan-oss@alpenlabs.io
+  role: research
+  level: ic
+  team: team:research
+  started_at: '2026-01-08'
+  last_active: '2026-05-19'
+  twitter: ''
+  blog_url: ''
+  bio: ''
+  commits: 4
+  top_repos:
+  - mosaic
+  - alpen
+  - strata-bridge
+  company_self_reported: ''
+  location: ''
+  likely_external: false
+- id: person:ali-rezai
+  github_handle: ali-rezai
+  full_name: Ali
+  email: ali-rezai@alpenlabs.io
+  role: engineer
+  level: ic
+  team: team:protocol
+  started_at: '2025-06-11'
+  last_active: '2025-07-21'
+  twitter: ''
+  blog_url: ''
+  bio: ''
+  commits: 4
+  top_repos:
+  - ssz-gen
+  company_self_reported: ''
+  location: ''
+  likely_external: false
+- id: person:arminsabouri
+  github_handle: arminsabouri
+  full_name: Armin Sabouri
+  email: arminsabouri@alpenlabs.io
+  role: infra
+  level: ic
+  team: team:infra
+  started_at: '2025-06-10'
+  last_active: '2025-12-23'
+  twitter: arminsdev
+  blog_url: https://arminsabouri.com/
+  bio: Bitcoin engineer and researcher | Co-Host of Boston Bitdevs | Embedded Systems Enthusiast
+  commits: 3
+  top_repos:
+  - bitcoind-async-client
+  company_self_reported: ''
+  location: ''
+  likely_external: false
+- id: person:Arniiiii
+  github_handle: Arniiiii
+  full_name: Arniiiii
+  email: lg3dx6fd@gmail.com
+  role: engineer
+  level: ic
+  team: team:protocol
+  started_at: '2025-09-04'
+  last_active: '2025-10-01'
+  twitter: ''
+  blog_url: ''
+  bio: ''
+  commits: 3
+  top_repos:
+  - strata-p2p
+  company_self_reported: ''
+  location: ''
+  likely_external: false

@@ -1,0 +1,10 @@
+.env
+.venv/
+cache/
+build/*
+!build/events.jsonl
+raw/github/
+scrape.log
+__pycache__/
+*.pyc
+.DS_Store

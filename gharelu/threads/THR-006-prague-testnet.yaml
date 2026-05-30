@@ -1,0 +1,172 @@
+id: THR-006-prague-testnet
+title: Prague Testnet Support
+window:
+  start: 2025-12-04
+  end: 2026-03-04
+driver: person:prajwolrg
+cast:
+- person:prajwolrg
+- person:MdTeach
+- person:krsnapaudel
+- person:Rajil1213
+- person:ProofOfKeags
+- person:john-light
+- person:bewakes
+linked_anchors:
+- milestone:prague-testnet
+linked_products:
+- product:strata
+- product:strata-bridge
+linked_repos:
+- repo:alpen
+- repo:strata-bridge
+- repo:strata-p2p
+- repo:checkpoint-explorer
+- repo:alpen-dashboards
+- repo:alpen-faucet
+beats:
+- id: B1
+  start: 2025-12-04
+  end: 2025-12-17
+  kind: kickoff
+  summary: Prajwol scopes Prague support as a two-month testnet enablement pass covering chain config, bridge smoke paths,
+    faucet readiness, explorer indexing, and dashboard visibility.
+  participants:
+  - person:prajwolrg
+  - person:MdTeach
+  - person:krsnapaudel
+  - person:Rajil1213
+  - person:john-light
+  tensions:
+  - holiday availability
+  - unclear faucet ownership
+  - bridge smoke tests lagging protocol config
+- id: B2
+  start: 2025-12-18
+  end: 2025-12-31
+  kind: design
+  summary: MdTeach drafts the Prague chain-params design while Rajil and ProofOfKeags mark which bridge assumptions depend
+    on final genesis and sequencer endpoint shape.
+  participants:
+  - person:prajwolrg
+  - person:MdTeach
+  - person:Rajil1213
+  - person:ProofOfKeags
+  tensions:
+  - genesis values still provisional
+  - bridge deposit watcher needs stable reorg policy
+- id: B3
+  start: 2026-01-01
+  end: 2026-01-14
+  kind: impl
+  summary: MdTeach lands the first alpen chain-config patch and bewakes follows with checkpoint-explorer parsing updates,
+    but review waits on Prajwol returning from a short break.
+  participants:
+  - person:MdTeach
+  - person:bewakes
+  - person:prajwolrg
+  tensions:
+  - review queue backs up
+  - explorer schema migration underestimated
+- id: B4
+  start: 2026-01-15
+  end: 2026-01-28
+  kind: impl
+  summary: krsnapaudel brings up Prague infra in staging with dashboards and faucet endpoints while the protocol team fixes
+    mismatched network IDs found by the first node boot attempts.
+  participants:
+  - person:krsnapaudel
+  - person:prajwolrg
+  - person:MdTeach
+  - person:bewakes
+  tensions:
+  - staging secrets rotation
+  - network ID mismatch
+  - faucet rate limits too strict for load tests
+- id: B5
+  start: 2026-01-29
+  end: 2026-02-11
+  kind: review
+  summary: Rajil and ProofOfKeags run bridge deposit and withdrawal smoke tests against staging, producing a late RFC amendment
+    that changes how Prague confirmations are represented in bridge config.
+  participants:
+  - person:Rajil1213
+  - person:ProofOfKeags
+  - person:prajwolrg
+  - person:krsnapaudel
+  tensions:
+  - bridge config duplicated across repos
+  - confirmation-depth default contested
+  - infra wants one rollout knob
+- id: B6
+  start: 2026-02-12
+  end: 2026-02-18
+  kind: audit
+  summary: Prajwol coordinates a short readiness audit that finds no consensus blocker but flags explorer lag, faucet abuse
+    controls, and missing public runbook steps.
+  participants:
+  - person:prajwolrg
+  - person:krsnapaudel
+  - person:bewakes
+  - person:john-light
+  tensions:
+  - explorer lag under bursty blocks
+  - public docs trail implementation
+- id: B7
+  start: 2026-02-19
+  end: 2026-02-25
+  kind: ship
+  summary: Prague support ships behind a guarded testnet profile, with krsnapaudel handling staged rollout and john-light
+    preparing the external testing note after final endpoint names settle.
+  participants:
+  - person:prajwolrg
+  - person:krsnapaudel
+  - person:john-light
+  - person:MdTeach
+  - person:Rajil1213
+  tensions:
+  - endpoint naming changed twice
+  - rollout window narrowed by infra maintenance
+- id: B8
+  start: 2026-02-26
+  end: 2026-03-04
+  kind: retro
+  summary: The team closes the milestone with a retro noting that core node support landed near plan, while bridge verification
+    and explorer indexing consumed the buffer meant for public polish.
+  participants:
+  - person:prajwolrg
+  - person:MdTeach
+  - person:krsnapaudel
+  - person:Rajil1213
+  - person:ProofOfKeags
+  - person:john-light
+  - person:bewakes
+  tensions:
+  - testnet profile ownership unclear
+  - cross-repo config drift
+  - late public-facing checklist
+artifacts:
+- kind: rfc
+  title: Prague Testnet Support Scope and Rollout Criteria
+  beat: B1
+  author: person:prajwolrg
+- kind: design_doc
+  title: Prague Chain Parameters and Node Profile
+  beat: B2
+  author: person:MdTeach
+- kind: rfc
+  title: Bridge Confirmation Policy for Prague
+  beat: B5
+  author: person:Rajil1213
+- kind: all_hands_recap
+  title: Prague Testnet Readiness and Public Testing Plan
+  beat: B7
+  author: person:john-light
+- kind: retro
+  title: Prague Testnet Support Retro
+  beat: B8
+  author: person:prajwolrg
+tensions:
+- cross-repo testnet configuration drift
+- bridge validation depended on late infra stability
+- public docs and faucet readiness trailed core protocol work

@@ -1,0 +1,120 @@
+# Bitcoin bridge
+
+{% hint style="info" %}
+Although the Strata bridge is designed to run on bitcoin mainnet, currently it is only running on a bitcoin signet. Any references to bitcoin or BTC in this documentation should be read as "bitcoin signet" or "signet BTC" when describing the current system.
+{% endhint %}
+
+Alpen's orchestration layer Strata has an enshrined bitcoin bridge that enables the transfer of BTC between the bitcoin and Alpen blockchains. The Strata bridge is run by a federation of operators who co-sign transactions to move BTC into and out of the bridge. The bridge is based on [BitVM2](https://bitvm.org/bitvm_bridge.pdf), which unlike other multisignature-based bridges that need an honest majority to keep the funds safe, requires a *single* functional operator to guarantee the safety and liveness of the bridge. Operators stake a bond that could be forfeited, in order to disincentivise them from deviating the protocol.
+
+This document gives a high-level overview of the bridge design and operation. A fully detailed description will be added at a later stage.
+
+## Overview <a href="#overview" id="overview"></a>
+
+At a high level, we can divide the bridge operations into three stages:
+
+1. A setup stage where operators stake the bond
+2. A deposit stage where operators process a user request to deposit BTC into the Alpen blockchain, and
+3. a withdrawal stage where funds are withdrawn from the bridge after a user initiates a request to withdraw BTC from Alpen to the bitcoin blockchain.
+
+{% hint style="info" %}
+Deposits and withdrawals are allowed in a fixed denomination of BTC, a value predefined by the bridge federation. For the current testnet, this is set to 10 BTC. The withdrawal fee is set at 0.01 BTC. The values for mainnet will be announced at a later stage.
+{% endhint %}
+
+Deposit UTXOs are indexed chronologically by order of arrival, and subsequently withdrawals are processed by the first-in-first-out method. That is, the withdrawal transaction input is the UTXO for the lowest deposit index that the bridge currently possesses.
+
+Similarly, the stakes "moves" with withdrawals such that it is always 'attached' to the lowest index UTXO — this guarantees that the bond remains at risk if the operator is dishonest, while allowing the operators to stake only once, instead of per UTXO. To read more on this, see "stake chains" in our [blog post](https://www.alpenlabs.io/blog/introducing-the-strata-bridge).
+
+The deposit flow is composed of a Deposit Request Transaction (DRT) which is fulfilled by the bridge federation using a Deposit Transaction (DT). The user must provide an Alpen address to receive their deposit on Alpen.
+
+Later, when a user wants to withdraw their BTC from Alpen, the user's withdrawal request is assigned to an operator. The operator fulfills the request by sending the user an equivalent amount of BTC from the operator’s own address (i.e. not directly from the bridge), minus a pre-determined fulfillment fee. After this fulfillment transaction is finalized on bitcoin, the operator is eligible to request a reimbursement by creating a transaction spending BTC from the bridge address to the operator's own address. This withdrawal reimbursement transaction is subject to the BitVM2-based challenge-response game to ensure correct bridge operations. An operator does not need cooperation from other operators at the time of a withdrawal.
+
+{% hint style="info" %}
+The full withdrawal can take a few days, to make sure that sufficient time is given to submit challenges in case of false bridge claims. In testnet, this challenge period is set to 36 blocks (approximately 6 hours). The exact challenge period duration for mainnet will be updated at a later stage.
+{% endhint %}
+
+{% hint style="info" %}
+All the multisigs in the deposit flow follow the [MuSig2](https://github.com/bitcoin/bips/blob/master/bip-0327.mediawiki) protocol, where signatures are aggregated into a single signature that validates all N participants' partial signatures.
+{% endhint %}
+
+## Deposit <a href="#deposit" id="deposit"></a>
+
+The deposit process is initiated by the user with a Deposit Request Transaction. This transaction sends 10[^1] BTC to a P2TR address, where:
+
+1. The key path spend is unspendable, following [BIP 341](https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki#constructing-and-spending-taproot-outputs) with a "NUMS" point as defined [here](https://github.com/alpenlabs/strata/blob/6ced1e88448f4b779be95fdbc475bc4ccdf78cec/crates/primitives/src/constants.rs#L102-L106).
+2. The script path spend has two paths:
+   1. "Deposit path", an N-of-N multisig path, where N is the number of bridge operators. Note that this uses Schnorr key aggregation, hence the signature is aggregated into a single signature that validates all N operators' signatures.
+   2. "Take back path", which allows the user to take back their funds if the bridge fails to move funds from the Deposit Request Transaction into the bridge address within 1,008 blocks, i.e. it is time-locked and the user can spend it by providing a signature approximately 7 days after their initial request.
+
+Apart from the previous Taproot output, the DRT has some metadata attached to it, in the form of an `OP_RETURN` output, that must be the **second** output of the transaction in order for the Alpen sequencer to be able to detect the transaction. The `OP_RETURN` output can be up to 80 bytes long (according to bitcoin standardness policy), and is composed of the following data:
+
+1. Magic bytes. These take 4 bytes and are used to identify the bridge.
+2. Depositor public key (X-only). This takes 32 bytes and are used to validate the DRT, while also necessary for the control block required to spend the P2TR output via the N-of-N Tapscript.
+3. Execution Layer address. The EL address is the Alpen address where the user wants to receive the BTC on Alpen. It is a 20-byte Ethereum Virtual Machine (EVM) address.
+
+In addition to the previous outputs, the user can add a third output for change.
+
+The bridge monitors the bitcoin blockchain for incoming transactions, which can be detected by the `OP_RETURN` output. Once the bridge detects the DRT, it verifies the TapLeaf hash, the multisig pubkey path, and the full Taproot commitment.
+
+If the DRT is valid, the bridge operators fulfill the deposit, via the "deposit path", with a Deposit Transaction that transfers the BTC to the bridge (that is, to the bridge-owned UTXO set), and the user is minted the same amount of BTC to the EL address provided in the DRT. The BTC is minted after the DT has sufficiently many block confirmations on bitcoin. The "finality depth" is currently set to six confirmations.
+
+After the DRT and before the DT, the BitVM2 transaction graph for the deposit is generated and signed by each operator and then distributed (offchain) to all operators. The full details on the transaction graph are out of scope for this doc and will be shared in future documentation. An operator will not sign the DT before they have the transaction graph signed by all other operators.
+
+The flow of a user deposit is depicted by the following diagram:
+
+<figure><img src="/files/ziwnWY1wEDcVa9L1D80s" alt=""><figcaption><p>Bridge deposit flow</p></figcaption></figure>
+
+## Withdrawal <a href="#withdrawal" id="withdrawal"></a>
+
+The withdrawal process is initiated by the user with a withdrawal request on Alpen. The full withdrawal process has two stages, where the second can start only after the first ended:
+
+1. The user requests a withdrawal on Alpen and an operator is assigned to fulfill the request on bitcoin — the operator 'fronts' the user BTC out of the operator's own address with a Withdrawal Fulfillment Transaction (WFT).
+2. The assigned operator makes a Claim Transaction to the bridge to claim back the BTC corresponding to the Withdrawal Fulfillment Transaction.
+
+### The user withdrawal
+
+1. The user initiates a withdrawal request, which can only be made for the bridge's preconfigured BTC denomination. This is done by sending 10 BTC to the [bridge precompile address](/how-alpen-works/specifications.md#other-notable-addresses-) on Alpen, and as a result the BTC is 'burned' on Alpen.
+2. After the burn is finalized, the assigned operator creates a Withdrawal Fulfillment Transaction on bitcoin that sends the user their BTC minus an agreed-upon fee. Finalization of the burn transaction means that the corresponding checkpoint appears on bitcoin and has a sufficient number of confirmations. The current "finalization depth" is the same as above, set to six blocks. The relevant checkpoint is the batch checkpoint that contains and proves the burn transaction (read more on batch checkpoints [here](/how-alpen-works/transaction-lifecycle.md#batch-checkpoint)).
+
+{% hint style="info" %}
+If the assigned operator does not fulfill the withdrawal request with an up-front payment (e.g. they do not have sufficient funds), a new operator is assigned after a timeout. Currently on testnet the timeout is set to be 64 blocks (approximately 11 hours).
+{% endhint %}
+
+### The operator claim
+
+1. The operator creates a Claim Transaction on bitcoin. This transaction commits to the WFT TXID in which the operator paid the user, and it includes a single input from the operator's stake chain, with the correct deposit index — this input connects the operator's stake to the claim.
+2. If there is no challenge to the Claim Transaction, the operator can process the bridge payout directly. In the testnet, the challenge period is set to 36 blocks (approximately 6 hours).
+3. If a challenge is submitted — a challenge can be submitted by anyone, and must be accompanied with the required amount of BTC[^2] — the challenge-response game starts, which allows the protocol to determine who is at fault. If the challenge is correct (the operator submitted a false claim), the operator will not get the bridge payout and is eligible to lose their stake; if the challenge is incorrect, then the operator will get the bridge payout.
+
+The withdrawal flow is depicted by the following diagram:
+
+<figure><img src="/files/rlNUC3aJuhb8Q5kmJ1ut" alt=""><figcaption><p>Bridge withdrawal flow. The user makes a withdrawal transaction on Alpen, which 'burns' the funds. Then, on bitcoin, the operator makes a transfer to the user, then starts the challenge-response game by making a Claim Transaction, claiming funds from the bridge.</p></figcaption></figure>
+
+## Strata's challenge-response game <a href="#bitvm" id="bitvm"></a>
+
+In BitVM2, a withdrawal initiates an on-chain challenge-response game. In the following diagram we give a high-level description of the withdrawal state machine, where challenges are made by the “Challenger” or the “Disprover” and the response is given by the “Operator”. The operator needs to make a true claim, otherwise the challenger can challenge the Claim Transaction using a Challenge Transaction. The operator must then respond to the challenge with an Assert Transaction. Finally, a disprover can disprove the operator's Assert Transaction using a Disprove Transaction. If the operator's claim was false and the challenger and disprover were correct, then the disprover will slash the operator's stake and keep part of the stake as a reward.
+
+A fully-detailed description of how BitVM2 is used in the Strata bridge will be shared in future documentation.
+
+<figure><img src="/files/xTgELRpkyoid06491x8n" alt=""><figcaption><p>BitVM2 state-machine (simplified). Yellow boxes are bitcoin transactions, black circles represent start/end points, black diamonds represent a decision point (only one path can be taken), text on arrows states who submits the corresponding transaction.</p></figcaption></figure>
+
+[^1]: The user must pay for the bitcoin network fees for both the Deposit Request and Deposit Transactions.
+
+[^2]: The BTC is used to cover the operator's mining fee for responding to the challenge. This is needed to make sure that a functional operator does not lose funds due to incorrect challenges (while correct challenges cause the operator to lose their stake, which is of greater value than the BTC provided by the challenger). The BTC amount is configured by the system.
+
+
+---
+
+# Agent Instructions: Querying This Documentation
+
+If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
+
+Perform an HTTP GET request on the current page URL with the `ask` query parameter:
+
+```
+GET https://docs.alpenlabs.io/how-alpen-works/bitcoin-bridge.md?ask=<question>
+```
+
+The question should be specific, self-contained, and written in natural language.
+The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
+
+Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.

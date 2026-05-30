@@ -1,0 +1,1318 @@
+pto:
+  person:Rajil1213:
+  - start: '2024-02-04'
+    end: '2024-02-04'
+    kind: sick
+    label: sick day
+  - start: '2024-08-09'
+    end: '2024-08-18'
+    kind: vacation
+    label: summer pto
+  - start: '2024-09-11'
+    end: '2024-09-11'
+    kind: sick
+    label: sick day
+  - start: '2025-05-13'
+    end: '2025-05-16'
+    kind: vacation
+    label: long weekend
+  - start: '2025-06-17'
+    end: '2025-06-23'
+    kind: vacation
+    label: summer pto
+  - start: '2025-10-17'
+    end: '2025-10-17'
+    kind: sick
+    label: sick day
+  - start: '2026-03-17'
+    end: '2026-03-17'
+    kind: sick
+    label: sick day
+  - start: '2026-05-10'
+    end: '2026-05-15'
+    kind: vacation
+    label: long weekend
+  - start: '2026-08-20'
+    end: '2026-08-25'
+    kind: vacation
+    label: summer pto
+  - start: '2026-10-23'
+    end: '2026-10-23'
+    kind: sick
+    label: sick day
+  person:prajwolrg:
+  - start: '2024-04-04'
+    end: '2024-04-04'
+    kind: sick
+    label: sick day
+  - start: '2024-08-11'
+    end: '2024-08-19'
+    kind: vacation
+    label: summer pto
+  - start: '2024-09-20'
+    end: '2024-09-20'
+    kind: sick
+    label: sick day
+  - start: '2024-12-20'
+    end: '2024-12-28'
+    kind: vacation
+    label: winter break
+  - start: '2025-02-13'
+    end: '2025-02-13'
+    kind: sick
+    label: sick day
+  - start: '2025-06-20'
+    end: '2025-07-01'
+    kind: vacation
+    label: summer pto
+  - start: '2025-09-06'
+    end: '2025-09-11'
+    kind: vacation
+    label: long weekend
+  - start: '2025-12-26'
+    end: '2026-01-04'
+    kind: vacation
+    label: winter break
+  - start: '2026-06-04'
+    end: '2026-06-14'
+    kind: vacation
+    label: summer pto
+  - start: '2026-11-08'
+    end: '2026-11-08'
+    kind: sick
+    label: sick day
+  person:storopoli:
+  - start: '2024-03-24'
+    end: '2024-03-24'
+    kind: sick
+    label: sick day
+  - start: '2024-08-10'
+    end: '2024-08-20'
+    kind: vacation
+    label: summer pto
+  - start: '2024-09-11'
+    end: '2024-09-14'
+    kind: vacation
+    label: long weekend
+  - start: '2024-12-22'
+    end: '2024-12-22'
+    kind: sick
+    label: sick day
+  - start: '2025-04-23'
+    end: '2025-04-23'
+    kind: sick
+    label: sick day
+  - start: '2025-11-27'
+    end: '2025-11-27'
+    kind: sick
+    label: sick day
+  - start: '2026-07-11'
+    end: '2026-07-11'
+    kind: sick
+    label: sick day
+  - start: '2026-07-21'
+    end: '2026-07-31'
+    kind: vacation
+    label: summer pto
+  - start: '2026-11-24'
+    end: '2026-11-28'
+    kind: vacation
+    label: long weekend
+  person:MdTeach:
+  - start: '2024-07-10'
+    end: '2024-07-18'
+    kind: vacation
+    label: summer pto
+  - start: '2024-07-13'
+    end: '2024-07-13'
+    kind: sick
+    label: sick day
+  - start: '2024-11-18'
+    end: '2024-11-18'
+    kind: sick
+    label: sick day
+  - start: '2024-12-21'
+    end: '2024-12-28'
+    kind: vacation
+    label: winter break
+  - start: '2025-04-11'
+    end: '2025-04-11'
+    kind: sick
+    label: sick day
+  - start: '2025-08-22'
+    end: '2025-09-02'
+    kind: vacation
+    label: summer pto
+  - start: '2025-08-23'
+    end: '2025-08-23'
+    kind: sick
+    label: sick day
+  - start: '2026-06-06'
+    end: '2026-06-17'
+    kind: vacation
+    label: summer pto
+  - start: '2026-06-26'
+    end: '2026-06-26'
+    kind: sick
+    label: sick day
+  - start: '2026-11-16'
+    end: '2026-11-18'
+    kind: vacation
+    label: long weekend
+  - start: '2026-12-22'
+    end: '2026-12-30'
+    kind: vacation
+    label: winter break
+  person:krsnapaudel:
+  - start: '2025-03-14'
+    end: '2025-03-14'
+    kind: sick
+    label: sick day
+  - start: '2025-03-15'
+    end: '2025-03-17'
+    kind: vacation
+    label: long weekend
+  - start: '2025-08-22'
+    end: '2025-09-01'
+    kind: vacation
+    label: summer pto
+  - start: '2025-12-22'
+    end: '2025-12-30'
+    kind: vacation
+    label: winter break
+  - start: '2026-08-08'
+    end: '2026-08-08'
+    kind: sick
+    label: sick day
+  - start: '2026-08-19'
+    end: '2026-08-31'
+    kind: vacation
+    label: summer pto
+  person:delbonis:
+  - start: '2024-03-21'
+    end: '2024-03-25'
+    kind: vacation
+    label: long weekend
+  - start: '2024-06-04'
+    end: '2024-06-16'
+    kind: vacation
+    label: summer pto
+  - start: '2024-08-20'
+    end: '2024-08-20'
+    kind: sick
+    label: sick day
+  - start: '2025-01-26'
+    end: '2025-01-26'
+    kind: sick
+    label: sick day
+  - start: '2025-06-16'
+    end: '2025-06-23'
+    kind: vacation
+    label: summer pto
+  - start: '2025-12-21'
+    end: '2025-12-26'
+    kind: vacation
+    label: winter break
+  - start: '2026-06-13'
+    end: '2026-06-20'
+    kind: vacation
+    label: summer pto
+  - start: '2026-08-12'
+    end: '2026-08-12'
+    kind: sick
+    label: sick day
+  person:sapinb:
+  - start: '2024-01-14'
+    end: '2024-01-14'
+    kind: sick
+    label: sick day
+  - start: '2024-05-20'
+    end: '2024-05-24'
+    kind: vacation
+    label: long weekend
+  - start: '2024-07-05'
+    end: '2024-07-17'
+    kind: vacation
+    label: summer pto
+  - start: '2025-06-13'
+    end: '2025-06-25'
+    kind: vacation
+    label: summer pto
+  - start: '2025-08-16'
+    end: '2025-08-16'
+    kind: sick
+    label: sick day
+  - start: '2026-01-09'
+    end: '2026-01-09'
+    kind: sick
+    label: sick day
+  - start: '2026-08-17'
+    end: '2026-08-22'
+    kind: vacation
+    label: summer pto
+  person:Zk2u:
+  - start: '2024-01-11'
+    end: '2024-01-11'
+    kind: sick
+    label: sick day
+  - start: '2024-01-18'
+    end: '2024-01-18'
+    kind: sick
+    label: sick day
+  - start: '2024-06-21'
+    end: '2024-07-03'
+    kind: vacation
+    label: summer pto
+  - start: '2024-09-08'
+    end: '2024-09-12'
+    kind: vacation
+    label: long weekend
+  - start: '2025-06-13'
+    end: '2025-06-13'
+    kind: sick
+    label: sick day
+  - start: '2025-06-21'
+    end: '2025-07-03'
+    kind: vacation
+    label: summer pto
+  - start: '2026-07-21'
+    end: '2026-08-01'
+    kind: vacation
+    label: summer pto
+  - start: '2026-12-26'
+    end: '2027-01-03'
+    kind: vacation
+    label: winter break
+  - start: '2026-12-27'
+    end: '2026-12-27'
+    kind: sick
+    label: sick day
+  person:uncomputable:
+  - start: '2025-02-05'
+    end: '2025-02-05'
+    kind: sick
+    label: sick day
+  - start: '2025-03-06'
+    end: '2025-03-06'
+    kind: sick
+    label: sick day
+  - start: '2025-05-15'
+    end: '2025-05-18'
+    kind: vacation
+    label: long weekend
+  - start: '2025-07-09'
+    end: '2025-07-16'
+    kind: vacation
+    label: summer pto
+  - start: '2025-12-23'
+    end: '2025-12-29'
+    kind: vacation
+    label: winter break
+  - start: '2026-02-17'
+    end: '2026-02-17'
+    kind: sick
+    label: sick day
+  - start: '2026-03-06'
+    end: '2026-03-10'
+    kind: vacation
+    label: long weekend
+  - start: '2026-03-06'
+    end: '2026-03-06'
+    kind: sick
+    label: sick day
+  - start: '2026-08-01'
+    end: '2026-08-09'
+    kind: vacation
+    label: summer pto
+  - start: '2026-12-26'
+    end: '2027-01-02'
+    kind: vacation
+    label: winter break
+  person:purusang:
+  - start: '2024-04-22'
+    end: '2024-04-22'
+    kind: sick
+    label: sick day
+  - start: '2024-05-20'
+    end: '2024-05-25'
+    kind: vacation
+    label: long weekend
+  - start: '2024-10-02'
+    end: '2024-10-02'
+    kind: sick
+    label: sick day
+  - start: '2025-08-01'
+    end: '2025-08-06'
+    kind: vacation
+    label: summer pto
+  - start: '2025-12-04'
+    end: '2025-12-04'
+    kind: sick
+    label: sick day
+  - start: '2026-06-04'
+    end: '2026-06-11'
+    kind: vacation
+    label: summer pto
+  - start: '2026-10-22'
+    end: '2026-10-22'
+    kind: sick
+    label: sick day
+  - start: '2026-12-27'
+    end: '2027-01-05'
+    kind: vacation
+    label: winter break
+  person:bewakes:
+  - start: '2024-01-05'
+    end: '2024-01-05'
+    kind: sick
+    label: sick day
+  - start: '2024-07-09'
+    end: '2024-07-15'
+    kind: vacation
+    label: summer pto
+  - start: '2024-10-22'
+    end: '2024-10-22'
+    kind: sick
+    label: sick day
+  - start: '2025-03-22'
+    end: '2025-03-22'
+    kind: sick
+    label: sick day
+  - start: '2025-12-23'
+    end: '2025-12-30'
+    kind: vacation
+    label: winter break
+  - start: '2025-12-25'
+    end: '2025-12-25'
+    kind: sick
+    label: sick day
+  - start: '2026-02-26'
+    end: '2026-02-26'
+    kind: sick
+    label: sick day
+  - start: '2026-06-04'
+    end: '2026-06-04'
+    kind: sick
+    label: sick day
+  - start: '2026-07-10'
+    end: '2026-07-20'
+    kind: vacation
+    label: summer pto
+  - start: '2026-11-16'
+    end: '2026-11-18'
+    kind: vacation
+    label: long weekend
+  person:voidash:
+  - start: '2024-03-05'
+    end: '2024-03-05'
+    kind: sick
+    label: sick day
+  - start: '2024-06-07'
+    end: '2024-06-18'
+    kind: vacation
+    label: summer pto
+  - start: '2024-12-26'
+    end: '2024-12-31'
+    kind: vacation
+    label: winter break
+  - start: '2025-04-03'
+    end: '2025-04-03'
+    kind: sick
+    label: sick day
+  - start: '2025-06-05'
+    end: '2025-06-13'
+    kind: vacation
+    label: summer pto
+  - start: '2025-08-17'
+    end: '2025-08-17'
+    kind: sick
+    label: sick day
+  - start: '2025-12-27'
+    end: '2026-01-01'
+    kind: vacation
+    label: winter break
+  - start: '2026-07-15'
+    end: '2026-07-21'
+    kind: vacation
+    label: summer pto
+  - start: '2026-10-12'
+    end: '2026-10-12'
+    kind: sick
+    label: sick day
+  person:mukeshdroid:
+  - start: '2025-04-15'
+    end: '2025-04-15'
+    kind: sick
+    label: sick day
+  - start: '2025-12-20'
+    end: '2025-12-25'
+    kind: vacation
+    label: winter break
+  - start: '2026-01-05'
+    end: '2026-01-05'
+    kind: sick
+    label: sick day
+  - start: '2026-12-14'
+    end: '2026-12-14'
+    kind: sick
+    label: sick day
+  person:Hakkush-07:
+  - start: '2025-05-09'
+    end: '2025-05-09'
+    kind: sick
+    label: sick day
+  - start: '2025-06-19'
+    end: '2025-06-27'
+    kind: vacation
+    label: summer pto
+  - start: '2025-09-13'
+    end: '2025-09-16'
+    kind: vacation
+    label: long weekend
+  - start: '2025-11-23'
+    end: '2025-11-23'
+    kind: sick
+    label: sick day
+  - start: '2025-12-27'
+    end: '2026-01-02'
+    kind: vacation
+    label: winter break
+  - start: '2026-05-10'
+    end: '2026-05-10'
+    kind: sick
+    label: sick day
+  - start: '2026-06-04'
+    end: '2026-06-10'
+    kind: vacation
+    label: summer pto
+  - start: '2026-08-17'
+    end: '2026-08-17'
+    kind: sick
+    label: sick day
+  - start: '2026-12-23'
+    end: '2026-12-30'
+    kind: vacation
+    label: winter break
+  person:evgenyzdanovich:
+  - start: '2024-04-24'
+    end: '2024-04-24'
+    kind: sick
+    label: sick day
+  - start: '2024-07-03'
+    end: '2024-07-09'
+    kind: vacation
+    label: summer pto
+  - start: '2024-09-24'
+    end: '2024-09-26'
+    kind: vacation
+    label: long weekend
+  - start: '2024-12-21'
+    end: '2024-12-30'
+    kind: vacation
+    label: winter break
+  - start: '2025-10-11'
+    end: '2025-10-11'
+    kind: sick
+    label: sick day
+  - start: '2026-03-18'
+    end: '2026-03-18'
+    kind: sick
+    label: sick day
+  - start: '2026-06-09'
+    end: '2026-06-19'
+    kind: vacation
+    label: summer pto
+  - start: '2026-12-24'
+    end: '2026-12-30'
+    kind: vacation
+    label: winter break
+  person:bbist:
+  - start: '2024-02-15'
+    end: '2024-02-15'
+    kind: sick
+    label: sick day
+  - start: '2024-03-21'
+    end: '2024-03-21'
+    kind: sick
+    label: sick day
+  - start: '2024-05-19'
+    end: '2024-05-23'
+    kind: vacation
+    label: long weekend
+  - start: '2024-07-20'
+    end: '2024-07-29'
+    kind: vacation
+    label: summer pto
+  - start: '2025-03-07'
+    end: '2025-03-07'
+    kind: sick
+    label: sick day
+  - start: '2025-03-10'
+    end: '2025-03-10'
+    kind: sick
+    label: sick day
+  - start: '2025-07-15'
+    end: '2025-07-21'
+    kind: vacation
+    label: summer pto
+  - start: '2025-12-25'
+    end: '2026-01-01'
+    kind: vacation
+    label: winter break
+  - start: '2026-06-22'
+    end: '2026-07-04'
+    kind: vacation
+    label: summer pto
+  - start: '2026-09-10'
+    end: '2026-09-10'
+    kind: sick
+    label: sick day
+  - start: '2026-10-17'
+    end: '2026-10-17'
+    kind: sick
+    label: sick day
+  person:AaronFeickert:
+  - start: '2024-03-25'
+    end: '2024-03-25'
+    kind: sick
+    label: sick day
+  - start: '2024-08-10'
+    end: '2024-08-18'
+    kind: vacation
+    label: summer pto
+  - start: '2025-10-03'
+    end: '2025-10-03'
+    kind: sick
+    label: sick day
+  - start: '2026-07-02'
+    end: '2026-07-02'
+    kind: sick
+    label: sick day
+  - start: '2026-08-06'
+    end: '2026-08-11'
+    kind: vacation
+    label: summer pto
+  - start: '2026-12-18'
+    end: '2026-12-18'
+    kind: sick
+    label: sick day
+  - start: '2026-12-23'
+    end: '2026-12-29'
+    kind: vacation
+    label: winter break
+  person:nakkstar123:
+  - start: '2025-06-13'
+    end: '2025-06-13'
+    kind: sick
+    label: sick day
+  - start: '2025-07-08'
+    end: '2025-07-18'
+    kind: vacation
+    label: summer pto
+  - start: '2025-09-25'
+    end: '2025-09-28'
+    kind: vacation
+    label: long weekend
+  - start: '2025-12-04'
+    end: '2025-12-04'
+    kind: sick
+    label: sick day
+  - start: '2025-12-27'
+    end: '2026-01-04'
+    kind: vacation
+    label: winter break
+  - start: '2026-06-02'
+    end: '2026-06-10'
+    kind: vacation
+    label: summer pto
+  - start: '2026-09-19'
+    end: '2026-09-19'
+    kind: sick
+    label: sick day
+  - start: '2026-10-18'
+    end: '2026-10-18'
+    kind: sick
+    label: sick day
+  - start: '2026-12-21'
+    end: '2026-12-27'
+    kind: vacation
+    label: winter break
+  person:sistemd:
+  - start: '2025-03-25'
+    end: '2025-03-25'
+    kind: sick
+    label: sick day
+  - start: '2025-06-05'
+    end: '2025-06-05'
+    kind: sick
+    label: sick day
+  - start: '2025-06-21'
+    end: '2025-06-30'
+    kind: vacation
+    label: summer pto
+  - start: '2026-04-01'
+    end: '2026-04-01'
+    kind: sick
+    label: sick day
+  - start: '2026-06-11'
+    end: '2026-06-17'
+    kind: vacation
+    label: summer pto
+  person:irnb:
+  - start: '2025-01-26'
+    end: '2025-01-26'
+    kind: sick
+    label: sick day
+  - start: '2026-07-07'
+    end: '2026-07-15'
+    kind: vacation
+    label: summer pto
+  - start: '2026-09-11'
+    end: '2026-09-11'
+    kind: sick
+    label: sick day
+  person:ProofOfKeags:
+  - start: '2025-08-20'
+    end: '2025-08-28'
+    kind: vacation
+    label: summer pto
+  - start: '2025-12-04'
+    end: '2025-12-04'
+    kind: sick
+    label: sick day
+  - start: '2025-12-23'
+    end: '2025-12-28'
+    kind: vacation
+    label: winter break
+  - start: '2026-06-14'
+    end: '2026-06-14'
+    kind: sick
+    label: sick day
+  - start: '2026-07-20'
+    end: '2026-07-27'
+    kind: vacation
+    label: summer pto
+  - start: '2026-12-08'
+    end: '2026-12-08'
+    kind: sick
+    label: sick day
+  person:manishbista28:
+  - start: '2025-07-03'
+    end: '2025-07-10'
+    kind: vacation
+    label: summer pto
+  - start: '2025-09-01'
+    end: '2025-09-01'
+    kind: sick
+    label: sick day
+  - start: '2025-12-24'
+    end: '2026-01-02'
+    kind: vacation
+    label: winter break
+  - start: '2026-02-06'
+    end: '2026-02-06'
+    kind: sick
+    label: sick day
+  - start: '2026-07-20'
+    end: '2026-07-26'
+    kind: vacation
+    label: summer pto
+  - start: '2026-11-16'
+    end: '2026-11-16'
+    kind: sick
+    label: sick day
+  person:john-light:
+  - start: '2024-05-07'
+    end: '2024-05-07'
+    kind: sick
+    label: sick day
+  - start: '2024-08-11'
+    end: '2024-08-19'
+    kind: vacation
+    label: summer pto
+  - start: '2024-10-15'
+    end: '2024-10-18'
+    kind: vacation
+    label: long weekend
+  - start: '2024-12-25'
+    end: '2024-12-30'
+    kind: vacation
+    label: winter break
+  - start: '2025-01-20'
+    end: '2025-01-20'
+    kind: sick
+    label: sick day
+  - start: '2025-08-10'
+    end: '2025-08-20'
+    kind: vacation
+    label: summer pto
+  - start: '2025-09-09'
+    end: '2025-09-09'
+    kind: sick
+    label: sick day
+  - start: '2026-01-12'
+    end: '2026-01-12'
+    kind: sick
+    label: sick day
+  - start: '2026-08-04'
+    end: '2026-08-16'
+    kind: vacation
+    label: summer pto
+  person:just-erray:
+  - start: '2025-06-07'
+    end: '2025-06-07'
+    kind: sick
+    label: sick day
+  - start: '2025-07-08'
+    end: '2025-07-19'
+    kind: vacation
+    label: summer pto
+  - start: '2025-07-20'
+    end: '2025-07-20'
+    kind: sick
+    label: sick day
+  - start: '2025-10-14'
+    end: '2025-10-17'
+    kind: vacation
+    label: long weekend
+  - start: '2025-12-24'
+    end: '2026-01-02'
+    kind: vacation
+    label: winter break
+  - start: '2026-08-11'
+    end: '2026-08-16'
+    kind: vacation
+    label: summer pto
+  - start: '2026-12-17'
+    end: '2026-12-17'
+    kind: sick
+    label: sick day
+  person:cyphersnake:
+  - start: '2025-04-16'
+    end: '2025-04-16'
+    kind: sick
+    label: sick day
+  - start: '2025-07-09'
+    end: '2025-07-17'
+    kind: vacation
+    label: summer pto
+  - start: '2025-12-24'
+    end: '2026-01-01'
+    kind: vacation
+    label: winter break
+  - start: '2026-07-17'
+    end: '2026-07-29'
+    kind: vacation
+    label: summer pto
+  - start: '2026-09-17'
+    end: '2026-09-17'
+    kind: sick
+    label: sick day
+  - start: '2026-12-21'
+    end: '2026-12-26'
+    kind: vacation
+    label: winter break
+  person:barakshani:
+  - start: '2025-06-03'
+    end: '2025-06-15'
+    kind: vacation
+    label: summer pto
+  - start: '2025-07-03'
+    end: '2025-07-03'
+    kind: sick
+    label: sick day
+  - start: '2025-09-08'
+    end: '2025-09-10'
+    kind: vacation
+    label: long weekend
+  - start: '2026-02-06'
+    end: '2026-02-06'
+    kind: sick
+    label: sick day
+  - start: '2026-06-12'
+    end: '2026-06-23'
+    kind: vacation
+    label: summer pto
+  - start: '2026-10-19'
+    end: '2026-10-22'
+    kind: vacation
+    label: long weekend
+  person:chhetri22:
+  - start: '2023-08-01'
+    end: '2023-08-13'
+    kind: vacation
+    label: summer pto
+  - start: '2023-11-09'
+    end: '2023-11-09'
+    kind: sick
+    label: sick day
+  - start: '2023-12-26'
+    end: '2024-01-01'
+    kind: vacation
+    label: winter break
+  - start: '2024-06-09'
+    end: '2024-06-20'
+    kind: vacation
+    label: summer pto
+  - start: '2024-08-08'
+    end: '2024-08-08'
+    kind: sick
+    label: sick day
+  - start: '2024-12-27'
+    end: '2025-01-01'
+    kind: vacation
+    label: winter break
+  - start: '2025-12-10'
+    end: '2025-12-10'
+    kind: sick
+    label: sick day
+  - start: '2025-12-20'
+    end: '2025-12-27'
+    kind: vacation
+    label: winter break
+  - start: '2025-12-26'
+    end: '2025-12-26'
+    kind: sick
+    label: sick day
+  - start: '2026-04-17'
+    end: '2026-04-17'
+    kind: sick
+    label: sick day
+  - start: '2026-07-15'
+    end: '2026-07-15'
+    kind: sick
+    label: sick day
+  - start: '2026-08-12'
+    end: '2026-08-21'
+    kind: vacation
+    label: summer pto
+  person:ceyhunsen:
+  - start: '2025-01-20'
+    end: '2025-01-20'
+    kind: sick
+    label: sick day
+  - start: '2025-05-08'
+    end: '2025-05-10'
+    kind: vacation
+    label: long weekend
+  - start: '2025-07-06'
+    end: '2025-07-17'
+    kind: vacation
+    label: summer pto
+  - start: '2025-12-27'
+    end: '2026-01-05'
+    kind: vacation
+    label: winter break
+  - start: '2026-08-02'
+    end: '2026-08-12'
+    kind: vacation
+    label: summer pto
+  - start: '2026-09-10'
+    end: '2026-09-14'
+    kind: vacation
+    label: long weekend
+  - start: '2026-10-25'
+    end: '2026-10-25'
+    kind: sick
+    label: sick day
+  person:sampkaALP:
+  - start: '2025-08-13'
+    end: '2025-08-23'
+    kind: vacation
+    label: summer pto
+  - start: '2025-11-02'
+    end: '2025-11-02'
+    kind: sick
+    label: sick day
+  - start: '2025-11-14'
+    end: '2025-11-16'
+    kind: vacation
+    label: long weekend
+  - start: '2026-05-18'
+    end: '2026-05-18'
+    kind: sick
+    label: sick day
+  - start: '2026-06-16'
+    end: '2026-06-27'
+    kind: vacation
+    label: summer pto
+  - start: '2026-06-20'
+    end: '2026-06-20'
+    kind: sick
+    label: sick day
+  person:alexhui01:
+  - start: '2026-02-16'
+    end: '2026-02-16'
+    kind: sick
+    label: sick day
+  - start: '2026-08-07'
+    end: '2026-08-07'
+    kind: sick
+    label: sick day
+  - start: '2026-08-10'
+    end: '2026-08-16'
+    kind: vacation
+    label: summer pto
+  - start: '2026-12-24'
+    end: '2027-01-02'
+    kind: vacation
+    label: winter break
+  person:pramodkandel:
+  - start: '2023-02-17'
+    end: '2023-02-17'
+    kind: sick
+    label: sick day
+  - start: '2023-07-19'
+    end: '2023-07-19'
+    kind: sick
+    label: sick day
+  - start: '2023-09-14'
+    end: '2023-09-19'
+    kind: vacation
+    label: long weekend
+  - start: '2023-12-27'
+    end: '2024-01-01'
+    kind: vacation
+    label: winter break
+  - start: '2024-04-15'
+    end: '2024-04-15'
+    kind: sick
+    label: sick day
+  - start: '2024-05-16'
+    end: '2024-05-18'
+    kind: vacation
+    label: long weekend
+  - start: '2024-06-08'
+    end: '2024-06-15'
+    kind: vacation
+    label: summer pto
+  - start: '2024-08-18'
+    end: '2024-08-18'
+    kind: sick
+    label: sick day
+  - start: '2025-04-18'
+    end: '2025-04-21'
+    kind: vacation
+    label: long weekend
+  - start: '2025-07-19'
+    end: '2025-07-19'
+    kind: sick
+    label: sick day
+  - start: '2025-08-10'
+    end: '2025-08-15'
+    kind: vacation
+    label: summer pto
+  - start: '2025-12-20'
+    end: '2025-12-27'
+    kind: vacation
+    label: winter break
+  - start: '2026-03-20'
+    end: '2026-03-22'
+    kind: vacation
+    label: long weekend
+  - start: '2026-07-20'
+    end: '2026-07-26'
+    kind: vacation
+    label: summer pto
+  - start: '2026-09-26'
+    end: '2026-09-26'
+    kind: sick
+    label: sick day
+  - start: '2026-12-22'
+    end: '2026-12-28'
+    kind: vacation
+    label: winter break
+  person:aunth:
+  - start: '2025-01-04'
+    end: '2025-01-04'
+    kind: sick
+    label: sick day
+  - start: '2025-06-17'
+    end: '2025-06-17'
+    kind: sick
+    label: sick day
+  - start: '2025-08-18'
+    end: '2025-08-29'
+    kind: vacation
+    label: summer pto
+  - start: '2025-09-13'
+    end: '2025-09-16'
+    kind: vacation
+    label: long weekend
+  - start: '2025-12-22'
+    end: '2025-12-30'
+    kind: vacation
+    label: winter break
+  - start: '2026-03-20'
+    end: '2026-03-22'
+    kind: vacation
+    label: long weekend
+  - start: '2026-08-21'
+    end: '2026-08-27'
+    kind: vacation
+    label: summer pto
+  - start: '2026-10-19'
+    end: '2026-10-19'
+    kind: sick
+    label: sick day
+  - start: '2026-12-19'
+    end: '2026-12-19'
+    kind: sick
+    label: sick day
+  - start: '2026-12-27'
+    end: '2027-01-01'
+    kind: vacation
+    label: winter break
+  person:madan-oss:
+  - start: '2026-04-08'
+    end: '2026-04-08'
+    kind: sick
+    label: sick day
+  - start: '2026-07-12'
+    end: '2026-07-22'
+    kind: vacation
+    label: summer pto
+  - start: '2026-10-25'
+    end: '2026-10-25'
+    kind: sick
+    label: sick day
+  - start: '2026-12-27'
+    end: '2027-01-03'
+    kind: vacation
+    label: winter break
+  person:ali-rezai:
+  - start: '2025-05-16'
+    end: '2025-05-16'
+    kind: sick
+    label: sick day
+  - start: '2025-08-15'
+    end: '2025-08-21'
+    kind: vacation
+    label: summer pto
+  - start: '2025-12-20'
+    end: '2025-12-25'
+    kind: vacation
+    label: winter break
+  - start: '2026-01-07'
+    end: '2026-01-07'
+    kind: sick
+    label: sick day
+  - start: '2026-08-21'
+    end: '2026-08-27'
+    kind: vacation
+    label: summer pto
+  person:arminsabouri:
+  - start: '2025-03-25'
+    end: '2025-03-25'
+    kind: sick
+    label: sick day
+  - start: '2025-04-14'
+    end: '2025-04-19'
+    kind: vacation
+    label: long weekend
+  - start: '2025-06-13'
+    end: '2025-06-25'
+    kind: vacation
+    label: summer pto
+  - start: '2025-09-02'
+    end: '2025-09-02'
+    kind: sick
+    label: sick day
+  - start: '2025-12-22'
+    end: '2025-12-31'
+    kind: vacation
+    label: winter break
+  - start: '2026-02-23'
+    end: '2026-02-23'
+    kind: sick
+    label: sick day
+  - start: '2026-07-15'
+    end: '2026-07-15'
+    kind: sick
+    label: sick day
+  - start: '2026-08-14'
+    end: '2026-08-21'
+    kind: vacation
+    label: summer pto
+  - start: '2026-10-05'
+    end: '2026-10-08'
+    kind: vacation
+    label: long weekend
+  person:Arniiiii:
+  - start: '2025-01-12'
+    end: '2025-01-12'
+    kind: sick
+    label: sick day
+  - start: '2025-02-05'
+    end: '2025-02-05'
+    kind: sick
+    label: sick day
+  - start: '2025-04-09'
+    end: '2025-04-13'
+    kind: vacation
+    label: long weekend
+  - start: '2025-06-04'
+    end: '2025-06-12'
+    kind: vacation
+    label: summer pto
+  - start: '2025-12-24'
+    end: '2025-12-30'
+    kind: vacation
+    label: winter break
+  - start: '2026-03-10'
+    end: '2026-03-10'
+    kind: sick
+    label: sick day
+  - start: '2026-05-07'
+    end: '2026-05-09'
+    kind: vacation
+    label: long weekend
+  - start: '2026-08-22'
+    end: '2026-09-02'
+    kind: vacation
+    label: summer pto
+  - start: '2026-12-26'
+    end: '2027-01-01'
+    kind: vacation
+    label: winter break
+external_events:
+- date: '2024-04-19'
+  kind: halving
+  label: Bitcoin halving (block 840000)
+  impact: watching
+  days: 1
+- date: '2024-05-08'
+  kind: milestone
+  label: Strata public announce — alpen blog post
+  impact: social
+  days: 2
+- date: '2024-07-26'
+  kind: conference
+  label: BTC++ Berlin
+  impact: travel
+  days: 5
+  travelers_pct: 0.15
+- date: '2024-09-12'
+  kind: disclosure
+  label: Bitcoin Core 27.1 security disclosure
+  impact: response_required
+  days: 3
+- date: '2024-10-04'
+  kind: external_press
+  label: BitVM2 SNARK verification public post
+  impact: social
+  days: 2
+- date: '2024-11-28'
+  kind: thanksgiving_us
+  label: US Thanksgiving slow week
+  impact: low_volume
+  days: 4
+- date: '2024-12-23'
+  kind: winter_break
+  label: Winter break — most of team off
+  impact: low_volume
+  days: 12
+- date: '2025-01-09'
+  kind: strategic_round
+  label: Strategic round announce
+  impact: social
+  days: 2
+- date: '2025-03-12'
+  kind: conference
+  label: BTC++ Asia
+  impact: travel
+  days: 6
+  travelers_pct: 0.2
+- date: '2025-04-29'
+  kind: incident
+  label: Testnet reorg longer than expected
+  impact: response_required
+  days: 4
+- date: '2025-06-13'
+  kind: incident
+  label: Upstream dep (bitcoind-async-client) CVE — needs patch
+  impact: response_required
+  days: 2
+- date: '2025-08-04'
+  kind: milestone
+  label: Alpen public testnet launch
+  impact: high_attention
+  days: 3
+- date: '2025-08-19'
+  kind: milestone
+  label: Glock release week
+  impact: high_attention
+  days: 3
+- date: '2025-09-22'
+  kind: conference
+  label: ZK Day (Devcon side-event)
+  impact: travel
+  days: 4
+  travelers_pct: 0.18
+- date: '2025-10-15'
+  kind: milestone
+  label: Starknet-Alpen shared verifier announce
+  impact: social
+  days: 2
+- date: '2025-11-27'
+  kind: thanksgiving_us
+  label: US Thanksgiving slow week
+  impact: low_volume
+  days: 4
+- date: '2025-12-22'
+  kind: winter_break
+  label: Winter break
+  impact: low_volume
+  days: 14
+- date: '2026-01-05'
+  kind: milestone
+  label: Inside Alpen's 2025 retrospective post
+  impact: social
+  days: 2
+- date: '2026-03-02'
+  kind: milestone
+  label: BTC Credit Markets paper drop
+  impact: social
+  days: 3
+- date: '2026-03-09'
+  kind: milestone
+  label: Duty-Free Bits blog post
+  impact: social
+  days: 2
+- date: '2026-05-07'
+  kind: milestone
+  label: Mosaic public release
+  impact: high_attention
+  days: 3
+conference_travel:
+  BTC++ Berlin:
+  - person:storopoli
+  - person:krsnapaudel
+  - person:purusang
+  - person:mukeshdroid
+  - person:manishbista28
+  - person:cyphersnake
+  - person:Arniiiii
+  BTC++ Asia:
+  - person:prajwolrg
+  - person:MdTeach
+  - person:bbist
+  - person:AaronFeickert
+  - person:ProofOfKeags
+  - person:manishbista28
+  - person:chhetri22
+  - person:alexhui01
+  - person:pramodkandel
+  - person:ali-rezai
+  ZK Day (Devcon side-event):
+  - person:Rajil1213
+  - person:prajwolrg
+  - person:MdTeach
+  - person:sapinb
+  - person:purusang
+  - person:bewakes
+  - person:AaronFeickert
+  - person:sistemd
+  - person:chhetri22
+  - person:alexhui01
+  - person:arminsabouri

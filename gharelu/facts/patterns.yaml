@@ -1,0 +1,289 @@
+patterns:
+  person:Rajil1213:
+    ship_lag_hours: -12.2
+    review_response_hours: 10.0
+    msg_hour_peak: 19
+    msg_hour_spread: 2.0
+    weekend_msg_factor: 0.5
+    standup_attendance: 0.8
+    review_thoroughness: 0.91
+  person:prajwolrg:
+    ship_lag_hours: 13.1
+    review_response_hours: 10.5
+    msg_hour_peak: 19
+    msg_hour_spread: 2.0
+    weekend_msg_factor: 0.29
+    standup_attendance: 0.89
+    review_thoroughness: 0.92
+  person:storopoli:
+    ship_lag_hours: -2.7
+    review_response_hours: 12.5
+    msg_hour_peak: 19
+    msg_hour_spread: 2.0
+    weekend_msg_factor: 0.37
+    standup_attendance: 0.82
+    review_thoroughness: 0.79
+  person:MdTeach:
+    ship_lag_hours: -7.3
+    review_response_hours: 6.5
+    msg_hour_peak: 22
+    msg_hour_spread: 2.5
+    weekend_msg_factor: 0.89
+    standup_attendance: 0.86
+    review_thoroughness: 0.85
+  person:krsnapaudel:
+    ship_lag_hours: 14.0
+    review_response_hours: 16.3
+    msg_hour_peak: 13
+    msg_hour_spread: 3.0
+    weekend_msg_factor: 0.26
+    standup_attendance: 0.84
+    review_thoroughness: 0.79
+  person:delbonis:
+    ship_lag_hours: -4.6
+    review_response_hours: 8.4
+    msg_hour_peak: 19
+    msg_hour_spread: 2.0
+    weekend_msg_factor: 0.23
+    standup_attendance: 0.91
+    review_thoroughness: 0.83
+  person:sapinb:
+    ship_lag_hours: 1.0
+    review_response_hours: 7.5
+    msg_hour_peak: 14
+    msg_hour_spread: 3.0
+    weekend_msg_factor: 0.2
+    standup_attendance: 0.95
+    review_thoroughness: 0.83
+  person:Zk2u:
+    ship_lag_hours: -2.8
+    review_response_hours: 6.4
+    msg_hour_peak: 23
+    msg_hour_spread: 2.5
+    weekend_msg_factor: 0.72
+    standup_attendance: 0.9
+    review_thoroughness: 0.53
+  person:uncomputable:
+    ship_lag_hours: 14.7
+    review_response_hours: 30.3
+    msg_hour_peak: 19
+    msg_hour_spread: 2.0
+    weekend_msg_factor: 0.24
+    standup_attendance: 0.76
+    review_thoroughness: 0.78
+  person:purusang:
+    ship_lag_hours: 45.5
+    review_response_hours: 10.1
+    msg_hour_peak: 19
+    msg_hour_spread: 2.0
+    weekend_msg_factor: 0.31
+    standup_attendance: 0.77
+    review_thoroughness: 0.83
+  person:bewakes:
+    ship_lag_hours: 18.7
+    review_response_hours: 9.8
+    msg_hour_peak: 20
+    msg_hour_spread: 2.0
+    weekend_msg_factor: 0.27
+    standup_attendance: 0.76
+    review_thoroughness: 0.79
+  person:voidash:
+    ship_lag_hours: 6.7
+    review_response_hours: 8.7
+    msg_hour_peak: 20
+    msg_hour_spread: 2.0
+    weekend_msg_factor: 0.37
+    standup_attendance: 0.89
+    review_thoroughness: 0.79
+  person:mukeshdroid:
+    ship_lag_hours: 10.5
+    review_response_hours: 30.6
+    msg_hour_peak: 18
+    msg_hour_spread: 2.0
+    weekend_msg_factor: 0.2
+    standup_attendance: 0.93
+    review_thoroughness: 0.81
+  person:Hakkush-07:
+    ship_lag_hours: 4.2
+    review_response_hours: 28.7
+    msg_hour_peak: 14
+    msg_hour_spread: 3.0
+    weekend_msg_factor: 0.38
+    standup_attendance: 0.83
+    review_thoroughness: 0.81
+  person:evgenyzdanovich:
+    ship_lag_hours: -7.5
+    review_response_hours: 6.3
+    msg_hour_peak: 20
+    msg_hour_spread: 2.0
+    weekend_msg_factor: 0.42
+    standup_attendance: 0.8
+    review_thoroughness: 0.84
+  person:bbist:
+    ship_lag_hours: 45.0
+    review_response_hours: 6.5
+    msg_hour_peak: 13
+    msg_hour_spread: 3.0
+    weekend_msg_factor: 0.38
+    standup_attendance: 0.84
+    review_thoroughness: 0.85
+  person:AaronFeickert:
+    ship_lag_hours: 1.6
+    review_response_hours: 26.1
+    msg_hour_peak: 14
+    msg_hour_spread: 3.0
+    weekend_msg_factor: 0.37
+    standup_attendance: 0.79
+    review_thoroughness: 0.91
+  person:nakkstar123:
+    ship_lag_hours: -6.3
+    review_response_hours: 28.7
+    msg_hour_peak: 20
+    msg_hour_spread: 2.0
+    weekend_msg_factor: 0.46
+    standup_attendance: 0.89
+    review_thoroughness: 0.86
+  person:sistemd:
+    ship_lag_hours: 16.6
+    review_response_hours: 12.9
+    msg_hour_peak: 19
+    msg_hour_spread: 2.0
+    weekend_msg_factor: 0.5
+    standup_attendance: 0.91
+    review_thoroughness: 0.91
+  person:irnb:
+    ship_lag_hours: 0.8
+    review_response_hours: 18.0
+    msg_hour_peak: 18
+    msg_hour_spread: 2.0
+    weekend_msg_factor: 0.27
+    standup_attendance: 0.92
+    review_thoroughness: 0.91
+  person:ProofOfKeags:
+    ship_lag_hours: 45.1
+    review_response_hours: 12.9
+    msg_hour_peak: 19
+    msg_hour_spread: 2.0
+    weekend_msg_factor: 0.56
+    standup_attendance: 0.79
+    review_thoroughness: 0.8
+  person:manishbista28:
+    ship_lag_hours: 7.8
+    review_response_hours: 25.6
+    msg_hour_peak: 18
+    msg_hour_spread: 2.0
+    weekend_msg_factor: 0.32
+    standup_attendance: 0.85
+    review_thoroughness: 0.9
+  person:john-light:
+    ship_lag_hours: 9.7
+    review_response_hours: 9.6
+    msg_hour_peak: 14
+    msg_hour_spread: 3.0
+    weekend_msg_factor: 0.34
+    standup_attendance: 0.94
+    review_thoroughness: 0.84
+  person:just-erray:
+    ship_lag_hours: 12.3
+    review_response_hours: 33.0
+    msg_hour_peak: 19
+    msg_hour_spread: 2.0
+    weekend_msg_factor: 0.22
+    standup_attendance: 0.9
+    review_thoroughness: 0.86
+  person:cyphersnake:
+    ship_lag_hours: 10.7
+    review_response_hours: 8.9
+    msg_hour_peak: 23
+    msg_hour_spread: 2.5
+    weekend_msg_factor: 0.68
+    standup_attendance: 0.92
+    review_thoroughness: 0.82
+  person:barakshani:
+    ship_lag_hours: 22.5
+    review_response_hours: 11.9
+    msg_hour_peak: 14
+    msg_hour_spread: 3.0
+    weekend_msg_factor: 0.58
+    standup_attendance: 0.87
+    review_thoroughness: 0.88
+  person:chhetri22:
+    ship_lag_hours: 27.0
+    review_response_hours: 11.6
+    msg_hour_peak: 18
+    msg_hour_spread: 2.0
+    weekend_msg_factor: 0.28
+    standup_attendance: 0.85
+    review_thoroughness: 0.79
+  person:ceyhunsen:
+    ship_lag_hours: 62.4
+    review_response_hours: 12.9
+    msg_hour_peak: 14
+    msg_hour_spread: 3.0
+    weekend_msg_factor: 0.2
+    standup_attendance: 0.77
+    review_thoroughness: 0.82
+  person:sampkaALP:
+    ship_lag_hours: 21.1
+    review_response_hours: 4.6
+    msg_hour_peak: 14
+    msg_hour_spread: 3.0
+    weekend_msg_factor: 0.21
+    standup_attendance: 0.84
+    review_thoroughness: 0.54
+  person:alexhui01:
+    ship_lag_hours: 12.3
+    review_response_hours: 6.6
+    msg_hour_peak: 13
+    msg_hour_spread: 3.0
+    weekend_msg_factor: 0.19
+    standup_attendance: 0.89
+    review_thoroughness: 0.83
+  person:pramodkandel:
+    ship_lag_hours: 21.0
+    review_response_hours: 9.9
+    msg_hour_peak: 15
+    msg_hour_spread: 3.0
+    weekend_msg_factor: 0.38
+    standup_attendance: 0.9
+    review_thoroughness: 0.5
+  person:aunth:
+    ship_lag_hours: 16.8
+    review_response_hours: 11.7
+    msg_hour_peak: 14
+    msg_hour_spread: 3.0
+    weekend_msg_factor: 0.18
+    standup_attendance: 0.75
+    review_thoroughness: 0.85
+  person:madan-oss:
+    ship_lag_hours: 17.4
+    review_response_hours: 33.2
+    msg_hour_peak: 19
+    msg_hour_spread: 2.0
+    weekend_msg_factor: 0.25
+    standup_attendance: 0.76
+    review_thoroughness: 0.84
+  person:ali-rezai:
+    ship_lag_hours: 18.8
+    review_response_hours: 10.8
+    msg_hour_peak: 14
+    msg_hour_spread: 3.0
+    weekend_msg_factor: 0.35
+    standup_attendance: 0.81
+    review_thoroughness: 0.89
+  person:arminsabouri:
+    ship_lag_hours: 23.1
+    review_response_hours: 12.9
+    msg_hour_peak: 15
+    msg_hour_spread: 3.0
+    weekend_msg_factor: 0.34
+    standup_attendance: 0.81
+    review_thoroughness: 0.78
+  person:Arniiiii:
+    ship_lag_hours: 24.2
+    review_response_hours: 7.5
+    msg_hour_peak: 15
+    msg_hour_spread: 3.0
+    weekend_msg_factor: 0.52
+    standup_attendance: 0.81
+    review_thoroughness: 0.91

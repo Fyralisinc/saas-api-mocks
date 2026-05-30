@@ -1,0 +1,201 @@
+id: THR-012-bitcoind-async-client
+title: Hardening the bitcoind async client for Strata node operations
+window:
+  start: 2025-04-30
+  end: 2026-04-30
+driver: person:krsnapaudel
+cast:
+- person:krsnapaudel
+- person:prajwolrg
+- person:MdTeach
+- person:delbonis
+- person:storopoli
+- person:bewakes
+- person:alexhui01
+linked_anchors:
+- repo:bitcoind-async-client
+linked_products:
+- product:strata
+linked_repos:
+- repo:bitcoind-async-client
+- repo:alpen
+- repo:strata-common
+beats:
+- id: B1
+  start: 2025-04-30
+  end: 2025-05-23
+  kind: kickoff
+  summary: krsnapaudel opens the maintenance thread after Strata node operators report uneven RPC latency during reorg-heavy
+    signet runs.
+  participants:
+  - person:krsnapaudel
+  - person:prajwolrg
+  - person:MdTeach
+  - person:delbonis
+  tensions:
+  - unclear ownership between infra and protocol
+  - sparse production traces
+- id: B2
+  start: 2025-05-26
+  end: 2025-06-20
+  kind: design
+  summary: prajwolrg drafts a bounded-queue and retry RFC while MdTeach maps every alpen caller that assumes bitcoind RPCs
+    are effectively synchronous.
+  participants:
+  - person:prajwolrg
+  - person:MdTeach
+  - person:krsnapaudel
+  - person:bewakes
+  tensions:
+  - callers disagree on timeout semantics
+  - backpressure policy risks surfacing old bugs
+- id: B3
+  start: 2025-06-23
+  end: 2025-07-18
+  kind: impl
+  summary: krsnapaudel lands the first client-side request limiter and delbonis adds fixture coverage for slow getblock and
+    getrawtransaction responses.
+  participants:
+  - person:krsnapaudel
+  - person:delbonis
+  - person:bewakes
+  tensions:
+  - mock bitcoind diverges from regtest behavior
+  - review queue backs up behind Strata milestone work
+- id: B4
+  start: 2025-07-21
+  end: 2025-08-15
+  kind: review
+  summary: storopoli finds that the retry layer can duplicate wallet-broadcast calls, forcing the team to split idempotent
+    chain queries from mutation-like RPCs.
+  participants:
+  - person:storopoli
+  - person:krsnapaudel
+  - person:prajwolrg
+  - person:MdTeach
+  tensions:
+  - API churn in downstream callers
+  - initial abstraction too broad
+- id: B5
+  start: 2025-08-18
+  end: 2025-09-19
+  kind: impl
+  summary: MdTeach refactors alpen checkpoint polling onto the new query-only client while krsnapaudel narrows the crate API
+    and removes automatic retries from broadcast paths.
+  participants:
+  - person:MdTeach
+  - person:krsnapaudel
+  - person:prajwolrg
+  - person:bewakes
+  tensions:
+  - checkpoint tests become flaky under lower timeouts
+  - crate release waits on alpen integration
+- id: B6
+  start: 2025-09-22
+  end: 2025-10-24
+  kind: audit
+  summary: bewakes runs long-lived regtest soak jobs and documents a memory-growth issue caused by retained pending-request
+    handles after dropped callers.
+  participants:
+  - person:bewakes
+  - person:krsnapaudel
+  - person:delbonis
+  tensions:
+  - load harness consumes shared CI capacity
+  - cancellation behavior differs by runtime
+- id: B7
+  start: 2025-10-27
+  end: 2025-11-28
+  kind: impl
+  summary: krsnapaudel and delbonis add cancellation-safe request tracking, structured tracing spans, and a small metrics
+    surface for queue depth and RPC duration.
+  participants:
+  - person:krsnapaudel
+  - person:delbonis
+  - person:storopoli
+  tensions:
+  - metrics naming debate
+  - tracing dependency version conflicts
+- id: B8
+  start: 2025-12-01
+  end: 2026-01-09
+  kind: review
+  summary: The team pauses the planned crate release after holiday soak runs show reconnection storms when bitcoind restarts
+    during compact block sync.
+  participants:
+  - person:krsnapaudel
+  - person:prajwolrg
+  - person:MdTeach
+  - person:storopoli
+  tensions:
+  - release slips into January
+  - reconnect logic touches shared transport code
+- id: B9
+  start: 2026-01-12
+  end: 2026-02-20
+  kind: impl
+  summary: prajwolrg rewrites reconnection around a single supervisor task while krsnapaudel threads explicit readiness states
+    into alpen node startup.
+  participants:
+  - person:prajwolrg
+  - person:krsnapaudel
+  - person:MdTeach
+  - person:bewakes
+  tensions:
+  - startup path becomes more verbose
+  - old tests relied on immediate client availability
+- id: B10
+  start: 2026-02-23
+  end: 2026-03-27
+  kind: ship
+  summary: bitcoind-async-client 0.4 ships with bounded queues, cancellation-safe requests, readiness reporting, and the first
+    alpen integration enabled behind a rollout flag.
+  participants:
+  - person:krsnapaudel
+  - person:prajwolrg
+  - person:MdTeach
+  - person:delbonis
+  - person:storopoli
+  tensions:
+  - documentation lags release
+  - downstream rollout kept conservative
+- id: B11
+  start: 2026-03-30
+  end: 2026-04-30
+  kind: retro
+  summary: alexhui01 joins late in the cycle, picks up dashboard polish, and helps convert the remaining operational notes
+    into onboarding material for future node-client work.
+  participants:
+  - person:alexhui01
+  - person:krsnapaudel
+  - person:bewakes
+  - person:MdTeach
+  tensions:
+  - new engineer ramps on historical decisions
+  - remaining wallet RPC cleanup deferred
+artifacts:
+- kind: rfc
+  title: Bounded RPC concurrency and retry semantics for bitcoind-async-client
+  beat: B2
+  author: person:prajwolrg
+- kind: design_doc
+  title: Separating query RPCs from broadcast-sensitive RPCs
+  beat: B4
+  author: person:storopoli
+- kind: postmortem
+  title: Pending request handle retention during cancelled checkpoint polling
+  beat: B6
+  author: person:bewakes
+- kind: design_doc
+  title: Reconnection supervisor and readiness states for Strata node startup
+  beat: B9
+  author: person:krsnapaudel
+- kind: retro
+  title: bitcoind-async-client 0.4 rollout retrospective
+  beat: B11
+  author: person:MdTeach
+tensions:
+- infra-owned crate with protocol-owned callers
+- safer timeout behavior delayed initial release target
+- regtest mocks repeatedly hid production-like bitcoind restart behavior
+- observability work competed with core Strata milestone reviews

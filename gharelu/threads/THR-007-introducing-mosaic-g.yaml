@@ -1,0 +1,178 @@
+id: THR-007-introducing-mosaic-g
+title: Mosaic Announcement Readiness
+window:
+  start: 2026-05-07
+  end: 2026-08-05
+driver: person:john-light
+cast:
+- person:john-light
+- person:pramodkandel
+- person:mukeshdroid
+- person:AaronFeickert
+- person:Hakkush-07
+- person:cyphersnake
+- person:delbonis
+- person:krsnapaudel
+linked_anchors:
+- milestone:introducing-mosaic-glocks-final-piece
+linked_products:
+- product:mosaic
+- product:glock
+- product:strata
+linked_repos:
+- repo:mosaic
+- repo:mosaic-torrent
+- repo:g16
+- repo:Technical-Whitepaper
+- repo:alpen-dashboards
+beats:
+- id: B1
+  start: 2026-05-07
+  end: 2026-05-15
+  kind: kickoff
+  summary: John scopes the Mosaic announcement around "Glock's final piece" while research and protocol owners agree on which
+    claims can be made publicly before the implementation notes are fully merged.
+  participants:
+  - person:john-light
+  - person:pramodkandel
+  - person:mukeshdroid
+  - person:AaronFeickert
+  - person:delbonis
+  tensions:
+  - unclear boundary between teaser and spec
+  - research claims ahead of repo state
+  - launch date tied to external comms calendar
+- id: B2
+  start: 2026-05-18
+  end: 2026-05-29
+  kind: design
+  summary: Mukesh drafts the first technical narrative tying Mosaic data availability to Glock verification, with Aaron pushing
+    for narrower language on finality and failure assumptions.
+  participants:
+  - person:mukeshdroid
+  - person:AaronFeickert
+  - person:Hakkush-07
+  - person:john-light
+  tensions:
+  - terminology drift between papers and code
+  - finality language too strong
+  - diagrams missing adversarial cases
+- id: B3
+  start: 2026-06-01
+  end: 2026-06-12
+  kind: impl
+  summary: Hakan and cyphersnake clean up the mosaic and mosaic-torrent examples so DevRel can point readers to runnable traces
+    instead of only describing the protocol flow.
+  participants:
+  - person:Hakkush-07
+  - person:cyphersnake
+  - person:delbonis
+  - person:john-light
+  tensions:
+  - example scripts flaky under fresh checkout
+  - review queue split across research and protocol
+  - README assumes local services already running
+- id: B4
+  start: 2026-06-15
+  end: 2026-06-26
+  kind: review
+  summary: Delbonis reviews the public-facing walkthrough against repo behavior and flags two places where the announcement
+    implies batching support that is still behind a feature branch.
+  participants:
+  - person:delbonis
+  - person:mukeshdroid
+  - person:john-light
+  - person:pramodkandel
+  tensions:
+  - feature branch not stable enough for announcement
+  - public copy outruns merged implementation
+  - late request for benchmark numbers
+- id: B5
+  start: 2026-06-29
+  end: 2026-07-10
+  kind: design
+  summary: The team replaces the original launch post outline with an RFC-backed structure that separates what Mosaic proves
+    today from what Strata will consume later.
+  participants:
+  - person:john-light
+  - person:AaronFeickert
+  - person:mukeshdroid
+  - person:Hakkush-07
+  - person:pramodkandel
+  tensions:
+  - scope reset after two weeks of draft work
+  - Strata integration examples still speculative
+  - stronger need for visual artifacts
+- id: B6
+  start: 2026-07-13
+  end: 2026-07-22
+  kind: audit
+  summary: Krsnapaudel adds dashboard snapshots and reproducibility checks for the demo environment after the first dry run
+    exposes gaps between local research traces and hosted infrastructure.
+  participants:
+  - person:krsnapaudel
+  - person:cyphersnake
+  - person:Hakkush-07
+  - person:john-light
+  tensions:
+  - demo environment differs from research laptops
+  - metrics labels inconsistent
+  - infra work arrives after copy freeze
+- id: B7
+  start: 2026-07-23
+  end: 2026-07-31
+  kind: ship
+  summary: John and Pramod finalize the announcement package, landing the blog draft, diagram captions, repo links, and coordinated
+    social snippets after one last pass on terminology.
+  participants:
+  - person:john-light
+  - person:pramodkandel
+  - person:mukeshdroid
+  - person:AaronFeickert
+  - person:krsnapaudel
+  tensions:
+  - last-minute title change
+  - reviewer availability uneven
+  - launch checklist depends on dashboard screenshots
+- id: B8
+  start: 2026-08-03
+  end: 2026-08-05
+  kind: retro
+  summary: The group captures follow-up work for Mosaic docs, benchmarks, and Strata integration notes after the announcement
+    generates more technical questions than expected.
+  participants:
+  - person:john-light
+  - person:pramodkandel
+  - person:mukeshdroid
+  - person:delbonis
+  - person:krsnapaudel
+  tensions:
+  - FAQ backlog larger than planned
+  - benchmarks requested publicly
+  - next milestone now depends on clearer integration roadmap
+artifacts:
+- kind: rfc
+  title: Public Claims Boundary for Mosaic and Glock
+  beat: B2
+  author: person:mukeshdroid
+- kind: design_doc
+  title: Mosaic Announcement Demo Trace and Repo Walkthrough
+  beat: B3
+  author: person:Hakkush-07
+- kind: rfc
+  title: Introducing Mosaic as Glock's Final Piece
+  beat: B5
+  author: person:john-light
+- kind: all_hands_recap
+  title: Mosaic Launch Readiness and Remaining Risks
+  beat: B7
+  author: person:pramodkandel
+- kind: retro
+  title: Mosaic Announcement Follow-ups and Integration Questions
+  beat: B8
+  author: person:john-light
+tensions:
+- public narrative needed to move faster than merged implementation
+- research terminology had to be translated without weakening correctness
+- demo reproducibility depended on late infra support
+- Strata integration roadmap stayed just outside the launch scope

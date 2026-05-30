@@ -1,0 +1,38 @@
+# Specifications
+
+This document is *not* a full system spec, it's instead intended to be a brief description of externally-facing behavior that is useful for application developers.
+
+## Consensus parameters <a href="#consensus-parameters" id="consensus-parameters"></a>
+
+<table><thead><tr><th width="373"></th><th></th></tr></thead><tbody><tr><td><strong>Block time</strong></td><td>5 seconds</td></tr><tr><td><strong>Block gas limit</strong></td><td>36,000,000</td></tr><tr><td><strong>EVM Chain ID</strong></td><td>8150</td></tr></tbody></table>
+
+These numbers will change in the future as Alpen's design evolves.
+
+## Upstream precompiles <a href="#upstream-precompiles" id="upstream-precompiles"></a>
+
+All upstream precompiles supported as of Prague, except `0x0a` for KZG proofs.
+
+See [execution-specs](https://github.com/ethereum/execution-specs?tab=readme-ov-file#ethereum-protocol-releases) or [evm.codes/precompiled](https://www.evm.codes/precompiled?fork=prague) for more information.
+
+## Other notable addresses <a href="#other-notable-addresses" id="other-notable-addresses"></a>
+
+* `0x5400000000000000000000000000000000000001`: Bridge withdrawal precompile. See the [bridge documentation](/how-alpen-works/bitcoin-bridge.md) for more information.
+* `0x5400000000000000000000000000000000000002`: Schnorr signature verification precompile.&#x20;
+
+
+---
+
+# Agent Instructions: Querying This Documentation
+
+If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
+
+Perform an HTTP GET request on the current page URL with the `ask` query parameter:
+
+```
+GET https://docs.alpenlabs.io/how-alpen-works/specifications.md?ask=<question>
+```
+
+The question should be specific, self-contained, and written in natural language.
+The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
+
+Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.

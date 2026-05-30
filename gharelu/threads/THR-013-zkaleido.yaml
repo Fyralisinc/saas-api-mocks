@@ -1,0 +1,203 @@
+id: THR-013-zkaleido
+title: zkaleido Proving Backend Hardening
+window:
+  start: 2024-12-17
+  end: 2025-12-17
+driver: person:AaronFeickert
+cast:
+- person:AaronFeickert
+- person:storopoli
+- person:Zk2u
+- person:mukeshdroid
+- person:Hakkush-07
+- person:ceyhunsen
+- person:cyphersnake
+- person:prajwolrg
+linked_anchors:
+- repo:zkaleido
+linked_products:
+- product:glock
+- product:strata
+linked_repos:
+- repo:zkaleido
+- repo:g16
+- repo:hash-benchmarks
+- repo:alpen
+beats:
+- id: B1
+  start: 2024-12-17
+  end: 2025-01-03
+  kind: kickoff
+  summary: Aaron scopes zkaleido as the shared proving substrate for Glock and Strata work, with storopoli taking the first
+    pass at crate boundaries and benchmark hygiene.
+  participants:
+  - person:AaronFeickert
+  - person:storopoli
+  - person:Zk2u
+  tensions:
+  - unclear ownership between research prototypes and production crates
+  - holiday review latency
+- id: B2
+  start: 2025-01-06
+  end: 2025-01-24
+  kind: design
+  summary: The group drafts a backend-trait RFC that separates circuit description, witness generation, and proof-system bindings
+    after the first sketch proves too coupled to g16 internals.
+  participants:
+  - person:AaronFeickert
+  - person:storopoli
+  - person:Zk2u
+  tensions:
+  - trait abstraction debate
+  - benchmark fixtures lagging the API proposal
+- id: B3
+  start: 2025-02-03
+  end: 2025-02-21
+  kind: impl
+  summary: storopoli lands the initial module split while Zk2u wires CI benchmarks, but the expected one-week cleanup turns
+    into three weeks because hash-benchmarks exposes inconsistent serialization assumptions.
+  participants:
+  - person:storopoli
+  - person:Zk2u
+  - person:AaronFeickert
+  tensions:
+  - serialization compatibility
+  - slow benchmark runners
+- id: B4
+  start: 2025-02-24
+  end: 2025-03-14
+  kind: review
+  summary: mukeshdroid joins the thread by reviewing constraint-system ergonomics and pushes for a smaller public API before
+    downstream protocol code starts depending on unstable helpers.
+  participants:
+  - person:mukeshdroid
+  - person:AaronFeickert
+  - person:storopoli
+  - person:prajwolrg
+  tensions:
+  - public API freeze pressure
+  - protocol integration waiting on review
+- id: B5
+  start: 2025-03-31
+  end: 2025-04-18
+  kind: impl
+  summary: Aaron and mukeshdroid replace ad hoc transcript plumbing with a typed transcript adapter, while prajwolrg opens
+    a draft alpen integration PR that immediately finds missing batch-verification hooks.
+  participants:
+  - person:AaronFeickert
+  - person:mukeshdroid
+  - person:prajwolrg
+  - person:storopoli
+  tensions:
+  - batch verification not in original estimate
+  - alpen integration breaks examples
+- id: B6
+  start: 2025-05-19
+  end: 2025-06-06
+  kind: design
+  summary: Hakkush-07 takes over the batching design note and narrows the scope from universal aggregation to the two proof
+    shapes needed by Glock milestones.
+  participants:
+  - person:Hakkush-07
+  - person:AaronFeickert
+  - person:mukeshdroid
+  - person:prajwolrg
+  tensions:
+  - research generality versus milestone delivery
+  - sparse reviewer availability
+- id: B7
+  start: 2025-06-16
+  end: 2025-07-04
+  kind: impl
+  summary: ceyhunsen implements the revised batch-verification API and spends the second week unwinding lifetime issues introduced
+    by the new witness borrowing model.
+  participants:
+  - person:ceyhunsen
+  - person:Hakkush-07
+  - person:storopoli
+  - person:AaronFeickert
+  tensions:
+  - Rust lifetime churn
+  - benchmark variance masking regressions
+- id: B8
+  start: 2025-07-14
+  end: 2025-08-01
+  kind: audit
+  summary: cyphersnake starts a focused audit of transcript domain separation and finds two ambiguous labels that require
+    coordinated fixes in zkaleido and the g16 adapter.
+  participants:
+  - person:cyphersnake
+  - person:AaronFeickert
+  - person:ceyhunsen
+  - person:mukeshdroid
+  tensions:
+  - cross-repo patch ordering
+  - security fix blocks release branch
+- id: B9
+  start: 2025-08-18
+  end: 2025-09-05
+  kind: ship
+  summary: The team ships a zkaleido minor release consumed by the Glock prototype, with one planned proving-speed improvement
+    deferred after CI shows memory growth on larger circuits.
+  participants:
+  - person:AaronFeickert
+  - person:storopoli
+  - person:Hakkush-07
+  - person:prajwolrg
+  tensions:
+  - deferred performance work
+  - downstream pinning in alpen
+- id: B10
+  start: 2025-10-06
+  end: 2025-10-24
+  kind: impl
+  summary: ceyhunsen and cyphersnake add deterministic test vectors and a compatibility harness so protocol engineers can
+    upgrade zkaleido without manually replaying old witness fixtures.
+  participants:
+  - person:ceyhunsen
+  - person:cyphersnake
+  - person:prajwolrg
+  - person:Zk2u
+  tensions:
+  - fixture format migration
+  - CI minutes budget
+- id: B11
+  start: 2025-11-17
+  end: 2025-12-05
+  kind: retro
+  summary: Aaron closes the year-long thread with a retro that records the API boundaries that held up, the batching work
+    that drifted, and a recommendation to keep zkaleido releases on a monthly cadence.
+  participants:
+  - person:AaronFeickert
+  - person:mukeshdroid
+  - person:storopoli
+  - person:ceyhunsen
+  - person:cyphersnake
+  tensions:
+  - release cadence ownership
+  - unresolved memory profile work
+artifacts:
+- kind: rfc
+  title: zkaleido Backend Trait Boundaries
+  beat: B2
+  author: person:AaronFeickert
+- kind: design_doc
+  title: Typed Transcript Adapter for zkaleido and g16
+  beat: B5
+  author: person:mukeshdroid
+- kind: rfc
+  title: Scoped Batch Verification for Glock Proof Shapes
+  beat: B6
+  author: person:Hakkush-07
+- kind: postmortem
+  title: Transcript Domain Separation Patch Ordering
+  beat: B8
+  author: person:cyphersnake
+- kind: retro
+  title: zkaleido 2025 API and Release Cadence Retro
+  beat: B11
+  author: person:AaronFeickert
+tensions:
+- research API generality repeatedly narrowed by Glock and Strata delivery needs
+- benchmark instability made performance claims hard to review
+- cross-repo dependencies caused release work to bunch near integration windows

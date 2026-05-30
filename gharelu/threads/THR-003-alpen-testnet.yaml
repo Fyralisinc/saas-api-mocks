@@ -1,0 +1,191 @@
+id: THR-003-alpen-testnet
+title: Alpen Public Testnet Launch
+window:
+  start: 2025-08-04
+  end: 2025-11-02
+driver: person:prajwolrg
+cast:
+- person:prajwolrg
+- person:krsnapaudel
+- person:Rajil1213
+- person:MdTeach
+- person:storopoli
+- person:bewakes
+- person:john-light
+- person:ProofOfKeags
+linked_anchors:
+- milestone:alpen-testnet
+linked_products:
+- product:strata
+- product:strata-bridge
+linked_repos:
+- repo:alpen
+- repo:strata-bridge
+- repo:strata-p2p
+- repo:alpen-faucet
+- repo:alpen-dashboards
+- repo:checkpoint-explorer
+beats:
+- id: B1
+  start: 2025-08-04
+  end: 2025-08-17
+  kind: kickoff
+  summary: Public testnet scope is narrowed to sequencer, checkpoint explorer, faucet, bridge deposit path, and a small validator
+    set instead of the full bridge exit flow.
+  participants:
+  - person:prajwolrg
+  - person:krsnapaudel
+  - person:Rajil1213
+  - person:john-light
+  tensions:
+  - exit path cut from launch scope
+  - ops checklist missing owner
+  - faucet abuse limits unclear
+- id: B2
+  start: 2025-08-18
+  end: 2025-08-31
+  kind: design
+  summary: Prajwol and Dilli turn the launch checklist into a readiness RFC covering network params, genesis generation, monitoring,
+    RPC exposure, and rollback criteria.
+  participants:
+  - person:prajwolrg
+  - person:krsnapaudel
+  - person:MdTeach
+  - person:storopoli
+  tensions:
+  - genesis format still moving
+  - dashboard metrics lag implementation
+  - review queue backs up behind consensus changes
+- id: B3
+  start: 2025-09-01
+  end: 2025-09-14
+  kind: impl
+  summary: Protocol work lands in bursts as block production stabilizes, but checkpoint finality handling takes longer after
+    a reorg simulation exposes an indexing assumption.
+  participants:
+  - person:prajwolrg
+  - person:MdTeach
+  - person:storopoli
+  - person:bewakes
+  tensions:
+  - reorg fixture breaks explorer assumptions
+  - senior reviewers split across hot paths
+  - two-day delay from flaky p2p tests
+- id: B4
+  start: 2025-09-15
+  end: 2025-09-28
+  kind: impl
+  summary: Bridge and faucet pieces move in parallel, with Rajil finishing deposit event plumbing while John and Dilli push
+    for rate limits and public-facing error messages.
+  participants:
+  - person:Rajil1213
+  - person:ProofOfKeags
+  - person:krsnapaudel
+  - person:john-light
+  tensions:
+  - bridge confirmations higher than devrel expected
+  - faucet needs captcha-free throttling
+  - infra waits on final RPC hostnames
+- id: B5
+  start: 2025-09-29
+  end: 2025-10-05
+  kind: review
+  summary: A release candidate is cut, then held after the bridge smoke test finds inconsistent BTC deposit status between
+    strata-bridge and checkpoint-explorer.
+  participants:
+  - person:prajwolrg
+  - person:Rajil1213
+  - person:ProofOfKeags
+  - person:bewakes
+  tensions:
+  - RC slips by four days
+  - ownership unclear between bridge indexer and explorer API
+  - testnet announcement draft already scheduled
+- id: B6
+  start: 2025-10-06
+  end: 2025-10-12
+  kind: audit
+  summary: The team runs an internal launch audit, adds runbook steps for stuck sequencer recovery, and decides to launch
+    with manual bridge operator intervention documented.
+  participants:
+  - person:prajwolrg
+  - person:krsnapaudel
+  - person:Rajil1213
+  - person:MdTeach
+  tensions:
+  - manual recovery remains accepted risk
+  - alert thresholds too noisy
+  - bridge operator flow depends on one senior reviewer
+- id: B7
+  start: 2025-10-13
+  end: 2025-10-19
+  kind: ship
+  summary: Public testnet goes live with faucet, explorer, RPC endpoints, and bridge deposits, while exits stay behind an
+    explicit follow-up milestone.
+  participants:
+  - person:prajwolrg
+  - person:krsnapaudel
+  - person:Rajil1213
+  - person:john-light
+  - person:ProofOfKeags
+  tensions:
+  - higher faucet traffic than load test
+  - explorer cache misses during announcement spike
+  - public docs trail final endpoint names
+- id: B8
+  start: 2025-10-20
+  end: 2025-10-26
+  kind: postmortem
+  summary: The first production-like week surfaces a p2p peer churn issue and a faucet queue leak, both fixed while keeping
+    the network online.
+  participants:
+  - person:krsnapaudel
+  - person:bewakes
+  - person:storopoli
+  - person:prajwolrg
+  tensions:
+  - hotfixes bypass normal review depth
+  - dashboards page late-night responders too often
+  - peer churn root cause spans infra and protocol
+- id: B9
+  start: 2025-10-27
+  end: 2025-11-02
+  kind: retro
+  summary: The launch retro records that the public testnet shipped two weeks later than the first target, with bridge exits,
+    automated recovery, and external validator onboarding moved into follow-up work.
+  participants:
+  - person:prajwolrg
+  - person:krsnapaudel
+  - person:Rajil1213
+  - person:john-light
+  - person:MdTeach
+  tensions:
+  - scope reduction needs clearer external framing
+  - reviewers overloaded during final two weeks
+  - launch readiness checklist started too late
+artifacts:
+- kind: rfc
+  title: Public Testnet Readiness and Launch Criteria
+  beat: B2
+  author: person:prajwolrg
+- kind: design_doc
+  title: Testnet Genesis, RPC, and Monitoring Plan
+  beat: B2
+  author: person:krsnapaudel
+- kind: design_doc
+  title: Bridge Deposit Path for Public Testnet
+  beat: B4
+  author: person:Rajil1213
+- kind: postmortem
+  title: First Week Testnet Incidents and Hotfixes
+  beat: B8
+  author: person:krsnapaudel
+- kind: retro
+  title: Public Testnet Launch Retro
+  beat: B9
+  author: person:prajwolrg
+tensions:
+- launch scope traded bridge completeness for public availability
+- protocol, bridge, and infra review queues converged in the final month
+- public docs and devrel timing moved faster than endpoint stabilization
+- manual recovery paths remained part of the launch posture

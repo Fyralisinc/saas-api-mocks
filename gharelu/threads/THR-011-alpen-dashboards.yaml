@@ -1,0 +1,200 @@
+id: THR-011-alpen-dashboards
+title: Alpen Dashboards Observability Thread
+window:
+  start: 2025-01-28
+  end: 2026-01-28
+driver: person:krsnapaudel
+cast:
+- person:krsnapaudel
+- person:prajwolrg
+- person:MdTeach
+- person:delbonis
+- person:Rajil1213
+- person:ProofOfKeags
+- person:john-light
+linked_anchors:
+- repo:alpen-dashboards
+linked_products:
+- product:strata
+- product:strata-bridge
+- product:mosaic
+linked_repos:
+- repo:alpen-dashboards
+- repo:alpen
+- repo:strata-bridge
+- repo:mosaic
+beats:
+- id: B1
+  start: 2025-01-28
+  end: 2025-02-16
+  kind: kickoff
+  summary: person:krsnapaudel takes ownership of alpen-dashboards and inventories the existing Strata node, bridge, and Mosaic
+    panels into a single backlog with a two-month goal of getting reliable internal testnet coverage.
+  participants:
+  - person:krsnapaudel
+  - person:prajwolrg
+  - person:MdTeach
+  - person:Rajil1213
+  tensions:
+  - unclear metric ownership across repos
+  - stale panel queries
+  - no shared naming convention
+- id: B2
+  start: 2025-02-17
+  end: 2025-03-09
+  kind: design
+  summary: The team drafts a dashboard taxonomy that separates operator health, protocol liveness, bridge safety, and devrel-facing
+    demo views, with person:prajwolrg pushing for fewer panels and person:Rajil1213 asking for bridge-specific drilldowns.
+  participants:
+  - person:krsnapaudel
+  - person:prajwolrg
+  - person:Rajil1213
+  - person:john-light
+  tensions:
+  - operator views competing with demo views
+  - Grafana folder layout churn
+  - bridge metrics not yet emitted consistently
+- id: B3
+  start: 2025-03-10
+  end: 2025-04-13
+  kind: impl
+  summary: person:krsnapaudel lands the first burst of Rust-side metric exporters and Grafana JSON cleanup while person:MdTeach
+    threads missing Strata block-processing counters through alpen.
+  participants:
+  - person:krsnapaudel
+  - person:MdTeach
+  - person:prajwolrg
+  tensions:
+  - review queue backs up behind protocol releases
+  - counter labels too high-cardinality
+  - local dashboards drift from staging
+- id: B4
+  start: 2025-04-14
+  end: 2025-05-25
+  kind: review
+  summary: person:delbonis performs a slower pass over alert semantics and catches that several panels report process health
+    but miss consensus stalls, forcing the dashboard scope to shift from visuals to actionable alerts.
+  participants:
+  - person:krsnapaudel
+  - person:delbonis
+  - person:prajwolrg
+  - person:MdTeach
+  tensions:
+  - alert fatigue concerns
+  - testnet incidents hard to replay
+  - original milestone slips by three weeks
+- id: B5
+  start: 2025-05-26
+  end: 2025-07-06
+  kind: impl
+  summary: Bridge and infra work converge as person:ProofOfKeags adds deposit-withdrawal queue metrics in strata-bridge and
+    person:krsnapaudel builds correlated panels for finality delay, bridge signer health, and BTC confirmation depth.
+  participants:
+  - person:krsnapaudel
+  - person:Rajil1213
+  - person:ProofOfKeags
+  tensions:
+  - bridge terminology differs from protocol labels
+  - signer telemetry lands late
+  - dashboard PRs depend on unreleased bridge branches
+- id: B6
+  start: 2025-07-07
+  end: 2025-08-17
+  kind: design
+  summary: After internal users complain that the dashboard is useful only to the authors, person:krsnapaudel writes a second
+    design note introducing runbook-linked panels and severity tiers instead of adding more graphs.
+  participants:
+  - person:krsnapaudel
+  - person:delbonis
+  - person:john-light
+  - person:Rajil1213
+  tensions:
+  - runbooks missing for new alerts
+  - severity names debated
+  - devrel wants sanitized screenshots before docs are ready
+- id: B7
+  start: 2025-08-18
+  end: 2025-09-28
+  kind: impl
+  summary: The repo moves from hand-edited Grafana exports to checked-in dashboard definitions with linting, which reduces
+    accidental JSON churn but slows person:krsnapaudel while existing panels are migrated.
+  participants:
+  - person:krsnapaudel
+  - person:MdTeach
+  - person:ProofOfKeags
+  tensions:
+  - large mechanical PRs hard to review
+  - Grafana export format noise
+  - CI flakes on dashboard schema validation
+- id: B8
+  start: 2025-09-29
+  end: 2025-11-09
+  kind: audit
+  summary: A staging incident around delayed checkpoint visibility becomes the first real test of the alerts, revealing that
+    bridge alerts fired correctly while Strata liveness panels hid the root cause behind averaged intervals.
+  participants:
+  - person:krsnapaudel
+  - person:prajwolrg
+  - person:delbonis
+  - person:Rajil1213
+  tensions:
+  - averages hide tail latency
+  - ownership unclear during incident triage
+  - paging thresholds too conservative
+- id: B9
+  start: 2025-11-10
+  end: 2025-12-14
+  kind: ship
+  summary: The team ships the first internally blessed alpen-dashboards baseline for testnet operations, including provisioning
+    docs, alert templates, and repo-linked panel ownership.
+  participants:
+  - person:krsnapaudel
+  - person:prajwolrg
+  - person:Rajil1213
+  - person:ProofOfKeags
+  - person:john-light
+  tensions:
+  - docs freeze conflicts with late metric renames
+  - demo dashboard intentionally lags operator dashboard
+  - bridge panels need manual secrets setup
+- id: B10
+  start: 2025-12-15
+  end: 2026-01-28
+  kind: retro
+  summary: The retro records that the original dashboard refresh became an observability program, with the most valuable work
+    being alert ownership and runbook links rather than the panel redesign planned in February.
+  participants:
+  - person:krsnapaudel
+  - person:prajwolrg
+  - person:delbonis
+  - person:Rajil1213
+  - person:john-light
+  tensions:
+  - dashboard polish deferred
+  - no single metrics SDK yet
+  - follow-up backlog larger than expected
+artifacts:
+- kind: design_doc
+  title: Alpen Dashboards Ownership and Taxonomy
+  beat: B2
+  author: person:krsnapaudel
+- kind: rfc
+  title: Metrics Naming and Cardinality Rules for Strata and Bridge Services
+  beat: B3
+  author: person:MdTeach
+- kind: design_doc
+  title: Alert Severity Tiers and Runbook-Linked Panels
+  beat: B6
+  author: person:krsnapaudel
+- kind: postmortem
+  title: Checkpoint Visibility Delay and Dashboard Gaps
+  beat: B8
+  author: person:delbonis
+- kind: retro
+  title: Alpen Dashboards 2025 Observability Retro
+  beat: B10
+  author: person:krsnapaudel
+tensions:
+- dashboard work expands from Grafana cleanup into cross-repo observability ownership
+- bridge and protocol teams use different metric language for similar failure modes
+- operational reliability work repeatedly competes with feature release review queues

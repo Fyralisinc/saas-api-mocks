@@ -1,0 +1,1837 @@
+chatter_by_person:
+  person:prajwolrg:
+    reactions:
+    - sg
+    - lol fair
+    - nice
+    - ack
+    - oof
+    - same
+    - ship it
+    - hm
+    random:
+    - coffee machine has a liveness issue again
+    - my keyboard dropped one key, not consensus safe
+    - cat reviewed the desk setup, rejected it
+    - rain is loud enough to count as infra
+    - 'found the stale assumption: i owned an umbrella'
+    - dinner path failed, retrying with noodles
+    - this song has no clean verification path
+    - evening brain is online, barely
+    - someone left a very optimistic banana in the kitchen
+    - minor reorg in my sleep schedule
+    pto_announce:
+    - out tomorrow, low signal unless urgent
+    - taking friday off, back monday evening
+    - ooo for a few days, will catch up after
+    - offline this afternoon, ping if bridge-shaped fire
+    return_from_pto:
+    - back, reading backlog now
+    - back online, catching the edges first
+    - returned, will page in context slowly
+    - back from pto, checking what assumptions expired
+    conference_post:
+    - at btc++ today, around after lunch
+    - anyone else at zk summit this week?
+    - at the conf venue, finding coffee before talks
+    - will be around the bitcoin++ hallway track later
+    incident_reaction:
+    - looking now, need exact affected path
+    - ack, checking whether this crosses consensus boundary
+    - first question is exploitability under reorg
+    - i can own triage for the bridge side
+    news_take:
+    - paper looks good, want to see the verifier cost
+    - release notes are short on failure modes
+    - interesting post, but the bridge assumption is doing work
+    - nice result if the test vectors hold
+    weekend_chatter:
+    - anyone tried the new ramen place this weekend?
+    - weekend plan is sleep and maybe one clean hike
+    - bike route had worse docs than expected
+    - cooking attempt passed locally, needs review
+  person:Rajil1213:
+    reactions:
+    - lol
+    - ack
+    - nice
+    - fair
+    - oof
+    - same
+    - yep
+    - wat
+    random:
+    - coffee state machine failed again
+    - my laptop fan is doing p2p discovery
+    - 'dinner invariant: no dishes left unhandled'
+    - cat found the warmest validator
+    - this keyboard has too many edge cases
+    - rain is making the internet feel honest
+    - i trust the toaster less after today
+    - evening debugging pairs well with bad noodles
+    - calendar says free, reality disagrees
+    - local grocery checkout has worse liveness than testnet
+    pto_announce:
+    - out tomorrow, will catch async things after
+    - taking friday off, no bridge state updates from me
+    - offline for a couple days, reachable only if urgent
+    - out this afternoon, leaving notes where context matters
+    return_from_pto:
+    - back, reading backlog in dependency order
+    - back online, catching up on the noisy parts first
+    - back, will rehydrate context this evening
+    - catching up now, ping me if i missed a blocking bit
+    conference_post:
+    - at btc++ today, around after the morning talks
+    - anyone else at the zk meetup later?
+    - at the conf, mostly hiding near the coffee
+    - btc++ hallway track has better throughput than expected
+    incident_reaction:
+    - ack, reading the disclosure now
+    - i can help trace the failure path
+    - let's separate confirmed impact from reachable states
+    - not great, but seems debuggable
+    news_take:
+    - paper is interesting, proof assumptions need a slower read
+    - release notes look good, waiting for edge case reports
+    - vitalik post has the right failure-mode framing
+    - bitcoin change seems small until you model reorg behavior
+    weekend_chatter:
+    - anyone tried the new ramen place this weekend?
+    - weekend plan is mostly sleep and one stubborn test
+    - hiking tomorrow if the weather state stays valid
+    - might finally fix my home network this weekend
+  person:storopoli:
+    reactions:
+    - lol
+    - yep
+    - oof
+    - fair
+    - nice
+    - sharp
+    - hm
+    - rip
+    random:
+    - coffee machine has consensus issues again
+    - cat walked over the keyboard, found no serialization bugs
+    - this sandwich is mostly plumbing, but good plumbing
+    - even my groceries need a better spec
+    - weather app lied with confidence
+    - found one endian footgun in my calendar
+    - my desk cable graph is no longer connected
+    - strongly considering a nap checkpoint
+    - the office chairs have p2p failure modes
+    - tea brewed correctly, tests pending
+    pto_announce:
+    - out tomorrow, low signal unless something is on fire
+    - taking friday off, will catch up in the evening
+    - ooo next week, not carrying protocol context with me
+    - offline for a bit, please serialize chaos deterministically
+    return_from_pto:
+    - back, catching up on the backlog now
+    - back online, reading threads in dependency order
+    - returned, inbox has interesting failure modes
+    - back, parsing slack before touching rust
+    conference_post:
+    - at btc++ today, ping if nearby
+    - anyone else at zk summit? hallway track seems underspecified
+    - in berlin for the conference, mostly around the bitcoin talks
+    - at the venue now, coffee path is not obvious
+    incident_reaction:
+    - ack, reading the disclosure now
+    - this looks sharp, checking the edge cases
+    - i can help trace the p2p path
+    - not panicking yet, but we should reproduce it
+    news_take:
+    - new zk paper is interesting, proof system section is the meat
+    - bitcoin core release notes have some p2p bits worth reading
+    - vitalik post is fine, but the bridge assumptions need more ink
+    - that serialization change looks small and therefore suspicious
+    weekend_chatter:
+    - anyone tried the new ramen place this weekend?
+    - weekend plan is hiking and pretending slack has no mempool
+    - made pizza, dough hydration had protocol weirdness
+    - 'sunday debugging: why does my bike creak under load'
+  person:MdTeach:
+    reactions:
+    - yep
+    - lol
+    - fair
+    - oof
+    - sgtm
+    - nice
+    - same
+    - wait
+    random:
+    - coffee invariant failed again
+    - cat stepped on the keyboard, no state transition observed
+    - my laptop fan is proving liveness
+    - who took the last sparkling water
+    - late dinner, back after
+    - desk plant is not making it
+    - calendar says focus time, slack disagrees
+    - this tea is load-bearing
+    - i need a better chair before my spine forks
+    - rain is good, internet is not
+    pto_announce:
+    - out tomorrow, back monday
+    - taking friday off. can handle anything urgent tonight
+    - offline next week, leaving notes before i go
+    - pto for the afternoon, reachable if something is actually broken
+    return_from_pto:
+    - back, reading backlog now
+    - back online, catching up on threads
+    - returned. send me anything i missed that matters
+    - back from pto, starting with the urgent stuff
+    conference_post:
+    - anyone else at btc++ today
+    - at the zk meetup, will be slow on slack
+    - heading to the bitcoin dev thing now
+    - if anyone is at sbc, ping me
+    incident_reaction:
+    - reading the disclosure now
+    - ok, checking whether the assumption maps to us
+    - not ideal. i'll trace the bridge path
+    - need exact affected versions before guessing
+    news_take:
+    - paper is interesting, but the setup assumption is doing work
+    - release notes look fine. want vectors before trusting it
+    - vitalik post is reasonable, edge cases are still under-specified
+    - nice result, unclear how it behaves under reorgs
+    weekend_chatter:
+    - anyone tried the new ramen place yet
+    - weekend plan is sleep and maybe one hike
+    - going offline for a bit, phone is still noisy
+    - if this rain holds, i'm not leaving the apartment
+  person:krsnapaudel:
+    reactions:
+    - ack
+    - lol
+    - nice
+    - oof
+    - same
+    - fair
+    - yep
+    - sounds stale
+    random:
+    - coffee machine is returning bad metrics again
+    - cat walked over the keyboard, no deploy triggered
+    - my lunch order had better retry logic than most apps
+    - weather dashboard says clear, window says no
+    - added logs to my sleep schedule, still inconclusive
+    - keyboard battery died without warning. poor observability
+    - found the missing sock. stale local state
+    - the elevator timeout is not sane
+    - tea fixed the incident
+    - i trust the dishwasher less than testnet today
+    pto_announce:
+    - out tomorrow, will catch up async
+    - taking friday off. nothing pending from me
+    - offline for a few days, reachable only if urgent
+    - out this afternoon. dashboards are green
+    return_from_pto:
+    - back, reading backlog now
+    - back online, catching up on threads
+    - back today. checking what changed
+    - caught up enough to know metrics moved
+    conference_post:
+    - anyone else at btc++ this week
+    - at the conf today, slower replies
+    - zk talks are good, wifi is not
+    - will be around the bitcoin dev area after lunch
+    incident_reaction:
+    - ack, looking at the actual failure mode
+    - let's confirm impact before guessing
+    - checking logs and external status now
+    - bad state likely persisted somewhere
+    news_take:
+    - paper looks useful, need to read assumptions
+    - release notes are short, diff is not
+    - the zk benchmark numbers need context
+    - interesting post, but metrics would help
+    weekend_chatter:
+    - anyone tried the new ramen place this weekend
+    - weekend hike had worse indexing than expected
+    - bike route was fine, maps had stale state
+    - spent sunday debugging home wifi, not recommended
+  person:delbonis:
+    reactions:
+    - lol
+    - ack
+    - nice
+    - oof
+    - fair
+    - yep
+    - sgtm
+    - hm
+    random:
+    - coffee machine is violating liveness again
+    - found the annoying dishwasher serialization mismatch
+    - cat stepped on caps lock, arguably valid input
+    - the office thermostat has consensus issues
+    - my laptop fan is proving work tonight
+    - this sandwich has too many trust assumptions
+    - train wifi dropped exactly at the commit boundary
+    - i think my calendar forked
+    - mechanical keyboard arrived, coworkers may disagree with this choice
+    - debugging soup temperature now
+    pto_announce:
+    - out tomorrow, back monday evening
+    - offline friday. nothing urgent should depend on me
+    - taking a few days off, will catch up after
+    - out next week, ping if there's a real invariant break
+    return_from_pto:
+    - back, catching up on the backlog
+    - back online, reading threads now
+    - back. will page through the interesting failures first
+    - returned, inbox is large but finite
+    conference_post:
+    - at btc++ today, around after the morning talks
+    - anyone else at zk summit this week?
+    - at the bitcoin dev room, mostly near the back
+    - going to the bridge panel if anyone wants to compare notes
+    incident_reaction:
+    - ack, reading the disclosure now
+    - i can help reduce the repro
+    - let's separate impact from trigger first
+    - owning the test vector side of this
+    news_take:
+    - paper looks interesting, constraint count is the real question
+    - release notes are light on edge cases
+    - vitalik post has the right invariant, unsure on implementation
+    - bridge design seems sane if the timeout assumptions hold
+    weekend_chatter:
+    - anyone tried that new ramen place this weekend?
+    - weekend plan is mostly sleep and one annoying test
+    - hiking tomorrow if the weather keeps its promise
+    - spent sunday fixing a chair, worse docs than bitcoin core
+  person:sapinb:
+    reactions:
+    - ack
+    - nice
+    - lol
+    - oof
+    - fair
+    - ship it
+    - checks out
+    - same
+    random:
+    - coffee machine is degraded again
+    - cat found the warm laptop, uptime unclear
+    - rain started right after i deployed lunch
+    - my apartment wifi has worse observability than prod
+    - keyboard cleanup complete, crumbs were the root cause
+    - the group chat has entered incident mode
+    - new headphones are working, noise floor is down
+    - lunch place changed the menu without migration notes
+    - desk plant is alive, monitoring still manual
+    - delivery app says arriving now, no packets observed
+    pto_announce:
+    - out tomorrow, will clear anything blocking today
+    - taking friday off, no deploy opinions from me
+    - offline next week, dashboards should be boring
+    - out this afternoon, ping if access is stuck before then
+    return_from_pto:
+    - back, catching up on threads
+    - back online, clearing notifications now
+    - back from pto, inbox has some drift
+    - back, reading backlog before touching anything
+    conference_post:
+    - at btc++ today, mostly hallway track
+    - anyone else at zk summit tomorrow
+    - in berlin for the conference, schedule looks packed
+    - at the venue now, wifi is predictably load-bearing
+    incident_reaction:
+    - ack, reading the disclosure now
+    - can help trace impact if needed
+    - checking whether any of our paths touch this
+    - not ideal, but scope first
+    news_take:
+    - paper looks useful, implementation details matter
+    - release notes are short, diff is not
+    - interesting post, but the operational bits are underspecified
+    - benchmark numbers look good, waiting for real-world failure modes
+    weekend_chatter:
+    - anyone tried the new ramen place this weekend
+    - weekend plan is low latency errands
+    - going offline for a hike, alerts should behave
+    - bike maintenance became a dependency chain
+  person:Zk2u:
+    reactions:
+    - lol
+    - yep
+    - nice
+    - oof
+    - same
+    - ship it
+    - sounds cursed
+    - fair
+    random:
+    - coffee path is degraded
+    - my sleep schedule forked again
+    - keyboard is dropping spaces. credible threat model
+    - rain is back. network stable, human not
+    - cat stepped on tmux. no survivors
+    - lunch took the slow path
+    - found the missing hoodie. cache invalidation issue
+    - desk cable topology is no longer reproducible
+    - airport wifi is doing consensus by vibes
+    - the espresso machine has entered maintenance mode
+    pto_announce:
+    - out tomorrow. phone reachable if bridge is on fire
+    - taking friday off. will catch up async
+    - offline for a few days. pager only for real incidents
+    - pto next week. leaving notes in the usual place
+    return_from_pto:
+    - back. reading backlog
+    - back online. catching up now
+    - back. inbox has state drift
+    - returned. will drain messages tonight
+    conference_post:
+    - at btc++ today. ping if nearby
+    - zk summit hallway track is predictably useful
+    - anyone else at tabconf this week
+    - at the conference. wifi is the actual adversary
+    incident_reaction:
+    - looking now. will repro first
+    - not great. checking blast radius
+    - i can take the bridge side
+    - confirmed. digging through logs
+    news_take:
+    - new proving paper looks useful, benchmarks unclear
+    - bitcoin release notes are worth reading this time
+    - vitalik post has one good section and three detours
+    - zkvm numbers moved again. need reproducible benches
+    weekend_chatter:
+    - anyone tried the new ramen spot this weekend
+    - 'weekend plan: sleep, laundry, maybe benchmarks'
+    - hiking tomorrow if weather stops griefing
+    - sunday coffee run if anyone is around
+  person:uncomputable:
+    reactions:
+    - yeah
+    - lol
+    - fair
+    - oof
+    - ack
+    - seems fine
+    - not ideal
+    - same
+    random:
+    - coffee machine has worse liveness than our bridge
+    - cat found the warm laptop again, threat model updated
+    - i took the boring lunch option, fewer moving parts
+    - rain started exactly when i left, timing assumptions invalid
+    - keyboard is dropping keys, so any typos are now consensus bugs
+    - the office plant looks recoverable but needs better monitoring
+    - i have no opinion until we define good pizza
+    - my headphones paired to the wrong device again, cursed protocol
+    - 'strong claim: all mugs should be larger'
+    - made tea and forgot it. timeout handling still poor
+    pto_announce:
+    - out tomorrow, low chance i check slack
+    - taking friday off. ping if actually blocking
+    - offline next week, back monday evening
+    - out for a long weekend. assume delayed replies
+    return_from_pto:
+    - back, catching up in dependency order
+    - back online, reading the backlog now
+    - back. will answer once i reconstruct state
+    - returned, still paging context into memory
+    conference_post:
+    - at btc++ today, around if anyone wants to compare notes
+    - anyone else at the zk sessions later?
+    - in berlin for the conference, replies may be batched
+    - talks are good so far, lots of bridge threat models in the air
+    incident_reaction:
+    - not great. first question is whether funds were actually at risk
+    - need the exact trust assumption that failed before speculating
+    - i can help trace the edge case tonight
+    - worth separating disclosure quality from bug severity here
+    news_take:
+    - paper looks interesting, but i want to see the model assumptions
+    - nice release. curious how they handle withdrawal finality
+    - the vitalik post is better if read as constraints, not roadmap
+    - good benchmark, though the proving setup details matter a lot
+    weekend_chatter:
+    - anyone tried that new ramen place this weekend?
+    - planning to be mostly offline sunday unless something catches fire
+    - 'weekend invariant: no laptop after dinner, probably violated'
+    - hiking tomorrow if the weather model stops lying
+  person:purusang:
+    reactions:
+    - ack
+    - nice
+    - lol
+    - oof
+    - sg
+    - yep
+    - same
+    - ship it
+    random:
+    - coffee machine needs a health check
+    - cat walked over keyboard, no deploy impact
+    - my apartment wifi is doing rpc cosplay
+    - found a good desk lamp finally
+    - rain started exactly when i left
+    - this snack has bad retry semantics
+    - evening walk fixed the cache in my head
+    - browser tabs need an indexer
+    - keyboard is cleaned, incident closed
+    - i trust this kettle more than most dashboards
+    pto_announce:
+    - out tomorrow, low signal. ping if actually blocking
+    - taking friday off. will catch up in the evening
+    - offline for a couple days, no deploys from me
+    - pto next week. leaving notes where state matters
+    return_from_pto:
+    - back, reading backlog now
+    - back online, catching up on logs and threads
+    - back. will reply as i page things in
+    - online again, starting with the noisy channels
+    conference_post:
+    - at btc++ today, around after lunch
+    - anyone else at zk summit?
+    - in the berlin venue now, wifi is acceptable
+    - at the bitcoin++ hallway track, ping if nearby
+    incident_reaction:
+    - ack, reading the disclosure now
+    - i can help check logs if useful
+    - let's get a minimal repro before guessing
+    - owned, will verify dashboard state first
+    news_take:
+    - new proving paper looks interesting, need to read past the abstract
+    - bitcoin release notes are short but worth checking
+    - vitalik post has one useful section, rest is context
+    - indexer behavior around reorgs is still the thing to watch
+    weekend_chatter:
+    - anyone tried the new coffee place this weekend?
+    - weekend plan is errands and zero notifications
+    - going hiking sunday if weather stops failing health checks
+    - made soup, retry logic was mostly manual
+  person:bewakes:
+    reactions:
+    - yep
+    - sgtm
+    - nice
+    - lol
+    - fair
+    - checking
+    - oof
+    - same
+    random:
+    - coffee path is fixed, state transition still pending
+    - my keyboard has started double-committing spaces
+    - cat stepped on enter, message validity unclear
+    - dinner plan is currently optimistic
+    - i have one clean mug invariant left
+    - weather looks adversarial today
+    - laundry backlog is not consensus safe
+    - this tea has better liveness than my router
+    - 'small update: noodles were correct'
+    - browser tabs exceeded reasonable storage bounds
+    pto_announce:
+    - out tomorrow, will catch bridge threads after
+    - taking friday off, low signal until evening
+    - offline next week, please assume delayed acks
+    - pto today, reachable only if something is actually burning
+    return_from_pto:
+    - back, reading the backlog in dependency order
+    - back online, catching up on the sharper edges first
+    - back, still paging in context
+    - returned, going through threads now
+    conference_post:
+    - at btc++ today, around after the zk talks
+    - anyone else at tabconf? checking the schedule now
+    - at the proving systems session, notes later
+    - btc++ hallway track has useful bridge questions
+    incident_reaction:
+    - ack, looking at assumptions before conclusions
+    - that disclosure has a few sharp edge cases
+    - checking whether this affects our threat model
+    - i'll read the postmortem before speculating
+    news_take:
+    - the paper is interesting, but the setup assumptions need care
+    - release notes look good, storage migration is the part to inspect
+    - vitalik post has a useful framing, some bridge details still fuzzy
+    - the proving change is small, but verifier behavior matters
+    weekend_chatter:
+    - anyone tried the new ramen place this weekend?
+    - weekend plan is mostly walking and reducing inbox state
+    - bike chain fixed, tests pending on hills
+    - sunday cooking produced acceptable outputs
+  person:voidash:
+    reactions:
+    - yep
+    - lol
+    - sgtm
+    - oof
+    - same
+    - nice
+    - fair
+    - ack
+    random:
+    - keyboard decided to checkpoint my lunch
+    - coffee path is wired locally
+    - cat found the warm laptop invariant
+    - i trust vending machines less than bridges
+    - this playlist has bad finality
+    - need one more snack before i trust it
+    - my apartment wifi is doing adversarial testing
+    - rain got here before the proof
+    - the microwave has a consensus bug
+    - leftovers survived a reorg in the fridge
+    pto_announce:
+    - out tomorrow, back monday evening
+    - taking friday off, will catch up after
+    - offline for a few days, no protocol thoughts
+    - pto next week, please assume delayed acks
+    return_from_pto:
+    - back, catching up now
+    - back online, reading backlog in order
+    - back from pto, will page in context
+    - back, need a bit to rebuild state
+    conference_post:
+    - anyone else at btc++ this week
+    - at zk summit, mostly around the hallway track
+    - in berlin for the conference, around after talks
+    - btc++ wifi has weak liveness
+    incident_reaction:
+    - ack, reading the disclosure now
+    - i can help trace the edge case
+    - need to understand the invariant break first
+    - will stay online and help debug
+    news_take:
+    - new zk paper looks useful, need to check assumptions
+    - release notes are short on reorg semantics
+    - vitalik post has the right failure model imo
+    - interesting bridge design, but the exit path needs scrutiny
+    weekend_chatter:
+    - anyone tried the new ramen place this weekend
+    - weekend plan is sleep plus maybe one hike
+    - my bike chain failed basic liveness
+    - trying to keep sunday free of consensus thoughts
+  person:mukeshdroid:
+    reactions:
+    - lol
+    - fair
+    - hm yeah
+    - oof
+    - checks out
+    - nice
+    - same
+    - noted
+    random:
+    - chai ratio was wrong, debugging from first principles
+    - my keyboard has developed opinions about whitespace
+    - the cat found the warm laptop, so consensus is delayed
+    - i trust this coffee less than a recursive verifier
+    - weather is doing a weird liveness failure today
+    - finally fixed the chair squeak, local soundness restored
+    - whoever invented calendar reminders assumed too much
+    - dinner plan has more unknowns than the bridge threat model
+    - my headphones disconnected at exactly the suspicious part
+    - there is probably a lower-cost proof for making toast
+    pto_announce:
+    - out tomorrow, will check async if something is actually on fire
+    - taking friday off. assume no reviews from me until evening sunday
+    - offline for a few days, leaving notes where assumptions matter
+    - pto next week. ping only if the threat model changed materially
+    return_from_pto:
+    - back, catching up in dependency order
+    - back online, reading context before saying anything useful
+    - back from pto. will triage mentions first, then reviews
+    - catching up now, please resend anything that needs a concrete answer
+    conference_post:
+    - at btc++ today, around after the zk talks if anyone is here
+    - anyone else at the zk summit? trying to map names to papers
+    - in berlin for the conference, mostly listening for bridge assumptions
+    - at the bitcoin dev meetup later, ping if nearby
+    incident_reaction:
+    - reading the disclosure now, need the exact assumptions before concluding impact
+    - i can help trace this once we know which boundary failed
+    - low drama for now, but we should write the threat model delta
+    - i’ll look at reproduction steps first, speculation after
+    news_take:
+    - paper looks interesting, but i want to see the constraint accounting
+    - nice release, though the prover cost section is doing a lot of work
+    - vitalik post has a fair framing, modulo bridge assumptions
+    - zk news is good, but soundness details still decide the thing
+    weekend_chatter:
+    - anyone tried the new ramen place this weekend? need data
+    - weekend plan is reading, errands, and pretending not to check logs
+    - might hike sunday if the weather model stops lying
+    - testing a bread recipe this weekend, proof costs currently high
+  person:Hakkush-07:
+    reactions:
+    - ack
+    - seems fine
+    - lol
+    - fair
+    - nice
+    - oof
+    - checks out
+    - same
+    random:
+    - coffee invariant failed again
+    - keyboard is behaving nondeterministically today
+    - the espresso machine has a liveness issue
+    - desk setup is now less wrong
+    - i trust neither weather apps nor hotel wifi
+    - lunch ordering remains underspecified
+    - cat walked across the keyboard, no valid proof emitted
+    - noise cancelling headphones are carrying the day
+    - calendar density looks suspicious
+    - i have reproduced the missing spoon issue locally
+    pto_announce:
+    - out tomorrow, will catch up after
+    - taking friday off, no strong assumptions about response time
+    - offline next week, please leave context in-thread
+    - ooo for a few days, back monday
+    return_from_pto:
+    - back, reading through backlog now
+    - back online, catching up in order
+    - back from pto, may ask redundant questions
+    - back, inbox state is not yet known
+    conference_post:
+    - at btc++ today, around if anyone else is here
+    - in the zk track, hallway wifi is the weak link
+    - anyone at the bitcoin dev meetup tonight?
+    - at the conference tomorrow, mostly listening
+    incident_reaction:
+    - ack, looking at the boundary conditions now
+    - bad but debuggable, need exact repro steps
+    - let's separate impact from speculation first
+    - i can help trace the failing path
+    news_take:
+    - paper looks interesting, need to check the assumptions section
+    - release notes are clearer than usual, appreciated
+    - the construction seems fine if the edge cases hold
+    - benchmark claims need a reproducible setup before i trust them
+    weekend_chatter:
+    - anyone tried the new ramen place this weekend?
+    - weekend plan is mostly reducing apartment entropy
+    - hiking tomorrow if weather model is not lying
+    - made decent coffee at home, parameters still unstable
+  person:evgenyzdanovich:
+    reactions:
+    - ack
+    - lol
+    - fair
+    - oof
+    - yep
+    - nice
+    - same
+    - hm
+    random:
+    - coffee path is failing open
+    - my laptop fan is proving liveness again
+    - keyboard layout changed itself, very consensus-breaking
+    - i think the microwave has worse finality than regtest
+    - cat stepped on esc, probably correct
+    - rain is good, but serialization of shoes is bad
+    - forgot dinner, compiled rust instead
+    - this chair has undefined behavior
+    - calendar says monday, cannot verify
+    - tea is the smaller constraint system
+    pto_announce:
+    - out tomorrow, will catch up in the evening
+    - taking friday off, not checking much
+    - offline for a few days, back monday
+    - pto today, ping if actually blocking
+    return_from_pto:
+    - back, reading through the backlog
+    - back online, catching up now
+    - returned, will process threads first
+    - back, rebuilding context slowly
+    conference_post:
+    - at btc++ today, around after lunch
+    - anyone else at zk summit this week
+    - in berlin for the conference, async may be slower
+    - heading to the bitcoin dev meetup later
+    incident_reaction:
+    - looking now, first checking boundary assumptions
+    - ack, will trace the failing path
+    - not enough info yet, debugging calmly
+    - i'll own the repro and report back
+    news_take:
+    - paper looks useful, need to check the constraint cost
+    - release notes are small but the serialization change matters
+    - vitalik post has a reasonable threat model section
+    - zkvm benchmark is interesting if the inputs are comparable
+    weekend_chatter:
+    - anyone tried the new ramen place this weekend
+    - weekend plan is hiking unless rust wins again
+    - going offline for a bit, need less screen time
+    - tried sourdough again, proof failed at room temp
+  person:bbist:
+    reactions:
+    - lol
+    - yep
+    - nice
+    - oof
+    - same
+    - fair
+    - hm
+    - wild
+    random:
+    - coffee machine is in retry mode again
+    - cat found the warm keyboard and merged nothing
+    - desk cable state got corrupted overnight
+    - lunch path was not deterministic today
+    - weather looks fine, still bringing the pessimistic jacket
+    - my headphones fixed themselves after a reboot, concerning
+    - delivery app says arrived, real world disagrees
+    - keyboard is clean now, regression risk remains
+    - calendar had one job and forked my morning
+    - printer is still the least verified system here
+    pto_announce:
+    - out tomorrow, back monday
+    - taking friday off, will catch up after
+    - offline next week, no urgent bridge thoughts from me
+    - out for a bit this afternoon, back later
+    return_from_pto:
+    - back, reading through backlog now
+    - back online, catching up in order
+    - back today, will rehydrate context first
+    - back, inbox has a few edge cases
+    conference_post:
+    - at btc++ today, around if folks are here
+    - heading to the zk side event after lunch
+    - at the bitcoin builders thing, ping if nearby
+    - watching the bridge panel, some useful failure modes mentioned
+    incident_reaction:
+    - reading now, will check the affected paths
+    - not ideal, but the mitigation looks scoped
+    - tracking this, mainly worried about retry behavior
+    - will sanity check state transition assumptions here
+    news_take:
+    - new zkvm release notes look mostly integration-risky
+    - the paper is interesting, proof costs need real numbers
+    - vitalik post has the usual good framing, details matter
+    - bitcoin core release looks quiet, still worth checking edge cases
+    weekend_chatter:
+    - anyone tried the new ramen place this weekend
+    - weekend plan is mostly sleep and fixing one bicycle state transition
+    - hiked saturday, knees found the rollback path
+    - trying to keep sunday offline, likely partial success
+  person:AaronFeickert:
+    reactions:
+    - seems right
+    - lol
+    - probably fine
+    - oof
+    - nice
+    - sure
+    - hm
+    - yep
+    random:
+    - coffee machine is making a threat model argument
+    - my keyboard has chosen violence today
+    - the sandwich was better specified than expected
+    - i assume the office plant is load-bearing
+    - cat reviewed my notes by deleting exactly one lemma
+    - 'weather report: still not a protocol'
+    - this mug has worse parameter choices than i remembered
+    - lunch was acceptable under standard assumptions
+    - the elevator is doing an interactive proof of slowness
+    - someone left a banana near my desk. unclear adversary model
+    pto_announce:
+    - out tomorrow. assume async unless something is actually urgent
+    - taking pto friday. will not be reviewing anything interesting
+    - i'll be offline monday. back after the usual backlog ritual
+    - out this afternoon for boring human maintenance
+    return_from_pto:
+    - back. catching up in timestamp order
+    - back online. reading the damage now
+    - back, mostly. will reply once i reconstruct state
+    - back from pto. inbox has not improved
+    conference_post:
+    - at btc++ today. ping if you're around
+    - anyone else at zk summit or just me and the coffee line
+    - at the conference. talks currently have acceptable notation
+    - in berlin for the workshop. around between sessions
+    incident_reaction:
+    - ack. reading the disclosure before guessing
+    - i can help check assumptions once details are public
+    - bad, but let's separate exploitability from noise
+    - looking now. first step is reproducing the condition
+    news_take:
+    - paper looks interesting. security model section is doing real work
+    - release notes are better than usual. low bar, still useful
+    - the construction is neat if the parameter story holds
+    - vitalik post is reasonable, modulo the usual abstraction leakage
+    weekend_chatter:
+    - anyone tried the new ramen place this weekend
+    - weekend plan is mostly books and not proving things
+    - hiking tomorrow if the weather model converges
+    - made bread. proof failed, artifact still edible
+  person:nakkstar123:
+    reactions:
+    - lol
+    - makes sense
+    - nice
+    - yep
+    - oof
+    - fair
+    - same
+    - ship it
+    random:
+    - coffee machine has a nondeterministic failure mode again
+    - cat stepped on the keyboard, no semantic diff somehow
+    - i reduced lunch to bread and cheese, seems sufficient
+    - weather is doing the degenerate case today
+    - my headphones only fail when i need them, impressive
+    - benchmarking new tea. current winner is still earl grey
+    - the elevator is slower but has better liveness than expected
+    - found one good banana in the batch. rare valid witness
+    - desk cable situation is no longer sound
+    - i think the microwave clock has forked from reality
+    pto_announce:
+    - out tomorrow. will catch up in the evening if needed
+    - taking friday off. no strong assumptions about connectivity
+    - offline next mon-tue. can handle anything urgent before then
+    - pto for a few days. leaving notes where state matters
+    return_from_pto:
+    - back now, catching up
+    - back online. reading backlog in dependency order
+    - back from pto, will page in context slowly
+    - back. looks like a few threads need fresh assumptions
+    conference_post:
+    - at btc++ today. ping if anyone else is around
+    - zk summit hallway track is already overconstrained
+    - around the conference venue for a bit, low-latency coffee preferred
+    - going to the proving systems session, mostly for constraint cost details
+    incident_reaction:
+    - ack, reading the disclosure now
+    - not great. first reduce the affected surface
+    - i can help check the edge cases here
+    - let's separate exploitability from blast radius first
+    news_take:
+    - new paper looks interesting, but i want the soundness argument first
+    - release notes are fine. benchmark setup is the real question
+    - vitalik post is directionally useful, some assumptions need unpacking
+    - the construction is clean if the batching argument holds
+    weekend_chatter:
+    - anyone tried making decent espresso with a cheap grinder
+    - weekend plan is mostly reading and fixing sleep debt
+    - hiked a bit. knees found the edge case
+    - trying a new ramen place sunday, expecting acceptable latency
+  person:sistemd:
+    reactions:
+    - ack
+    - lol
+    - fair
+    - nice
+    - oof
+    - same
+    - checks out
+    - reasonable
+    random:
+    - coffee machine is accepting too much
+    - cat found the warm laptop invariant
+    - my calendar parser rejected monday
+    - the kitchen faucet has worse liveness than our bridge
+    - browser tabs reached unsafe depth
+    - this chair needs a withdrawal delay
+    - lunch was under-specified but passed
+    - local weather has no finality guarantees
+    - i have accidentally implemented dinner
+    - sleep schedule reorged again
+    pto_announce:
+    - out tomorrow, low signal unless bridge-shaped
+    - taking friday off, will catch async after
+    - offline next week, no useful liveness expected
+    - out for a couple days, ping only for safety issues
+    return_from_pto:
+    - back, catching up on backlog
+    - back online, reading from oldest state
+    - returned, processing messages now
+    - back, please resend anything that needs actual attention
+    conference_post:
+    - at btc++ today, around if anyone wants to compare bridge assumptions
+    - anyone else at zk summit?
+    - at the conference, hallway track has decent signal
+    - btc++ talks are good so far, fewer vibes than expected
+    incident_reaction:
+    - ack, reading the disclosure now
+    - not ideal. checking assumptions before conclusions
+    - keep calm, identify affected paths first
+    - need facts, logs, and exact trigger conditions
+    news_take:
+    - paper looks interesting, proof model is doing real work
+    - release notes are short on adversarial cases
+    - vitalik post is reasonable, but bridge details matter
+    - nice result, want to see the concrete verifier costs
+    weekend_chatter:
+    - anyone tried the new thai place this weekend?
+    - weekend plan is sleep and maybe repair the bike
+    - hiking tomorrow if the weather keeps its promise
+    - cooking something slow, monitoring only for smoke
+  person:irnb:
+    reactions:
+    - sgtm
+    - lol
+    - fair
+    - nice
+    - yep
+    - oof
+    - same
+    - ack
+    random:
+    - coffee machine has a nondeterministic failure mode
+    - cat found the warm laptop invariant
+    - i'm keeping dinner dumb on purpose
+    - rain is back, seems correct
+    - keyboard cleanup revealed an older keyboard
+    - this tea has better docs than most libraries
+    - i trust the toaster less after today
+    - 'minor update: soup was fine'
+    - my package delivery entered reorg territory
+    - evening walk fixed more than expected
+    pto_announce:
+    - out tomorrow, low signal until evening
+    - taking friday off. ping if actually urgent
+    - ooo next week, will clear loose ends tonight
+    - offline for a bit, back monday
+    return_from_pto:
+    - back, catching up now
+    - back online, reading backlog in order
+    - back. will page in context slowly
+    - returned, checking what changed
+    conference_post:
+    - at btc++ today, around after lunch
+    - anyone else at zk summit?
+    - in berlin for the conf, low async latency
+    - btc++ hallway track is doing real work
+    incident_reaction:
+    - reading the disclosure now
+    - i can help reduce this to concrete cases
+    - let's separate impact from exploitability first
+    - i'll stay on and verify the fix
+    news_take:
+    - paper looks interesting, need the exact assumptions
+    - release notes are short, diff is not
+    - the construction is clean if the boundary checks hold
+    - vitalik post has one useful framing buried in there
+    weekend_chatter:
+    - anyone tried the new ramen place yet?
+    - weekend plan is mostly sleep and one hike
+    - trying to keep saturday dependency-free
+    - made bread, tests passed enough
+  person:ProofOfKeags:
+    reactions:
+    - yep
+    - lol
+    - same
+    - rough
+    - checks out
+    - nice
+    - oof
+    - ship it
+    random:
+    - coffee machine is in degraded mode again
+    - my keyboard just produced a better test vector than me
+    - found the missing state transition in my laundry
+    - the cat sat on escape, honestly fair review
+    - i don't trust this weather edge path
+    - dinner compiled, no witnesses required
+    - airport wifi has strong testnet energy
+    - my sleep schedule forked and nobody finalized it
+    - someone should add observability to house plants
+    - the bridge from couch to desk is failing liveness
+    pto_announce:
+    - out tomorrow, will check in if anything bridge-shaped catches fire
+    - taking friday off. async me anything with concrete failure modes
+    - offline next week, back after i remember what sunlight is
+    - out for a couple days, not trusting airport wifi with context
+    return_from_pto:
+    - back, catching up on the interesting breakage first
+    - back online, reading backlog from the incident-shaped end
+    - back, will page in slowly and patch whatever i own
+    - returned, inbox has too many state transitions
+    conference_post:
+    - at btc++ today, ping if anyone wants to compare weird verifier assumptions
+    - anyone else at zk summit and hiding near the coffee
+    - at the conf, collecting edge cases in human form
+    - btc++ hallway track has better p2p gossip than expected
+    incident_reaction:
+    - ack, looking for the concrete edge path now
+    - not great. i'll trace the bridge side first
+    - ok, let's separate disclosure noise from actual reachable states
+    - owning the p2p angle, will post findings once reproducible
+    news_take:
+    - new paper looks clean, but i want the verifier assumptions spelled out
+    - release notes are fine, withdrawal edge cases still need a second read
+    - vitalik post is useful, mostly for naming the failure mode
+    - interesting zk result, reserving trust until someone writes the ugly tests
+    weekend_chatter:
+    - anyone tried the new climbing gym this weekend
+    - weekend plan is bikes unless the rain reorgs me
+    - making ramen tonight, failure mode is too much chili
+    - if anyone wants coffee sunday, i'm probably debugging sleep anyway
+  person:manishbista28:
+    reactions:
+    - lol
+    - nice
+    - fair
+    - hmm
+    - checks out
+    - oof
+    - same
+    - yep
+    random:
+    - implemented coffee first, no optimizations yet
+    - 'small caveat: my lunch assumption was false'
+    - the cat found a new edge case in my keyboard
+    - evening rain is passing small vectors now
+    - i think the microwave has nondeterministic timing
+    - keeping dinner boring for now
+    - my desk has too many constraints
+    - 'minor update: plant is still alive'
+    - not sound, but the playlist is good
+    - debugged the rice cooker. assumption was user error
+    pto_announce:
+    - i'll be out friday, offline most of the day
+    - taking pto tomorrow. async if anything is blocking
+    - out next week, will catch up in the evenings if needed
+    - i'll be offline for a few days, no strong assumptions on response time
+    return_from_pto:
+    - back now, catching up on threads
+    - back online. reading context before replying
+    - back from pto, inbox has nontrivial constraint count
+    - catching up now, will handle anything assigned
+    conference_post:
+    - anyone else at btc++ this week?
+    - at the zk side event later, curious about the proof details
+    - heading to the bitcoin meetup tonight if others are around
+    - at the conference today, mostly listening for concrete assumptions
+    incident_reaction:
+    - i can take a look, starting from the minimal repro
+    - bad, but let's separate impact from assumptions first
+    - i'm checking the edge cases now
+    - will debug from the boring path first
+    news_take:
+    - skimmed the paper. construction looks clean, assumptions need another pass
+    - release seems useful if the constraint counts are real
+    - vitalik post is interesting, but the edge cases matter here
+    - nice result. i want to see the proof details before trusting it
+    weekend_chatter:
+    - anyone tried the new ramen place this weekend?
+    - weekend plan is hiking, assuming weather behaves
+    - debugging sourdough again. witness generation still flaky
+    - might go climbing sunday evening if anyone is interested
+  person:john-light:
+    reactions:
+    - yep
+    - makes sense
+    - nice
+    - lol
+    - fair
+    - ack
+    - good catch
+    - same
+    random:
+    - coffee machine state appears non-deterministic again
+    - my calendar has achieved consensus without me
+    - small docs cleanup, but for my kitchen labels
+    - cat reviewed my notes and found them under-specified
+    - today's mental model is just tabs all the way down
+    - the printer is still the least trust-minimized system here
+    - i fixed one drawer and introduced two new edge cases
+    - weather app says clear, window says not quite
+    - lunch ordering has worse coordination assumptions than most bridges
+    - my keyboard is making a new sound, treating as suspicious
+    pto_announce:
+    - i'll be out friday, back monday
+    - offline tomorrow, will catch up when i'm back
+    - taking a few days off next week
+    - out this afternoon, nothing urgent pending from me
+    return_from_pto:
+    - back now, catching up on threads
+    - back online, reading through what i missed
+    - back today, will respond as i get context
+    - i'm back, queue is mostly sorted
+    conference_post:
+    - anyone else at btc++ this week?
+    - at the bitcoin builders thing today, slower on slack
+    - i'm around the zk sessions if folks are here
+    - at the conference, will send notes if anything looks relevant
+    incident_reaction:
+    - reading now, will avoid guessing until details settle
+    - not great. let's separate impact from speculation first
+    - i'm checking the assumptions against our bridge flow
+    - worth documenting the failure mode once the dust clears
+    news_take:
+    - paper is interesting, but the bitcoin assumptions need a closer read
+    - release notes are clearer than the thread, for once
+    - the construction looks useful if the verifier costs hold up
+    - vitalik post is reasonable, but different trust model than ours
+    weekend_chatter:
+    - anyone tried the new ramen place yet?
+    - weekend plan is mostly errands and catching up on sleep
+    - might finally clean up my home node setup
+    - 'low-context recommendation: the park was good this morning'
+  person:just-erray:
+    reactions:
+    - lol
+    - seems bounded
+    - fair
+    - oof
+    - checks out
+    - nice
+    - why though
+    - same
+    random:
+    - coffee machine has a liveness bug
+    - cat found the warm laptop invariant
+    - i trusted the microwave timer. unsound assumption.
+    - rain is fine, humidity is the actual adversary
+    - the elevator UI has spec drift
+    - my dinner constraint system is mostly carbs
+    - keyboard started double-typing. threat model expanding.
+    - this playlist is acceptable under weak assumptions
+    - someone should prove that socks disappear, not just observe it
+    - i bought one cable and somehow need three adapters
+    pto_announce:
+    - out tomorrow. no strong assumptions about connectivity.
+    - taking friday off. will catch up in the evening if needed.
+    - offline for a couple days. ping only for sharp edges.
+    - pto next week. leaving notes so the invariants are explicit.
+    return_from_pto:
+    - back. reading backlog from newest failures first.
+    - back online, catching up slowly.
+    - returned. if i missed a constraint change, point me at it.
+    - back. inbox has nontrivial size.
+    conference_post:
+    - at btc++ today. anyone else here?
+    - zk summit hallway track has better threat models than some talks
+    - at the conference, mostly near coffee and whiteboards
+    - anyone at bitcoin++ want to compare notes after the proving talks?
+    incident_reaction:
+    - looking now. first question is what invariant actually broke.
+    - bad. let's separate impact from speculation.
+    - i can help trace the edge case tonight.
+    - assume worst reasonable adversary until we bound it.
+    news_take:
+    - new paper is interesting, but the soundness assumption is doing work.
+    - release notes look fine. checking the constraint delta before trusting it.
+    - vitalik post has a useful framing, modulo the usual abstraction leak.
+    - bitcoin core change seems boring in the good way.
+    weekend_chatter:
+    - anyone tried making sourdough with actual measurements, not vibes?
+    - weekend plan is mostly walking and reducing screen time variance
+    - hiked today. knees remain the bottleneck.
+    - trying a new coffee place tomorrow if the weather behaves.
+  person:cyphersnake:
+    reactions:
+    - lol
+    - fair
+    - oof
+    - yep
+    - ack
+    - hm
+    - nice
+    - same
+    random:
+    - coffee machine invariant broken again
+    - cat sat on the keyboard. locally not green.
+    - this snack claims 2 servings. spec mismatch.
+    - late night grocery run, found only edge cases
+    - weather app says clear. empirical data disagrees.
+    - keyboard is making a new sound. not ideal.
+    - my desk has converged to mostly cables
+    - i trust this chair less every week
+    - someone left spicy chips near my laptop. risky
+    - laundry pipeline stalled at fold step
+    pto_announce:
+    - out tomorrow, will catch up async
+    - taking friday off. ping if actually urgent
+    - ooo next week, trying to reduce review latency before then
+    - offline this afternoon. assumptions should be written down
+    return_from_pto:
+    - back, catching up
+    - back online. inbox has depth
+    - back, reading threads in dependency order
+    - back now. send anything time-sensitive again if i missed it
+    conference_post:
+    - at btc++ today, around after lunch
+    - anyone else at zk summit?
+    - in the back row, debugging slides as usual
+    - conference wifi is not proving liveness
+    incident_reaction:
+    - reading the disclosure now
+    - ok, let's separate impact from noise
+    - i can help repro if there is a minimal case
+    - not enough data yet, but this looks real
+    news_take:
+    - paper is interesting, but the model assumptions need daylight
+    - release notes look clean. still want to diff the spec
+    - vitalik post has useful framing, less convinced on the edge cases
+    - the benchmark is neat, pending adversarial inputs
+    weekend_chatter:
+    - anyone tried the new ramen place this weekend?
+    - 'weekend plan: fix bike, likely discover hidden state'
+    - hiking tomorrow if the weather oracle stabilizes
+    - sunday batch cooking. mostly deterministic
+  person:barakshani:
+    reactions:
+    - nice
+    - lol
+    - yep
+    - fair
+    - oof
+    - ack
+    - same
+    - clean
+    random:
+    - coffee machine has entered consensus failure
+    - cat found the warm laptop. availability reduced.
+    - pushing a small lunch first
+    - this sandwich is mostly plumbing now
+    - keyboard battery died in the least surprising failure mode
+    - neighbor's dog has strong liveness guarantees
+    - 'added the edge case test: nap after coffee'
+    - weather app lied. need better observability.
+    - the office chair squeak is back
+    - 'small diff: replaced bad socks'
+    pto_announce:
+    - out tomorrow, back monday
+    - taking friday off. will catch up after.
+    - offline next week, low signal
+    - out for a few days. nothing blocking from me.
+    return_from_pto:
+    - back, catching up now
+    - back online. reading backlog.
+    - back today, will process threads
+    - back. looks like mostly plumbing.
+    conference_post:
+    - anyone else at btc++ this week?
+    - at zk summit today, low reply latency
+    - heading to the bitcoin conf tomorrow
+    - if you're at btc++, say hi
+    incident_reaction:
+    - ack, looking for exact failure mode
+    - bad, but debuggable. reading now.
+    - do we know impact bounds yet?
+    - need timeline and blast radius first
+    news_take:
+    - paper looks interesting, assumptions section is doing a lot
+    - release notes look fine. want to see failure cases.
+    - vitalik post is good, but bridge part needs care
+    - new zk result seems useful if prover costs hold
+    weekend_chatter:
+    - anyone tried the new ramen place this weekend?
+    - 'weekend plan is small diff: sleep'
+    - hiking tomorrow if weather doesn't fork again
+    - tested new coffee beans. acceptable latency.
+  person:chhetri22:
+    reactions:
+    - yeah
+    - makes sense
+    - lol
+    - nice
+    - sgtm
+    - fair
+    - oof
+    - checking
+    random:
+    - coffee machine has entered an undefined state
+    - my laptop fan is reviewing the room now
+    - keeping dinner boring so digestion is easier
+    - cat changed my tmux layout, no clear invariant
+    - rain is loud enough to count as pair programming
+    - i trust airport wifi approximately zero
+    - 'small cleanup: removed three stale mugs from desk'
+    - calendar says free block, reality disagrees
+    - keyboard battery died exactly at the useful moment
+    - this playlist has too much consensus and not enough execution
+    pto_announce:
+    - out tomorrow, will catch async in the evening
+    - taking friday off, nothing urgent should route through me
+    - offline for a couple days, please leave context in-thread
+    - pto next week, i'll clear review notes before then
+    return_from_pto:
+    - back, catching up on threads in timestamp order
+    - back online, reading context before replying
+    - back from pto, will triage the easy stuff first
+    - caught up enough to be useful again
+    conference_post:
+    - at btc++ today, mostly around the hallway track
+    - anyone else at zk summit, trying to map talks to actual assumptions
+    - at the conference now, wifi already needs a threat model
+    - if anyone is at bitcoin++ tonight, i'm around
+    incident_reaction:
+    - reading the disclosure now, separating impact from noise
+    - i can help trace assumptions if useful
+    - not ideal, but let's keep the timeline precise
+    - checking whether this changes any local invariants
+    news_take:
+    - new zk paper looks interesting, but the setup assumptions need a second pass
+    - bitcoin core release notes are refreshingly concrete
+    - the proof size claim is useful if the verifier model matches ours
+    - vitalik post has a good framing, less convinced on the trust boundary
+    weekend_chatter:
+    - anyone tried the new ramen place this weekend
+    - hiking plan depends on rain, so currently underspecified
+    - 'weekend invariant: no laptop after dinner, probably false'
+    - trying to keep sunday boring and recoverable
+  person:ceyhunsen:
+    reactions:
+    - ack
+    - nice
+    - lol
+    - fair
+    - makes sense
+    - checking
+    - same
+    - oof
+    random:
+    - coffee machine latency is measurable today
+    - cat found the warm laptop again
+    - i think my keyboard is developing opinions
+    - lunch plan is currently underspecified
+    - rain is making the office wifi feel more honest
+    - i'll benchmark the cookies if needed
+    - desk plant survived another week, surprising result
+    - the assumption that i bought enough coffee was false
+    - calendar says monday, but evidence is weak
+    - noise-canceling headphones are carrying this afternoon
+    pto_announce:
+    - i'll be out friday, back monday
+    - taking tomorrow off, will catch up when back
+    - offline next week, please assume slow replies
+    - out this afternoon for an appointment
+    return_from_pto:
+    - back now, catching up
+    - back online, reading backlog
+    - back today, please resend anything urgent
+    - back, going through messages in order
+    conference_post:
+    - anyone else at btc++ this week?
+    - at the zk summit today, mostly listening
+    - i'll be around the bitcoin++ venue tomorrow
+    - at sbc today, ping if nearby
+    incident_reaction:
+    - ack, looking at the disclosure now
+    - i can help check the affected assumptions
+    - will read the patch before speculating
+    - rerunning the relevant tests locally
+    news_take:
+    - new paper looks interesting, need to check the model
+    - release notes are useful, benchmarks would help
+    - the soundness section is the part to read first
+    - vitalik post has a reasonable framing, modulo assumptions
+    weekend_chatter:
+    - anyone tried the new coffee place this weekend?
+    - weekend plan is mostly offline, hopefully
+    - i may finally debug my bike brakes
+    - recommendations for quiet sunday reading welcome
+  person:sampkaALP:
+    reactions:
+    - ack
+    - lol
+    - nice
+    - fair
+    - oof
+    - same
+    - yep
+    - wild
+    random:
+    - coffee machine is degraded again
+    - keyboard battery died mid sentence. fine system.
+    - who owns the office playlist
+    - lunch status?
+    - my calendar has too many fake conflicts
+    - weather dashboard would help here
+    - cat walked over slack. no action needed
+    - this tea is better than expected
+    - standing desk stuck in incident mode
+    - need a dashboard for fridge inventory
+    pto_announce:
+    - out tomorrow. no alerts unless real.
+    - offline friday. will check handoff before i leave
+    - taking pto next week. docs should be current
+    - out for a few days. ping backup first
+    return_from_pto:
+    - back. catching up now
+    - back online. reading missed threads
+    - back. send me anything still active
+    - caught up on alerts. checking slack next
+    conference_post:
+    - at btc++ today. who else is here
+    - at the zk thing. talks are running late
+    - anyone at bitcoin++ have wifi that works
+    - conference badge acquired. finding coffee
+    incident_reaction:
+    - checking current blast radius
+    - need concrete status, not vibes
+    - i'll watch dashboards for regressions
+    - ack. starting from alerts and logs
+    news_take:
+    - paper looks useful. need benchmarks
+    - release notes are light on failure modes
+    - vitalik post is fine. want numbers
+    - new zk writeup seems sane. reading details
+    weekend_chatter:
+    - anyone tried that ramen place this weekend
+    - 'weekend plan: no dashboards'
+    - bike route recommendations?
+    - making coffee and ignoring laptop alerts
+  person:alexhui01:
+    reactions:
+    - lol
+    - ack
+    - nice
+    - oof
+    - fair
+    - yep
+    - same
+    - ok good
+    random:
+    - coffee machine is producing invalid witnesses again
+    - cat found the warm laptop invariant
+    - lunch order has too many hidden assumptions
+    - my calendar has a race condition
+    - airport wifi proving adversarial today
+    - this tea is acceptable after two retries
+    - 'found the edge case: i forgot groceries'
+    - desk plant still alive, surprising liveness result
+    - keyboard battery died at the least isolated moment
+    - weather says rain, but not committing to finality
+    pto_announce:
+    - out tomorrow, will catch up monday
+    - taking friday off, nothing blocking from my side
+    - offline next week, left notes where i had context
+    - out for a couple days, ping if something is genuinely stuck
+    return_from_pto:
+    - back, catching up on threads now
+    - back online, reading the backlog in order
+    - back today, will reply as i reload context
+    - back, looks like only a few things need attention
+    conference_post:
+    - at btc++ today, around if anyone wants to compare notes
+    - anyone else at zk summit this week?
+    - at the conference venue now, wifi seems underspecified
+    - heard one good talk on recursion assumptions, notes later
+    incident_reaction:
+    - looking now, first need the exact affected range
+    - let's pin the invariant before speculating
+    - i can help reduce this to a test case
+    - bad, but debuggable. checking the boundary conditions
+    news_take:
+    - paper looks useful, but the setup assumptions need reading carefully
+    - release notes are short on consensus-impacting detail
+    - interesting construction, want to see concrete vectors
+    - vitalik post has a good framing, but skips the annoying edge cases
+    weekend_chatter:
+    - anyone tried the new ramen place this weekend?
+    - weekend plan is mostly sleep and deleting flaky assumptions
+    - went hiking, trail markers had poor domain separation
+    - trying to keep sunday offline, with limited success
+  person:pramodkandel:
+    reactions:
+    - makes sense
+    - yeah
+    - nice
+    - lol
+    - same
+    - good catch
+    - oof
+    - fair
+    random:
+    - coffee machine docs are still unclear
+    - my notes app is just terminology drift at this point
+    - added context to my grocery list, still missed onions
+    - 'small wording update: it''s not lunch, it''s delayed breakfast'
+    - i think the plant is now in review
+    - calendar says focus time, kitchen says dishes
+    - the weather app needs a better threat model
+    - cleaned up my desk, mostly moved ambiguity elsewhere
+    - this playlist has strong launch checklist energy
+    - cat walked across the keyboard and improved the outline
+    pto_announce:
+    - i'll be out tomorrow, back monday
+    - offline friday, will catch up when i'm back
+    - taking a couple days off, notes are in docs
+    - out this afternoon for errands, nothing blocking from me
+    return_from_pto:
+    - back now, catching up on threads
+    - back online, reading through the updates
+    - back today, will sort through docs and pings
+    - i'm back, starting with the longer threads
+    conference_post:
+    - anyone else at btc++ this week?
+    - at the zk summit today, mostly taking notes
+    - heading to the bitcoin builder meetup later
+    - i'm around the conference venue if folks want to sync
+    incident_reaction:
+    - i'm reading the disclosure now, will summarize what matters
+    - checking the impact notes before we amplify anything
+    - looks serious, let's separate facts from speculation first
+    - i'll track the public updates and pull context into a doc
+    news_take:
+    - the paper is good, but the terminology section needs care
+    - interesting release, especially the migration wording
+    - vitalik post is worth reading, some definitions are doing work
+    - bitcoin core notes look straightforward, but the edge cases matter
+    weekend_chatter:
+    - anyone tried the new cafe near the office this weekend?
+    - weekend plan is mostly errands and cleaning up notes
+    - hiking tomorrow if the forecast stops changing
+    - spent saturday fixing one shelf and creating three followups
+  person:aunth:
+    reactions:
+    - ack
+    - nice
+    - lol
+    - makes sense
+    - same
+    - oof
+    - yep
+    - checking
+    random:
+    - coffee machine timed out again
+    - keyboard battery died mid-sentence, reasonable failure mode
+    - neighbor wifi is flapping harder than my local node
+    - cat walked across the keyboard, no consensus changes
+    - that meme needs a repro
+    - lunch path is blocked by rain
+    - still not trusting bluetooth today
+    - desk cable routing is mostly plumbing
+    - my router rebooted itself. rude but informative
+    - the dishwasher has bad message ordering
+    pto_announce:
+    - out tomorrow, back monday
+    - taking friday off, will catch up after
+    - offline for a few days. nothing urgent pending from me
+    - pto this afternoon, will be back normal hours tomorrow
+    return_from_pto:
+    - back, catching up now
+    - back online, reading the backlog
+    - back today. send me anything that needs attention
+    - caught up on most of it, still checking threads
+    conference_post:
+    - at btc++ today, around if anyone wants to compare notes
+    - heading to zk summit tomorrow
+    - anyone else at bitcoin++ this week
+    - at the conf venue now, wifi is predictably suspect
+    incident_reaction:
+    - ack, checking traces
+    - i can look at peer behavior
+    - need timestamps and affected nodes
+    - will help narrow the ordering path
+    news_take:
+    - paper looks interesting, need to read the network assumptions
+    - release notes are light on p2p details
+    - the construction seems fine, unclear on edge cases
+    - vitalik post is worth reading, some transport assumptions are doing work
+    weekend_chatter:
+    - anyone tried the new ramen place this weekend
+    - weekend plan is mostly offline
+    - might debug my home network, unfortunately
+    - hiking tomorrow if the weather path clears
+  person:madan-oss:
+    reactions:
+    - ack
+    - fair
+    - lol
+    - same
+    - hm
+    - yep
+    - strong claim
+    - checks out
+    random:
+    - coffee machine has entered an invalid state
+    - my dinner proof is mostly handwavy tonight
+    - cat stepped on caps lock, no consensus impact
+    - this playlist has fewer edge cases than expected
+    - i distrust weather apps on principle now
+    - keyboard battery died exactly at the commit message
+    - ordering food is just distributed systems with worse observability
+    - small walk, mostly debugging my spine
+    - 'the invariant is: no meetings after soup'
+    - i have no model for why this plant is still alive
+    pto_announce:
+    - out tomorrow, low signal unless something is actually on fire
+    - 'taking friday off. assumptions: i will not read slack'
+    - offline for a few days, back monday evening
+    - pto today. please treat my silence as expected behavior
+    return_from_pto:
+    - back, catching up on the relevant threads
+    - online again, reading from oldest invariants first
+    - back now. send me anything that still needs eyes
+    - caught up enough to be useful again
+    conference_post:
+    - at btc++ today, mostly listening for concrete threat models
+    - anyone else at zk summit? i'm around after the talks
+    - conference wifi is making bold liveness assumptions
+    - at the bitcoin++ venue, ping if you want to compare notes
+    incident_reaction:
+    - ok, reading the disclosure before forming opinions
+    - bad. first step is bounding affected assumptions
+    - i can help trace the edge cases this touches
+    - let's separate confirmed impact from speculation
+    news_take:
+    - new paper looks interesting, but the setup assumptions need scrutiny
+    - release notes are short; diff is probably the real spec
+    - vitalik post has useful framing, less convinced by the complexity budget
+    - nice result if the proof obligations are actually that small
+    weekend_chatter:
+    - anyone tried the new ramen place this weekend?
+    - 'weekend plan: sleep, laundry, maybe prove i own a kitchen'
+    - hiking tomorrow if the weather model holds
+    - sunday evening debugging groceries, low confidence
+  person:ali-rezai:
+    reactions:
+    - lol
+    - nice
+    - ack
+    - fair
+    - same
+    - oof
+    - looks right
+    - ship it
+    random:
+    - coffee machine emitted the wrong format again
+    - keyboard has entered degraded mode
+    - lunch ordering needs stricter validation
+    - my desk cable graph is no longer acyclic
+    - cat found the warm laptop path
+    - this weather has bad liveness
+    - updated my chair config, seems compatible
+    - the office mugs need stable ordering
+    - headphones were paired to the wrong container
+    - tea fixed the local state
+    pto_announce:
+    - out tomorrow, back monday
+    - taking friday off, will catch up after
+    - offline next week, no expected responses
+    - out this afternoon for an appointment
+    return_from_pto:
+    - back, reading backlog
+    - back online, catching up now
+    - back today, processing messages in order
+    - returned, will sync on anything still active
+    conference_post:
+    - at btc++ today, ping if nearby
+    - will be at zk summit tomorrow
+    - anyone else at bitdevs tonight
+    - at the conf, mostly in the hallway track
+    incident_reaction:
+    - ack, looking for concrete repro vectors
+    - low drama path is isolate first
+    - need exact versions before concluding anything
+    - i can help reduce the failing case
+    news_take:
+    - paper looks useful, need test vectors
+    - release notes are sparse but the change seems bounded
+    - interesting post, but the edge cases need spelling out
+    - worth reading, especially the encoding assumptions
+    weekend_chatter:
+    - anyone tried the new ramen place this weekend
+    - weekend plan is mostly sleep and fixing my bike
+    - hiking saturday if the weather stays valid
+    - going offline for a bit, backlog monday
+  person:arminsabouri:
+    reactions:
+    - yep
+    - lol
+    - hm
+    - makes sense
+    - nice
+    - oof
+    - ack
+    - same
+    random:
+    - coffee machine is retrying without backoff again
+    - keyboard decided space is optional today
+    - neighbor's wifi has better uptime than my router
+    - small lunch walk, will check logs after
+    - cat stepped on enter, no damage observed
+    - rain started exactly when i left, expected behavior
+    - desk cable situation is mostly plumbing, nothing fancy
+    - does anyone have a decent monitor arm rec
+    - mic was muted. probably for the best
+    - local espresso path is broken, debugging
+    pto_announce:
+    - out tomorrow, will be offline unless something is burning
+    - taking friday off. anything async is fine
+    - ooo next week, back monday. no pager on my side
+    - stepping out for the afternoon, will catch up later
+    return_from_pto:
+    - back now, reading through threads
+    - back, catching up on logs and pings
+    - online again. send anything that still needs eyes
+    - back from pto, inbox has expected backlog
+    conference_post:
+    - at btc++ today, around if anyone wants to compare notes
+    - anyone else at zk summit or just me
+    - heading to the talks after coffee, ping if nearby
+    - conference wifi is behaving suspiciously well
+    incident_reaction:
+    - i'll watch the logs and check retry behavior
+    - let's get timestamps first before guessing
+    - owning rpc-side checks now
+    - pulling metrics, will post anything concrete
+    news_take:
+    - new paper looks interesting, need to read the failure assumptions
+    - release notes mention rpc changes, worth checking edge cases
+    - vitalik post has one async bit i want to reread
+    - proof latency claims look good, curious about the benchmark setup
+    weekend_chatter:
+    - anyone tried the new ramen spot this weekend
+    - weekend plan is mostly sleep and fixing my router
+    - hiking tomorrow if weather does not flake
+    - 'sunday build: shelves, hopefully fewer retries'
+  person:Arniiiii:
+    reactions:
+    - lol
+    - nice
+    - yep
+    - oof
+    - fair
+    - hm
+    - same
+    - good catch
+    random:
+    - coffee machine is doing a weird retry loop
+    - cat found the warm laptop path
+    - weather looks flaky, staying local
+    - lunch plan is mostly plumbing, not much magic
+    - my headphones paired with the wrong peer again
+    - found one weird timeout case in my oven
+    - keyboard is dropping keys, concrete repro pending
+    - someone left a very optimistic banana in the kitchen
+    - the office wifi has strong main character energy today
+    - tea fixed the local failure mode
+    pto_announce:
+    - out tomorrow, back monday
+    - taking friday off, will catch up after
+    - offline for a couple days, nothing urgent from me
+    - out this afternoon, ping if something needs handoff
+    return_from_pto:
+    - back, catching up now
+    - back online, reading backlog
+    - back, inbox has some churn
+    - around again, will unwind threads today
+    conference_post:
+    - at btc++ today, ping if around
+    - anyone else at the zk thing tomorrow?
+    - in berlin for the conference, low bandwidth this week
+    - heading to the talks now, mostly listening
+    incident_reaction:
+    - looking now, need concrete repro
+    - i can help trace peer behavior
+    - owning the network-side check
+    - seems like a bad edge case, digging
+    news_take:
+    - paper looks interesting, assumptions need a closer read
+    - release notes seem sane, tests matter here
+    - vitalik post is fine, threat model does the work
+    - nice result if the network assumptions hold
+    weekend_chatter:
+    - anyone tried the new ramen place this weekend?
+    - offline most of saturday, doing normal life stuff
+    - 'weekend plan is simple: sleep, groceries, maybe logs'
+    - hiking sunday if the weather stops flapping

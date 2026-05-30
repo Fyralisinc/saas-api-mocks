@@ -1,0 +1,188 @@
+id: THR-002-strategic-round
+title: Strategic Round Technical Diligence
+window:
+  start: 2025-01-09
+  end: 2025-04-09
+driver: person:pramodkandel
+cast:
+- person:pramodkandel
+- person:john-light
+- person:prajwolrg
+- person:MdTeach
+- person:Rajil1213
+- person:AaronFeickert
+- person:krsnapaudel
+- person:delbonis
+linked_anchors:
+- milestone:strategic-round
+linked_products:
+- product:strata
+- product:strata-bridge
+- product:glock
+- product:bitcoin-dollar
+linked_repos:
+- repo:Technical-Whitepaper
+- repo:alpen
+- repo:strata-bridge
+- repo:zkaleido
+- repo:bitcoin-bosd
+beats:
+- id: B1
+  start: 2025-01-09
+  end: 2025-01-19
+  kind: kickoff
+  summary: Pramod opens the diligence room plan and asks protocol, bridge, and research leads for a two-week package covering
+    Strata state, bridge risk, proving roadmap, and Bitcoin-dollar positioning.
+  participants:
+  - person:pramodkandel
+  - person:john-light
+  - person:prajwolrg
+  - person:MdTeach
+  - person:Rajil1213
+  - person:AaronFeickert
+  tensions:
+  - technical depth versus investor readability
+  - incomplete bridge threat model
+  - whitepaper sections out of date
+- id: B2
+  start: 2025-01-20
+  end: 2025-02-02
+  kind: design
+  summary: Prajwol and MdTeach draft the Strata execution and settlement brief while Aaron rewrites the ZK assumptions section
+    to separate current implementation from target architecture.
+  participants:
+  - person:prajwolrg
+  - person:MdTeach
+  - person:AaronFeickert
+  - person:john-light
+  tensions:
+  - settlement terminology still inconsistent
+  - proof latency numbers missing
+  - review bandwidth concentrated on two senior engineers
+- id: B3
+  start: 2025-02-03
+  end: 2025-02-16
+  kind: impl
+  summary: Rajil turns bridge questions from early investor calls into a repo-backed risk register and starts landing small
+    clarifying PRs in strata-bridge instead of keeping answers only in slides.
+  participants:
+  - person:Rajil1213
+  - person:ProofOfKeags
+  - person:prajwolrg
+  - person:pramodkandel
+  tensions:
+  - bridge answers depend on protocol finality wording
+  - PRs queue behind release work
+  - slide claims need source links
+- id: B4
+  start: 2025-02-17
+  end: 2025-03-02
+  kind: review
+  summary: John consolidates the first diligence memo, but the team pulls back a planned "mainnet timeline" page after reviewers
+    flag that external dates were firmer than engineering confidence.
+  participants:
+  - person:john-light
+  - person:pramodkandel
+  - person:prajwolrg
+  - person:AaronFeickert
+  - person:Rajil1213
+  tensions:
+  - commercial timeline pressure
+  - reviewers asking for precise dates
+  - protocol milestones still moving
+- id: B5
+  start: 2025-03-03
+  end: 2025-03-16
+  kind: audit
+  summary: Krsna joins the diligence thread from infra and adds reproducible deployment notes, dashboard gaps, and a short
+    incident-response appendix for investor security review.
+  participants:
+  - person:krsnapaudel
+  - person:MdTeach
+  - person:Rajil1213
+  - person:pramodkandel
+  tensions:
+  - new infra owner ramping midstream
+  - monitoring screenshots not yet investor-safe
+  - incident process exists more in Slack than docs
+- id: B6
+  start: 2025-03-17
+  end: 2025-03-26
+  kind: design
+  summary: The narrative shifts from a product roadmap deck to a protocol-readiness dossier, with Bitcoin Dollar framed as
+    a downstream market unlocked by Strata rather than part of the near-term ship plan.
+  participants:
+  - person:pramodkandel
+  - person:john-light
+  - person:prajwolrg
+  - person:AaronFeickert
+  tensions:
+  - positioning change requires deck rewrites
+  - Bitcoin Dollar scope narrowed late
+  - research caveats compete with fundraising clarity
+- id: B7
+  start: 2025-03-27
+  end: 2025-04-02
+  kind: ship
+  summary: Delbonis and MdTeach close the last source-linked repo references while Pramod publishes the clean diligence room
+    with a changelog and answer bank for partner calls.
+  participants:
+  - person:delbonis
+  - person:MdTeach
+  - person:pramodkandel
+  - person:john-light
+  - person:krsnapaudel
+  tensions:
+  - last-minute repo link cleanup
+  - duplicated answers across memo and FAQ
+  - final review lands after two investor calls
+- id: B8
+  start: 2025-04-03
+  end: 2025-04-09
+  kind: retro
+  summary: After the strategic round announcement work wraps, the team records what slipped, which technical claims need owners,
+    and which diligence artifacts should become maintained product docs.
+  participants:
+  - person:pramodkandel
+  - person:john-light
+  - person:prajwolrg
+  - person:Rajil1213
+  - person:krsnapaudel
+  - person:AaronFeickert
+  tensions:
+  - fundraise artifacts drifting from canonical docs
+  - ownership unclear after announcement
+  - fatigue from parallel roadmap and diligence work
+artifacts:
+- kind: rfc
+  title: Strategic Round Diligence Room Scope
+  beat: B1
+  author: person:pramodkandel
+- kind: design_doc
+  title: Strata Settlement and Proof Readiness Brief
+  beat: B2
+  author: person:prajwolrg
+- kind: design_doc
+  title: Strata Bridge Risk Register for Strategic Diligence
+  beat: B3
+  author: person:Rajil1213
+- kind: rfc
+  title: Investor-Facing Roadmap Claims Policy
+  beat: B4
+  author: person:john-light
+- kind: design_doc
+  title: Diligence Infra Appendix and Response Playbook
+  beat: B5
+  author: person:krsnapaudel
+- kind: all_hands_recap
+  title: Strategic Round Technical Narrative and Announcement Prep
+  beat: B7
+  author: person:pramodkandel
+- kind: retro
+  title: Strategic Round Diligence Retro
+  beat: B8
+  author: person:john-light
+tensions:
+- investor narrative kept getting ahead of protocol confidence
+- bridge and infra answers depended on senior reviewers already committed to release work
+- several fundraising artifacts needed to become canonical docs instead of one-off collateral

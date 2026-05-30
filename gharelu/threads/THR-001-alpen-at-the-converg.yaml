@@ -1,0 +1,152 @@
+id: THR-001-alpen-at-the-converg
+title: Public Launch Narrative and First Technical Blog
+window:
+  start: 2024-04-09
+  end: 2024-07-08
+driver: person:pramodkandel
+cast:
+- person:pramodkandel
+- person:chhetri22
+- person:delbonis
+- person:bewakes
+- person:prajwolrg
+- person:MdTeach
+linked_anchors:
+- milestone:alpen-at-the-convergence-of-two-revolutions
+linked_products:
+- product:strata
+linked_repos:
+- repo:alpen
+- repo:Technical-Whitepaper
+- repo:.github
+beats:
+- id: B1
+  start: 2024-04-09
+  end: 2024-04-21
+  kind: kickoff
+  summary: Pramod frames the launch around Bitcoin-native finance while Abishkar collects protocol claims that can be said
+    publicly without overpromising implementation maturity.
+  participants:
+  - person:pramodkandel
+  - person:chhetri22
+  tensions:
+  - unclear boundary between vision and roadmap
+  - missing canonical protocol terminology
+- id: B2
+  start: 2024-04-22
+  end: 2024-05-05
+  kind: design
+  summary: Abishkar drafts the first narrative outline and Trey joins in his first week to sanity-check how Strata should
+    be described against the early repo architecture.
+  participants:
+  - person:pramodkandel
+  - person:chhetri22
+  - person:delbonis
+  tensions:
+  - new engineer onboarding during review
+  - architecture still moving under the draft
+- id: B3
+  start: 2024-05-06
+  end: 2024-05-19
+  kind: design
+  summary: The team splits the launch material into a public blog post, a deeper technical appendix, and a private reviewer
+    note for claims that need more evidence.
+  participants:
+  - person:pramodkandel
+  - person:chhetri22
+  - person:delbonis
+  tensions:
+  - single post becoming too dense
+  - reviewer note blocking publish confidence
+- id: B4
+  start: 2024-05-20
+  end: 2024-06-02
+  kind: impl
+  summary: Bibek and Prajwol arrive in consecutive weeks and turn scattered protocol notes into concrete diagrams, repo references,
+    and a launch glossary.
+  participants:
+  - person:bewakes
+  - person:prajwolrg
+  - person:delbonis
+  - person:pramodkandel
+  tensions:
+  - terminology churn
+  - onboarding pull requests competing with launch edits
+- id: B5
+  start: 2024-06-03
+  end: 2024-06-16
+  kind: review
+  summary: Pramod drives a review queue across the blog draft and Technical-Whitepaper notes while Trey pushes back on wording
+    that implies finalized consensus behavior.
+  participants:
+  - person:pramodkandel
+  - person:delbonis
+  - person:bewakes
+  - person:prajwolrg
+  tensions:
+  - review queue backs up behind protocol questions
+  - launch date pressure
+- id: B6
+  start: 2024-06-17
+  end: 2024-06-23
+  kind: review
+  summary: Abishek joins and takes a narrow pass over the alpen repo references, catching two outdated descriptions and one
+    internal acronym that had leaked into the public draft.
+  participants:
+  - person:MdTeach
+  - person:pramodkandel
+  - person:chhetri22
+  - person:delbonis
+  tensions:
+  - late reviewer finds real issues
+  - glossary no longer matches draft examples
+- id: B7
+  start: 2024-06-24
+  end: 2024-06-30
+  kind: ship
+  summary: The launch copy is frozen after a final reduction of technical claims, with the first blog post positioned as the
+    opening thesis rather than a product announcement.
+  participants:
+  - person:pramodkandel
+  - person:chhetri22
+  - person:prajwolrg
+  - person:MdTeach
+  tensions:
+  - less technical detail than engineers wanted
+  - publish checklist owned by one person
+- id: B8
+  start: 2024-07-01
+  end: 2024-07-08
+  kind: retro
+  summary: The team records what slipped from the launch package into follow-up work, including a public technical explainer
+    and cleaner repo-level onboarding docs.
+  participants:
+  - person:pramodkandel
+  - person:delbonis
+  - person:bewakes
+  - person:prajwolrg
+  - person:MdTeach
+  tensions:
+  - follow-up docs lack owners
+  - blog feedback creates new roadmap questions
+artifacts:
+- kind: design_doc
+  title: Public Launch Message Architecture
+  beat: B2
+  author: person:pramodkandel
+- kind: rfc
+  title: Public Claims Boundary for Strata Launch Materials
+  beat: B3
+  author: person:chhetri22
+- kind: design_doc
+  title: Strata Launch Glossary and Diagram Notes
+  beat: B4
+  author: person:prajwolrg
+- kind: retro
+  title: First Blog Launch Retro and Follow-Up Queue
+  beat: B8
+  author: person:pramodkandel
+tensions:
+- launch narrative needed to move faster than protocol docs
+- early engineers disagreed on how much architecture to expose
+- public wording repeatedly lagged behind repo and whitepaper edits

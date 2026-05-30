@@ -1,0 +1,332 @@
+# Using the Alpen CLI
+
+The Alpen CLI is a Rust command line interface that allows you to interact with Alpen, the [bitcoin bridge](/how-alpen-works/bitcoin-bridge.md), and an associated signet bitcoin network.
+
+### Installation <a href="#user-content-installation" id="user-content-installation"></a>
+
+{% hint style="info" %}
+If you are running Linux, you need a C/C++ compiler along with `libssl` and development libraries and tools required for compiling software.\
+\
+In Debian/Ubuntu flavored distributions you can install them with:\
+\
+`sudo apt install build-essential libssl-dev pkg-config`
+{% endhint %}
+
+Ensure you have Cargo installed. If you don't have it, we recommend you install it using [Rustup](https://rustup.rs/). Then run:
+
+{% code overflow="wrap" %}
+
+```
+cargo install --git https://github.com/alpenlabs/alpen --branch releases/0.2.0 alpen-cli@0.2.0 --locked --force
+```
+
+{% endcode %}
+
+This will compile and install the binary into your system path. It may take a few minutes depending on how powerful your hardware is.
+
+#### Configure the CLI <a href="#user-content-configure-the-cli" id="user-content-configure-the-cli"></a>
+
+Before using the CLI, run `alpen config` to find the location of your `config.toml` file. The output will look like:
+
+```
+~/.config/alpen/config.toml # Linux
+~/Library/Application Support/io.alpenlabs.alpen/config.toml # MacOS
+C:\Users\<USER>\AppData\Roaming\alpen\config.toml # Windows
+```
+
+{% hint style="info" %}
+Note for macOS: If using the terminal, make sure to escape the space in "Application Support", e.g.:\
+\~/Library/Application\ Support/io.alpenlabs.alpen/config.toml
+{% endhint %}
+
+If the directory containing `config.toml` file does not exist, create the directory. Open the file (or create if it does not exist) and save the following configuration:
+
+```
+# Use esplora for the bitcoin signet backend
+esplora = "https://esplora.testnet.alpenlabs.io"
+# EVM-compatible endpoint for Alpen transactions
+alpen_endpoint = "https://rpc.testnet.alpenlabs.io"
+# Alpen's hosted faucet API
+faucet_endpoint = "https://faucet-api.testnet.alpenlabs.io"
+# mempool.space instance to explore the bitcoin signet
+mempool_endpoint = "https://bitcoin.testnet.alpenlabs.io"
+# Blockscout instance to explore Alpen's chain
+blockscout_endpoint = "https://explorer.testnet.alpenlabs.io"
+# Bridge multisig public key
+bridge_pubkey = "50eaad3a98150e584555f1e4a479be2d8ccd8927a4ec3df075d3c65161f47295"
+# Prefix added to OP_RETURN metadata to identify deposit requests
+magic_bytes = "alpn"
+```
+
+Then save and close the file. Now the CLI is ready to use.
+
+{% hint style="info" %}
+If you are updating an existing `config.toml`, do a seed phrase backup with `alpen backup` then run `alpen reset`. Otherwise, the CLI may show an incorrect wallet balance, which may cause problems when spending your coins.
+
+Follow the `alpen scan` instructions in the [dedicated section below](#user-content-scan-your-wallet) to restore your spendable balance.
+{% endhint %}
+
+### How to use <a href="#user-content-how-to-use" id="user-content-how-to-use"></a>
+
+The CLI is your entrypoint for interacting with Alpen.
+
+Run `alpen --help` to display the help message. If you're using a newer version, the output might be slightly different.
+
+```
+Usage: alpen <command> [<args>]
+
+A CLI for interacting with Alpen and the underlying bitcoin (signet) network
+
+Options:
+  --help, help      display usage information
+
+Commands:
+  recover           Attempts a recovery of old deposit transactions
+  drain             Drains the internal wallet to the provided signet or Alpen
+                    address
+  balance           Prints the wallet's current balance(s)
+  backup            Prints a BIP39 mnemonic encoding the internal wallet's seed
+                    bytes
+  deposit           Deposits 10 BTC from signet into Alpen
+  withdraw          Withdraws 10 BTC from Alpen to signet
+  faucet            Requests BTC from the faucet
+  send              Sends BTC from the internal wallet
+  receive           Prints a new address for the internal wallet
+  change-password   Changes the seed's encryption password
+  reset             DANGER: resets the CLI completely, destroying all keys and
+                    databases. Keeps config.
+  scan              Performs a full scan of the signet wallet
+  config            Prints the location of the CLI's TOML config file
+  debug             Various debug utilities
+```
+
+The CLI is composed of multiple commands. You can append `--help` to any command to get more details about what the command does and what arguments it supports.
+
+Available via commands are a bitcoin signet wallet and an EVM-compatible Alpen wallet, allowing you to use Alpen without any other tools. For example, the CLI can help you deposit into and withdraw BTC from Alpen via the `deposit` and `withdraw` commands, respectively.
+
+The first time you make a command in the CLI, you will be asked to create a new password to encrypt the wallet's secret. If you're using Windows or macOS, `alpen` will store the encrypted secret in the operating system's keychain. On Linux, it is stored in a file in the user's home directory.
+
+#### Backup your wallet <a href="#user-content-backup-your-wallet" id="user-content-backup-your-wallet"></a>
+
+Before you start, you should make sure to backup your wallet.
+
+```
+Usage: alpen backup [--language <language>]
+
+Prints a BIP39 mnemonic encoding the internal wallet's seed bytes
+
+Options:
+  --language        select a language for the BIP39 mnemonic. defaults to
+                    English. options: en, cn, cn-trad, cz, fr, it, jp, kr or es
+  --help, help      display usage information
+```
+
+Keep this backup safe; your funds will be lost if you lose it. **Don't reset a wallet when you have deposit transactions that haven't either been received on Alpen yet or recovered, as the database that stores recovery information is separate to your seed, and it will be very difficult to recover those funds.**
+
+When you restore your wallet, make sure to run the command [`alpen scan`](/welcome/using-the-alpen-cli.md#user-content-scan-your-wallet) so the CLI can find all your previous funds. This process can take some time, depending on how many UTXOs you have.
+
+#### Request BTC <a href="#user-content-request-btc" id="user-content-request-btc"></a>
+
+Alpen uses a custom signet where Alpen Labs is the only miner. We have a faucet that you can request BTC from via the CLI.
+
+```
+Usage: alpen faucet <network_type> [<address>]
+
+Requests BTC from the faucet
+
+Positional Arguments:
+  network_type      either "signet" or "alpen"
+  address           address that funds will be sent to. defaults to internal
+                    wallet address
+
+Options:
+  --help, help      display usage information
+```
+
+To receive \~10 BTC to test, run this command. If you haven't created a wallet yet, this will prompt you for a password to encrypt a new one.
+
+```
+alpen faucet signet
+```
+
+Our signet has block time of 10 minutes, similar to the average block time on bitcoin mainnet. After requesting funds from the faucet, you can check if they have arrived by viewing the recent transactions in the [signet explorer](https://bitcoin.testnet.alpenlabs.io/).
+
+#### Check your balance <a href="#user-content-check-your-balance" id="user-content-check-your-balance"></a>
+
+```
+Usage: alpen balance <network_type>
+
+Prints the wallet's current balance(s)
+
+Positional Arguments:
+  network_type      either "signet" or "alpen"
+
+Options:
+  --help, help      display usage information
+```
+
+#### Deposit BTC into Alpen <a href="#user-content-deposit-btc-into-alpen" id="user-content-deposit-btc-into-alpen"></a>
+
+After you have more than 10 BTC, you can make a deposit into Alpen.
+
+```
+Usage: alpen deposit [<alpen_address>] [--fee-rate <fee-rate>]
+
+Deposits 10 BTC from signet into Alpen
+
+Positional Arguments:
+  alpen_address     the Alpen address to deposit the funds into. defaults to the
+                    wallet's internal address
+
+Options:
+  --fee-rate        override signet fee rate in sat/vbyte. must be >=1
+  --help, help      display usage information
+```
+
+To deposit 10 BTC from the internal signet wallet into the internal Alpen wallet, run this command.
+
+```
+alpen deposit
+```
+
+If the funds are not available in your Alpen wallet (check using `alpen balance alpen`) after 1,008 signet blocks, you can run the `recover` command to perform an autorecovery.
+
+#### Withdraw BTC back to signet <a href="#user-content-withdraw-btc-back-to-signet" id="user-content-withdraw-btc-back-to-signet"></a>
+
+To withdraw BTC from your Alpen wallet to a signet address, use the following command. If an address is provided, it must be a P2TR address. If an address isn't provided, the CLI will send to an unused signet address from its own wallet. As with the deposit, the withdrawal amount must be exactly 10 BTC.
+
+```
+Usage: alpen withdraw [<p2tr_address>]
+
+Withdraws 10 BTC from Alpen to signet
+
+Positional Arguments:
+  p2tr_address      the signet address to send funds to. defaults to a new
+                    internal wallet address
+
+Options:
+  --help, help      display usage information
+```
+
+#### Send BTC <a href="#user-content-send-btc" id="user-content-send-btc"></a>
+
+You can send BTC from the internal signet or Alpen wallet via the `alpen send` command. Use the `fee-rate` option to override the automatically determined fee rate. If you want to drain your wallet, see the [drain command](#user-content-drain-the-wallet).
+
+```
+Usage: alpen send <network_type> <amount> <address> [--fee-rate <fee-rate>]
+
+Sends BTC from the internal wallet.
+
+Positional Arguments:
+  network_type      either "signet" or "alpen"
+  amount            amount to send in sats
+  address           address to send to
+
+Options:
+  --fee-rate        override signet fee rate in sat/vbyte. must be >=1
+  --help, help      display usage information
+```
+
+**Receive BTC**
+
+You can generate an address for receiving BTC using the `receive` command. For the Alpen wallet, this will always return the same address. The Alpen wallet creates an EVM-compatible externally owned account (EOA) with the following BIP44 derivation path: `m/44'/60'/0'/0/0`.
+
+The signet wallet will print a different address every time, which is a [BIP-86](https://github.com/bitcoin/bips/blob/master/bip-0086.mediawiki) P2TR address.
+
+```
+Usage: alpen receive <network_type>
+
+Prints a new address for the internal wallet
+
+Positional Arguments:
+  network_type      either "signet" or "alpen"
+
+Options:
+  --help, help      display usage information
+```
+
+#### Change wallet password <a href="#user-content-change-wallet-password" id="user-content-change-wallet-password"></a>
+
+The `change-password` command will load your existing seed, decrypt it, and then prompt you for a new password, encrypt the seed with the new password, and overwrite the old encrypted seed.
+
+```
+Usage: alpen change-password
+
+Changes the seed's encryption password
+
+Options:
+  --help, help      display usage information
+```
+
+#### Drain the wallet <a href="#user-content-drain-the-wallet" id="user-content-drain-the-wallet"></a>
+
+If you want to send all of your funds to a single address. To do this, run the `alpen drain` command.
+
+Signet funds can only be drained to another signet address, and Alpen funds can only be drained to another Alpen address. This command will not implicitly deposit/withdraw funds between the two wallets.
+
+```
+Usage: alpen drain [-s <signet-address>] [-r <alpen-address>] [--fee-rate <fee-rate>]
+
+Drains the internal wallet to the provided signet and Alpen addresses
+
+Options:
+  -s, --signet-address
+                    a signet address for signet funds to be drained to
+  -r, --alpen-address
+                    an Alpen address for Alpen funds to be drained to
+  --fee-rate        override signet fee rate in sat/vbyte. must be >=1
+  --help, help      display usage information
+```
+
+#### Recover <a href="#user-content-recover" id="user-content-recover"></a>
+
+To recover any failed/expired deposit transactions, use the `recover` command.
+
+Recovery of failed deposit transactions can be made 1,008 signet blocks after the deposit transaction was confirmed. With a 10 minute block time, that's about 1 week.
+
+```
+Usage: alpen recover [--fee-rate <fee-rate>]
+
+Attempts a recovery of old deposit transactions
+
+Options:
+  --fee-rate        override signet fee rate in sat/vbyte. must be >=1
+  --help, help      display usage information
+```
+
+#### Scan your wallet <a href="#user-content-scan-your-wallet" id="user-content-scan-your-wallet"></a>
+
+The `scan` command scans the signet for coins belonging to the internal wallet. This should be used after restoring Alpen CLI from a BIP-39 mnemonic.
+
+```
+Usage: alpen scan
+
+Performs a full scan of the signet wallet
+
+Options:
+  --help, help      display usage information
+```
+
+### Configuration <a href="#user-content-configuration" id="user-content-configuration"></a>
+
+The CLI uses a TOML file for configuration. This is for *advanced users only*.
+
+To find your config file location, run `alpen config`. You can then open this file in an editor. You may only change the keys listed in the file if you want to use alternatives to the defaults provided.<br>
+
+
+---
+
+# Agent Instructions: Querying This Documentation
+
+If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
+
+Perform an HTTP GET request on the current page URL with the `ask` query parameter:
+
+```
+GET https://docs.alpenlabs.io/welcome/using-the-alpen-cli.md?ask=<question>
+```
+
+The question should be specific, self-contained, and written in natural language.
+The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
+
+Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.

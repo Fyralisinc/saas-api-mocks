@@ -1,0 +1,195 @@
+id: THR-010-mosaic
+title: Mosaic Data Availability Hardening
+window:
+  start: 2025-10-14
+  end: 2026-10-14
+driver: person:uncomputable
+cast:
+- person:uncomputable
+- person:Rajil1213
+- person:ProofOfKeags
+- person:Zk2u
+- person:mukeshdroid
+- person:cyphersnake
+- person:krsnapaudel
+linked_anchors:
+- repo:mosaic
+linked_products:
+- product:mosaic
+- product:strata
+linked_repos:
+- repo:mosaic
+- repo:mosaic-torrent
+- repo:alpen
+- repo:strata-p2p
+- repo:alpen-dashboards
+beats:
+- id: B1
+  start: 2025-10-14
+  end: 2025-11-03
+  kind: kickoff
+  summary: person:uncomputable scopes the next Mosaic cycle around making blob retrieval predictable enough for Strata testnet
+    operators instead of treating the torrent path as a research prototype.
+  participants:
+  - person:uncomputable
+  - person:Rajil1213
+  - person:ProofOfKeags
+  - person:Zk2u
+  tensions:
+  - unclear owner boundary between bridge and research
+  - old mosaic-torrent assumptions still undocumented
+- id: B2
+  start: 2025-11-04
+  end: 2025-12-01
+  kind: design
+  summary: person:uncomputable drafts the provider-selection RFC while person:Zk2u and person:mukeshdroid pressure-test the
+    sampling model against adversarial seeding and partial availability cases.
+  participants:
+  - person:uncomputable
+  - person:Zk2u
+  - person:mukeshdroid
+  - person:Rajil1213
+  tensions:
+  - sampling target changes twice
+  - research comments arrive after bridge implementation planning starts
+- id: B3
+  start: 2025-12-02
+  end: 2026-01-12
+  kind: impl
+  summary: person:Rajil1213 lands the first steady stream of Rust changes in repo:mosaic for chunk manifests and provider
+    scoring, while person:ProofOfKeags picks up the slower retry-state work after holiday gaps.
+  participants:
+  - person:Rajil1213
+  - person:ProofOfKeags
+  - person:uncomputable
+  tensions:
+  - manifest format churn
+  - retry state tests expose nondeterministic peer ordering
+- id: B4
+  start: 2026-01-13
+  end: 2026-02-16
+  kind: design
+  summary: The team redirects from a generic gossip integration to a narrower strata-p2p adapter after person:krsnapaudel
+    shows that the original plan would complicate node deployment and observability.
+  participants:
+  - person:uncomputable
+  - person:krsnapaudel
+  - person:Rajil1213
+  - person:ProofOfKeags
+  tensions:
+  - deployment shape blocks protocol review
+  - adapter ownership split across repos
+- id: B5
+  start: 2026-02-17
+  end: 2026-03-30
+  kind: impl
+  summary: person:ProofOfKeags implements the strata-p2p adapter in small PRs, person:Rajil1213 rewrites manifest validation
+    around the new transport, and person:uncomputable keeps the RFC current as the shipped shape diverges from the October
+    estimate.
+  participants:
+  - person:ProofOfKeags
+  - person:Rajil1213
+  - person:uncomputable
+  - person:krsnapaudel
+  tensions:
+  - review queue piles up on adapter PRs
+  - local integration tests require infra fixtures
+- id: B6
+  start: 2026-03-31
+  end: 2026-05-11
+  kind: review
+  summary: person:cyphersnake joins the review loop and finds two edge cases in provider scoring that force a short freeze
+    on feature work while person:mukeshdroid rechecks the sampling assumptions.
+  participants:
+  - person:cyphersnake
+  - person:mukeshdroid
+  - person:uncomputable
+  - person:Rajil1213
+  - person:ProofOfKeags
+  tensions:
+  - late security review changes scoring constants
+  - benchmark numbers disagree across machines
+- id: B7
+  start: 2026-05-12
+  end: 2026-06-22
+  kind: audit
+  summary: The team runs a controlled fault-injection pass against repo:mosaic and repo:mosaic-torrent, turning flaky retrieval
+    failures into tracked bugs instead of adding more transport features.
+  participants:
+  - person:uncomputable
+  - person:Zk2u
+  - person:cyphersnake
+  - person:krsnapaudel
+  tensions:
+  - test harness consumes infra time
+  - several failures reproduce only under long-running nodes
+- id: B8
+  start: 2026-06-23
+  end: 2026-08-03
+  kind: impl
+  summary: person:Rajil1213 closes the highest-impact retrieval bugs quickly, while person:ProofOfKeags spends most of the
+    beat untangling cancellation semantics that had been hidden by the older torrent wrapper.
+  participants:
+  - person:Rajil1213
+  - person:ProofOfKeags
+  - person:uncomputable
+  - person:cyphersnake
+  tensions:
+  - cancellation fix touches shared async code
+  - bug backlog competes with Strata integration requests
+- id: B9
+  start: 2026-08-04
+  end: 2026-09-07
+  kind: ship
+  summary: Mosaic v0.3 is cut for internal Strata operators with documented manifest compatibility, dashboard panels from
+    person:krsnapaudel, and a reduced provider-scoring feature set.
+  participants:
+  - person:uncomputable
+  - person:Rajil1213
+  - person:ProofOfKeags
+  - person:krsnapaudel
+  - person:Zk2u
+  tensions:
+  - one planned scoring mode deferred
+  - dashboard metrics land after release-candidate testing begins
+- id: B10
+  start: 2026-09-08
+  end: 2026-10-14
+  kind: retro
+  summary: person:uncomputable writes up the release retro, capturing why Mosaic shipped as a reliability layer first and
+    leaving the incentive-aware provider market for a later research-backed thread.
+  participants:
+  - person:uncomputable
+  - person:Rajil1213
+  - person:ProofOfKeags
+  - person:mukeshdroid
+  - person:krsnapaudel
+  tensions:
+  - research roadmap wants broader market design
+  - bridge team wants fewer cross-repo release dependencies
+artifacts:
+- kind: rfc
+  title: Mosaic Provider Selection and Chunk Manifest RFC
+  beat: B2
+  author: person:uncomputable
+- kind: design_doc
+  title: Strata P2P Adapter for Mosaic Retrieval
+  beat: B4
+  author: person:krsnapaudel
+- kind: design_doc
+  title: Mosaic Fault Injection Harness and Availability Scenarios
+  beat: B7
+  author: person:Zk2u
+- kind: all_hands_recap
+  title: Mosaic v0.3 Internal Operator Release
+  beat: B9
+  author: person:uncomputable
+- kind: retro
+  title: Mosaic Reliability Cycle Retro
+  beat: B10
+  author: person:uncomputable
+tensions:
+- reliability work repeatedly displaces incentive-market design
+- research review arrives in bursts while bridge implementation moves steadily
+- cross-repo integration makes small transport changes expensive
+- internal operator needs pull Mosaic toward observability before feature completeness

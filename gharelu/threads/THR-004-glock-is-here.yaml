@@ -1,0 +1,165 @@
+id: THR-004-glock-is-here
+title: Glock Public Release
+window:
+  start: 2025-08-19
+  end: 2025-11-17
+driver: person:AaronFeickert
+cast:
+- person:AaronFeickert
+- person:mukeshdroid
+- person:Hakkush-07
+- person:Zk2u
+- person:ceyhunsen
+- person:john-light
+- person:storopoli
+linked_anchors:
+- milestone:glock-is-here
+linked_products:
+- product:glock
+linked_repos:
+- repo:g16
+- repo:hash-benchmarks
+- repo:Technical-Whitepaper
+- repo:alpen
+beats:
+- id: B1
+  start: 2025-08-19
+  end: 2025-08-29
+  kind: kickoff
+  summary: Aaron scopes the public release around a reproducible verifier demo, updated benchmark claims, and a short whitepaper
+    appendix instead of a full protocol integration story.
+  participants:
+  - person:AaronFeickert
+  - person:mukeshdroid
+  - person:Hakkush-07
+  - person:john-light
+  tensions:
+  - release date tied to devrel calendar
+  - benchmark wording still too research-heavy
+  - unclear owner for demo packaging
+- id: B2
+  start: 2025-09-01
+  end: 2025-09-12
+  kind: design
+  summary: Mukesh drafts the release RFC for the Glock API boundary while Hakan sketches the verification examples that can
+    run without internal Strata services.
+  participants:
+  - person:mukeshdroid
+  - person:Hakkush-07
+  - person:AaronFeickert
+  - person:Zk2u
+  tensions:
+  - API examples expose unstable crate names
+  - appendix math review takes longer than expected
+- id: B3
+  start: 2025-09-15
+  end: 2025-09-26
+  kind: impl
+  summary: Hakan lands the first runnable g16 examples and Zk2u wires CI for deterministic benchmark runs, but several jobs
+    fail intermittently on memory pressure.
+  participants:
+  - person:Hakkush-07
+  - person:Zk2u
+  - person:mukeshdroid
+  tensions:
+  - CI runners too small for proving benchmarks
+  - example fixtures checked in without final naming
+  - review queue backs up behind bridge work
+- id: B4
+  start: 2025-09-29
+  end: 2025-10-10
+  kind: review
+  summary: Aaron and Ceyhun review the cryptographic claims line by line, narrowing the public announcement to verifier performance
+    and deferring broader composability claims.
+  participants:
+  - person:AaronFeickert
+  - person:ceyhunsen
+  - person:mukeshdroid
+  - person:john-light
+  tensions:
+  - marketing copy ahead of reviewed claims
+  - disagreement over benchmark baseline
+  - whitepaper appendix still references old notation
+- id: B5
+  start: 2025-10-13
+  end: 2025-10-24
+  kind: impl
+  summary: Zk2u replaces the flaky benchmark workflow with pinned machine profiles while Storopoli patches the alpen integration
+    notes so downstream protocol engineers can follow the release branch.
+  participants:
+  - person:Zk2u
+  - person:storopoli
+  - person:Hakkush-07
+  - person:AaronFeickert
+  tensions:
+  - infra change slips by four days
+  - integration notes depend on unreleased crate tags
+- id: B6
+  start: 2025-10-27
+  end: 2025-11-03
+  kind: audit
+  summary: The team runs a release-candidate audit over examples, benchmark scripts, and the whitepaper appendix, finding
+    two serialization edge cases and one stale benchmark chart.
+  participants:
+  - person:AaronFeickert
+  - person:mukeshdroid
+  - person:ceyhunsen
+  - person:Zk2u
+  tensions:
+  - late serialization fix changes public sample output
+  - chart regeneration blocks John’s announcement draft
+- id: B7
+  start: 2025-11-04
+  end: 2025-11-12
+  kind: ship
+  summary: Glock is tagged for public release with the demo, benchmark bundle, and appendix published together after John
+    trims the launch post to match reviewed claims.
+  participants:
+  - person:AaronFeickert
+  - person:john-light
+  - person:Hakkush-07
+  - person:Zk2u
+  - person:mukeshdroid
+  tensions:
+  - tag cut waits on final CI green
+  - launch copy loses the stronger performance headline
+- id: B8
+  start: 2025-11-13
+  end: 2025-11-17
+  kind: retro
+  summary: The retro records that the release shipped one week later than the first target, with the demo stronger than planned
+    but protocol integration guidance pushed into a follow-up thread.
+  participants:
+  - person:AaronFeickert
+  - person:mukeshdroid
+  - person:Hakkush-07
+  - person:john-light
+  - person:storopoli
+  tensions:
+  - follow-up integration owner undecided
+  - benchmark automation treated as release-critical too late
+artifacts:
+- kind: rfc
+  title: Glock Public Release Scope and Claims
+  beat: B2
+  author: person:mukeshdroid
+- kind: design_doc
+  title: Standalone Glock Verifier Demo Plan
+  beat: B2
+  author: person:Hakkush-07
+- kind: design_doc
+  title: Reproducible Glock Benchmark Workflow
+  beat: B5
+  author: person:Zk2u
+- kind: all_hands_recap
+  title: Glock Is Here Launch Recap
+  beat: B7
+  author: person:john-light
+- kind: retro
+  title: Glock Public Release Retro
+  beat: B8
+  author: person:AaronFeickert
+tensions:
+- public claims had to be narrowed as review caught up with launch planning
+- benchmark reproducibility became a blocker later than expected
+- protocol integration notes were deferred to keep the release focused

@@ -1,0 +1,183 @@
+# Alpen full node operator guide
+
+## Prerequisites <a href="#prerequisites" id="prerequisites"></a>
+
+Before you begin, ensure you have met the following requirements:
+
+* **Docker**: Make sure Docker is installed on your machine. You can download it from [here](https://www.docker.com/get-started).
+* **Docker Compose**: Ensure Docker Compose is installed. It typically comes bundled with Docker Desktop.
+* **Git**: To clone the repository. Download from [here](https://git-scm.com/downloads).
+
+## Installation <a href="#installation" id="installation"></a>
+
+Follow these steps to set up and run the project.
+
+### 1. Clone the `alpen` repository <a href="#id-1-clone-the-strata-repository" id="id-1-clone-the-strata-repository"></a>
+
+{% code overflow="wrap" %}
+
+```sh
+git clone https://github.com/alpenlabs/alpen.git --branch releases/0.2.0 && cd alpen/docker
+```
+
+{% endcode %}
+
+### 2. Configure environment variables <a href="#id-2-configure-environment-variables" id="id-2-configure-environment-variables"></a>
+
+Create a `.env` file in the `docker/` directory of the repository with the following contents:
+
+**Testnet `.env` Content:**
+
+```sh
+# signet
+SIGNETCHALLENGE=001471cb548371eb2e30773b843046e2c18665fd98b5
+ADDNODE=bitcoin.testnet.alpenlabs.io
+
+# reth
+JWTSECRET=/app/configs/jwt.hex
+```
+
+{% hint style="warning" %}
+Fullnode must use the provided `.env` to connect to and sync from alpen testnet chain.
+{% endhint %}
+
+### 3. Configure parameters <a href="#id-3-configure-parameters" id="id-3-configure-parameters"></a>
+
+Create a `params.json` file in the `configs` directory with the following contents.
+
+```sh
+{
+  "rollup_name": "alpn",
+  "block_time": 5000,
+  "da_tag": "strata-da",
+  "checkpoint_tag": "strata-ckpt",
+  "cred_rule": {
+    "schnorr_key": "b390b7eff2f5de1a3d6a32dd8cc613ee00da16e860a47fd18d4c48e5a4b7a5d7"
+  },
+  "horizon_l1_height": 90,
+  "genesis_l1_height": 100,
+  "operator_config": {
+      "static": [
+        {
+          "signing_pk": "73d5bb0995cd5f3e799f56646dd54195d4f9d6c56a70a37a4a5d79390eae1c8a",
+          "wallet_pk": "0xa4d54276304e60f2b22b77c37b0c1a8f59168f83a07bf75e8fa6cf9b7bf85da5"
+        },
+        {
+          "signing_pk": "d644794228df8782bd7ecc238887dba9d062b9f429537291d310c5dc6ffc592d",
+          "wallet_pk": "0x0d85503c7e8522025ec87523de9ba2a5f66ca75c428807bcc9fe1e49cb7866b7"
+        },
+        {
+          "signing_pk": "d644794228df8782bd7ecc238887dba9d062b9f429537291d310c5dc6ffc592a",
+          "wallet_pk": "0x879d70c1c4864731c370d3dbbbfb2a1c29670499d2437e38aadb6a6cb8d36f0b"
+        },
+        {
+          "signing_pk": "d644794228df8782bd7ecc238887dba9d062b9f429537291d310c5dc6ffc592e",
+          "wallet_pk": "0x55dd05dc6e7a4684eb550140af6da03a9c87359668912836f27511f2959b5aa7"
+        }
+      ]
+  },
+  "evm_genesis_block_hash": "0102272379ba01273f82eb5ad1b00d2616458ad308efdfe4a6cc3012c9d3447a",
+  "evm_genesis_block_state_root": "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+  "l1_reorg_safe_depth": 4,
+  "target_l2_batch_size": 64,
+  "address_length": 20,
+  "deposit_amount": 1000000000,
+  "rollup_vk": {
+    "sp1": "00271dfa665204ccb604a8601dd6cb7ae6b4ae4c27e4fc861aa12cdf952272e5"
+  },
+  "dispatch_assignment_dur": 64,
+  "proof_publish_mode": {"timeout":10800},
+  "max_deposits_in_block": 16,
+  "network": "signet"
+}
+```
+
+{% hint style="warning" %}
+Full node must use the provided params.json to be in consensus with the strata testnet chain.
+{% endhint %}
+
+### 4. Generate keys <a href="#id-4-generate-keys" id="id-4-generate-keys"></a>
+
+Generate `jwt.hex` inside `configs` directory file with jwt keys. This is used for authentication between `alpen-reth` and `alpen-client` for engine-api auth-rpc.
+
+```sh
+od -An -tx1 -N32 /dev/urandom | tr -d ' \n' > configs/jwt.hex
+```
+
+## Running the services <a href="#running-the-services" id="running-the-services"></a>
+
+Once you have configured the environment and generated the necessary keys, you can start the services using Docker Compose.
+
+```sh
+docker compose -f docker-compose-fullnode.yml up -d
+```
+
+{% hint style="warning" %}
+Make sure you have correctly installed docker and docker is up and running.
+{% endhint %}
+
+Initial sync can take several hours based on network latency and machine load. The sync status can be checked using an rpc call to `strata_syncStatus` method:
+
+```sh
+curl --location 'localhost:8432' \
+--header 'Content-Type: application/json' \
+--data '{
+ "jsonrpc":"2.0",
+ "method":"strata_syncStatus",
+ "params":[],
+ "id": 1
+}'
+```
+
+## Pairing with a local wallet <a href="#troubleshooting" id="troubleshooting"></a>
+
+If your [wallet](/welcome/wallet-setup.md) supports connecting to custom EVM networks, then you can connect your wallet to your Alpen full node to view your account balance and send transactions.
+
+1. Click the button in your wallet that enables you to add a custom network
+2. Enter the following values:
+   1. Network name: **Alpen Testnet**
+   2. Default RPC URL: **<http://localhost:8545>**
+   3. Chain ID: **8150**
+   4. Currency symbol: **sBTC**
+   5. Block explorer URL: **<https://explorer.testnet.alpenlabs.io>**
+
+## Troubleshooting <a href="#troubleshooting" id="troubleshooting"></a>
+
+* **Service fails to start:**
+  * Ensure all environment variables in `.env` are correctly set.
+  * Verify that `params.json` is correctly placed in the `configs` directory.
+  * Check Docker logs for more details:
+
+```
+docker compose -f docker-compose-fullnode.yml logs -f
+```
+
+* **Ports already in use:**
+  * If any of the specified ports are already in use, either stop the conflicting service or modify the port mappings in the `docker-compose.yml` file.
+* **Client cannot connect to bitcoin node and exits:**
+  * Make sure the environment variables in `.env` are correctly set as in step 2.
+  * Bitcoin node probably started later than the client. Make sure bitcoin node has started and then restart `client`.
+* **Initial Sync does not make progress or fails**
+  * Check that the urls provided in `.env` are accessible from the machine.
+  * If `FATAL ERROR: block not found:` is seen in the `client` logs after restart, delete `data/reth` and `data/strata` directories and restart.
+* **If nothing else seems to work**
+  * Stop all the containers: `docker compose -f docker-compose-fullnode.yml down`
+  * Delete the `data` directory and restart the containers: `docker compose -f docker compose-fullnode.yml up`
+
+
+---
+
+# Agent Instructions: Querying This Documentation
+
+If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
+
+Perform an HTTP GET request on the current page URL with the `ask` query parameter:
+
+```
+GET https://docs.alpenlabs.io/running-an-alpen-node/alpen-full-node-operator-guide.md?ask=<question>
+```
+
+The question should be specific, self-contained, and written in natural language.
+The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
+
+Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.

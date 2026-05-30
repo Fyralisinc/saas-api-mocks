@@ -1,0 +1,1052 @@
+_meta:
+  generated_at: '2026-05-28T10:31:41.896647Z'
+  generator: scripts/build_facts.py
+  note: DRAFT — review and copy to facts.yaml before editing. Fields marked 'needs:linkedin' require hand-entry.
+company:
+  name: Alpen Labs
+  id: company:alpen-labs
+  mission: Bitcoin's Own Financial System — borrow, earn, and spend in dollars directly with Bitcoin.
+  founded: '2022-01-01'
+  homepage: https://www.alpenlabs.io
+  github_org: alpenlabs
+  blog: https://www.alpenlabs.io/blog
+  docs: https://docs.alpenlabs.io
+  headcount_estimate: 39
+products:
+- id: product:strata
+  name: Strata
+  description: Bitcoin rollup enabling programmability without wrapped tokens or custodians.
+- id: product:glock
+  name: Glock
+  description: SNARK verification standard for Bitcoin (BitVM2-based).
+- id: product:mosaic
+  name: Mosaic
+  description: Garbled-circuit protocol for Bitcoin verification (Glock's final piece).
+- id: product:strata-bridge
+  name: Strata Bridge
+  description: Reference implementation of the Strata bridge.
+- id: product:btc-credit-markets
+  name: Bitcoin Credit Markets
+  description: Borrow against Bitcoin holdings.
+- id: product:bitcoin-dollar
+  name: Bitcoin Dollar
+  description: Spend Bitcoin collateral in dollar-denominated form.
+milestones_from_blog:
+- date: null
+  slug: btc-credit-markets
+  title: Btc Credit Markets
+  url: https://www.alpenlabs.io/blog/btc-credit-markets
+- date: null
+  slug: introducing-mosaic-glocks-final-piece
+  title: Introducing Mosaic Glocks Final Piece
+  url: https://www.alpenlabs.io/blog/introducing-mosaic-glocks-final-piece
+- date: null
+  slug: duty-free-bits-bitcoin
+  title: Duty Free Bits Bitcoin
+  url: https://www.alpenlabs.io/blog/duty-free-bits-bitcoin
+- date: null
+  slug: inside-alpens-2025
+  title: Inside Alpens 2025
+  url: https://www.alpenlabs.io/blog/inside-alpens-2025
+- date: null
+  slug: prague-testnet
+  title: Prague Testnet
+  url: https://www.alpenlabs.io/blog/prague-testnet
+- date: null
+  slug: starknet-shared-glock-verifier
+  title: Starknet Shared Glock Verifier
+  url: https://www.alpenlabs.io/blog/starknet-shared-glock-verifier
+- date: null
+  slug: glock-is-here
+  title: Glock Is Here
+  url: https://www.alpenlabs.io/blog/glock-is-here
+- date: null
+  slug: alpen-testnet
+  title: Alpen Testnet
+  url: https://www.alpenlabs.io/blog/alpen-testnet
+- date: null
+  slug: glock-verification-on-bitcoin
+  title: Glock Verification On Bitcoin
+  url: https://www.alpenlabs.io/blog/glock-verification-on-bitcoin
+- date: null
+  slug: bitcoin-dollar
+  title: Bitcoin Dollar
+  url: https://www.alpenlabs.io/blog/bitcoin-dollar
+- date: null
+  slug: strategic-round
+  title: Strategic Round
+  url: https://www.alpenlabs.io/blog/strategic-round
+- date: null
+  slug: introducing-the-strata-bridge
+  title: Introducing The Strata Bridge
+  url: https://www.alpenlabs.io/blog/introducing-the-strata-bridge
+- date: null
+  slug: state-of-snark-verification-with-bitvm2
+  title: State Of Snark Verification With Bitvm2
+  url: https://www.alpenlabs.io/blog/state-of-snark-verification-with-bitvm2
+- date: null
+  slug: releasing-tmul
+  title: Releasing Tmul
+  url: https://www.alpenlabs.io/blog/releasing-tmul
+- date: null
+  slug: proof-of-work
+  title: Proof Of Work
+  url: https://www.alpenlabs.io/blog/proof-of-work
+- date: null
+  slug: current-state-of-snarks
+  title: Current State Of Snarks
+  url: https://www.alpenlabs.io/blog/current-state-of-snarks
+- date: null
+  slug: the-rise-of-snarks
+  title: The Rise Of Snarks
+  url: https://www.alpenlabs.io/blog/the-rise-of-snarks
+- date: null
+  slug: snarknado-practical-round-efficient-snark-verifier-on-bitcoin
+  title: Snarknado Practical Round Efficient Snark Verifier On Bitcoin
+  url: https://www.alpenlabs.io/blog/snarknado-practical-round-efficient-snark-verifier-on-bitcoin
+- date: null
+  slug: alpen-at-the-convergence-of-two-revolutions
+  title: Alpen At The Convergence Of Two Revolutions
+  url: https://www.alpenlabs.io/blog/alpen-at-the-convergence-of-two-revolutions
+milestones_curated:
+- date: '2024-04-09'
+  kind: company.launch
+  title: Public launch / first blog post
+  source: blog/alpen-at-the-convergence-of-two-revolutions
+- date: '2025-01-09'
+  kind: fundraise
+  title: Strategic funding round
+  source: blog/strategic-round
+- date: '2025-08-04'
+  kind: product.launch
+  title: Public testnet live
+  source: blog/alpen-testnet
+- date: '2025-08-19'
+  kind: product.launch
+  title: Glock public release
+  source: blog/glock-is-here
+- date: '2025-10-15'
+  kind: partnership
+  title: Starknet shared Glock verifier collaboration
+  source: blog/starknet-shared-glock-verifier
+- date: '2025-12-04'
+  kind: product.update
+  title: Prague testnet support
+  source: blog/prague-testnet
+- date: '2026-05-07'
+  kind: product.launch
+  title: Mosaic announcement
+  source: blog/introducing-mosaic-glocks-final-piece
+repos:
+- name: alpen
+  id: repo:alpen
+  description: Rust implementation of the Alpen protocol
+  language: Rust
+  stars: 102
+  created_at: '2024-05-03'
+  archived: false
+  private: false
+- name: bitcoind-async-client
+  id: repo:bitcoind-async-client
+  description: BitcoinD JSON-RPC Async Client
+  language: Rust
+  stars: 22
+  created_at: '2025-04-30'
+  archived: false
+  private: false
+- name: bitcoin-bosd
+  id: repo:bitcoin-bosd
+  description: Bitcoin Output Script Descriptor (BOSD)
+  language: Rust
+  stars: 20
+  created_at: '2025-01-09'
+  archived: false
+  private: false
+- name: strata-bridge
+  id: repo:strata-bridge
+  description: Reference Implementation of the Strata Bridge
+  language: Rust
+  stars: 15
+  created_at: '2024-10-27'
+  archived: false
+  private: false
+- name: zkaleido
+  id: repo:zkaleido
+  description: Core traits and adapters to unify experience among various zkVMs.
+  language: Rust
+  stars: 12
+  created_at: '2024-12-17'
+  archived: false
+  private: false
+- name: Technical-Whitepaper
+  id: repo:Technical-Whitepaper
+  description: ''
+  language: ''
+  stars: 9
+  created_at: '2023-01-31'
+  archived: false
+  private: false
+- name: verifiable-garbling
+  id: repo:verifiable-garbling
+  description: A research tool useful for generating and proving validity of garbling tables
+  language: Rust
+  stars: 9
+  created_at: '2025-06-11'
+  archived: false
+  private: false
+- name: mosaic
+  id: repo:mosaic
+  description: Implementation of Alpen's Mosaic protocol for garbled circuits
+  language: Rust
+  stars: 7
+  created_at: '2025-10-14'
+  archived: false
+  private: false
+- name: ckt
+  id: repo:ckt
+  description: High performance garbled circuit tooling
+  language: Rust
+  stars: 5
+  created_at: '2025-07-29'
+  archived: false
+  private: false
+- name: dv-pari
+  id: repo:dv-pari
+  description: Rust implementation of the DV-Pari SNARK over sect233k1
+  language: Rust
+  stars: 4
+  created_at: '2025-07-31'
+  archived: false
+  private: false
+- name: duty-free-bits
+  id: repo:duty-free-bits
+  description: An implementation of the Duty-Free Bits switch system
+  language: Rust
+  stars: 3
+  created_at: '2026-03-24'
+  archived: false
+  private: false
+- name: dv-pari-circuit
+  id: repo:dv-pari-circuit
+  description: Binary circuit generator for DV-Pari verifier
+  language: Rust
+  stars: 3
+  created_at: '2025-07-31'
+  archived: false
+  private: false
+- name: garbled-circuits
+  id: repo:garbled-circuits
+  description: Tooling for binary circuit garbling and evaluation
+  language: Rust
+  stars: 3
+  created_at: '2025-07-10'
+  archived: false
+  private: false
+- name: fastmul
+  id: repo:fastmul
+  description: ''
+  language: Rust
+  stars: 2
+  created_at: '2024-07-26'
+  archived: false
+  private: false
+- name: faucet-api
+  id: repo:faucet-api
+  description: PoW-based faucet for bitcoin (signets) & Alpen EVM
+  language: Rust
+  stars: 2
+  created_at: '2024-09-11'
+  archived: false
+  private: false
+- name: make_buf
+  id: repo:make_buf
+  description: 'A macro to make byte buffers easier. '
+  language: Rust
+  stars: 2
+  created_at: '2025-02-20'
+  archived: false
+  private: false
+- name: rust-template
+  id: repo:rust-template
+  description: Alpen Labs Rust Template
+  language: Just
+  stars: 2
+  created_at: '2025-05-13'
+  archived: false
+  private: false
+- name: asm
+  id: repo:asm
+  description: ''
+  language: Rust
+  stars: 1
+  created_at: '2026-03-16'
+  archived: false
+  private: false
+- name: docs-archive
+  id: repo:docs-archive
+  description: This repository contains all public documentation related to Strata
+  language: Just
+  stars: 1
+  created_at: '2024-09-30'
+  archived: true
+  private: false
+- name: ssz-gen
+  id: repo:ssz-gen
+  description: SSZ Types Generator
+  language: Rust
+  stars: 1
+  created_at: '2025-06-06'
+  archived: false
+  private: false
+- name: strata-common
+  id: repo:strata-common
+  description: ''
+  language: Rust
+  stars: 1
+  created_at: '2025-05-13'
+  archived: false
+  private: false
+- name: .github
+  id: repo:.github
+  description: Alpen Lab's GitHub Organizational README
+  language: ''
+  stars: 0
+  created_at: '2024-10-07'
+  archived: false
+  private: false
+- name: alpen-dashboards
+  id: repo:alpen-dashboards
+  description: Alpen dashboards for public or internal use.
+  language: Rust
+  stars: 0
+  created_at: '2025-01-28'
+  archived: false
+  private: false
+- name: alpen-faucet
+  id: repo:alpen-faucet
+  description: A faucet and GUI for users to receive test BTC directly to their Alpen address.
+  language: TypeScript
+  stars: 0
+  created_at: '2025-03-04'
+  archived: false
+  private: false
+- name: bridge-sm-design-docs
+  id: repo:bridge-sm-design-docs
+  description: This repo contains the design doc specification for the state machines in the bridge
+  language: Haskell
+  stars: 0
+  created_at: '2026-01-08'
+  archived: false
+  private: false
+- name: checkpoint-explorer
+  id: repo:checkpoint-explorer
+  description: Repo for Alpen checkpoint explorer, which will mainly contain frontend, api backend and database.
+  language: Rust
+  stars: 0
+  created_at: '2024-12-16'
+  archived: false
+  private: false
+- name: g16
+  id: repo:g16
+  description: Groth16 -> CKT v5a pipeline
+  language: Rust
+  stars: 0
+  created_at: '2025-09-21'
+  archived: false
+  private: false
+- name: hash-benchmarks
+  id: repo:hash-benchmarks
+  description: A simple utility repository to benchmark cryptographic hash functions
+  language: Rust
+  stars: 0
+  created_at: '2025-05-02'
+  archived: false
+  private: false
+- name: moho
+  id: repo:moho
+  description: Moho proof infrastructure for Strata
+  language: Rust
+  stars: 0
+  created_at: '2025-04-21'
+  archived: false
+  private: false
+- name: mosaic-torrent
+  id: repo:mosaic-torrent
+  description: Torrent handling for large Mosaic artifacts
+  language: Rust
+  stars: 0
+  created_at: '2025-12-09'
+  archived: false
+  private: false
+- name: rust-template-workspace
+  id: repo:rust-template-workspace
+  description: Alpen Labs Rust Template for Workspace
+  language: Just
+  stars: 0
+  created_at: '2025-06-11'
+  archived: false
+  private: false
+- name: strata-p2p
+  id: repo:strata-p2p
+  description: Common code for Strata's P2P stack (for rollup full nodes and bridge operators)
+  language: Rust
+  stars: 0
+  created_at: '2024-12-31'
+  archived: false
+  private: false
+- name: typed-sled
+  id: repo:typed-sled
+  description: Type safe wrapper for Sled db
+  language: Rust
+  stars: 0
+  created_at: '2025-08-11'
+  archived: false
+  private: false
+- name: unspendable-pubkey-gen
+  id: repo:unspendable-pubkey-gen
+  description: Generates an unspendable pubkey for a random `r`.
+  language: Python
+  stars: 0
+  created_at: '2024-08-27'
+  archived: true
+  private: false
+people:
+- id: person:Rajil1213
+  github_handle: Rajil1213
+  full_name: Rajil Bajracharya
+  email: imrb1213@gmail.com
+  role: engineer
+  level: senior
+  team: team:bridge
+  started_at: '2024-07-26'
+  last_active: '2026-05-22'
+  twitter: null
+  blog_url: null
+  bio: Building @ Alpen Labs
+  commits: 907
+  top_repos:
+  - strata-bridge
+  - alpen
+  - bridge-sm-design-docs
+  - strata-p2p
+  - bitcoind-async-client
+- id: person:prajwolrg
+  github_handle: prajwolrg
+  full_name: Prajwol Gyawali
+  email: prajwolrg@alpenlabs.io
+  role: engineer
+  level: senior
+  team: team:protocol
+  started_at: '2024-05-24'
+  last_active: '2026-05-27'
+  twitter: null
+  blog_url: null
+  bio: ''
+  commits: 618
+  top_repos:
+  - alpen
+  - strata-bridge
+  - moho
+  - zkaleido
+  - asm
+- id: person:storopoli
+  github_handle: storopoli
+  full_name: Jose Storopoli
+  email: jose@storopoli.com
+  role: engineer
+  level: senior
+  team: team:protocol
+  started_at: '2024-12-18'
+  last_active: '2026-05-27'
+  twitter: storopoli
+  blog_url: storopoli.com
+  bio: "\"Cypherpunks write code\"\r\n\r\n\U0001F511  0x1BD38BE8D0653A7A"
+  commits: 534
+  top_repos:
+  - alpen
+  - strata-bridge
+  - strata-p2p
+  - bitcoin-bosd
+  - ssz-gen
+- id: person:MdTeach
+  github_handle: MdTeach
+  full_name: Abishek Bashyal
+  email: abishek_bashyal@outlook.com
+  role: engineer
+  level: senior
+  team: team:protocol
+  started_at: '2024-06-17'
+  last_active: '2026-05-27'
+  twitter: null
+  blog_url: null
+  bio: "A nice guy\r\n"
+  commits: 530
+  top_repos:
+  - strata-bridge
+  - alpen
+  - zkaleido
+  - asm
+  - moho
+- id: person:krsnapaudel
+  github_handle: krsnapaudel
+  full_name: Dilli Raj Paudel
+  email: krsnapaudel@alpenlabs.io
+  role: engineer
+  level: senior
+  team: team:infra
+  started_at: '2025-01-30'
+  last_active: '2026-05-26'
+  twitter: null
+  blog_url: null
+  bio: ''
+  commits: 440
+  top_repos:
+  - alpen-dashboards
+  - alpen-faucet
+  - alpen
+  - checkpoint-explorer
+  - faucet-api
+- id: person:delbonis
+  github_handle: delbonis
+  full_name: Trey Del Bonis
+  email: delbonis@alpenlabs.io
+  role: engineer
+  level: ic
+  team: team:protocol
+  started_at: '2024-05-03'
+  last_active: '2026-05-27'
+  twitter: null
+  blog_url: https://tr3y.io/
+  bio: "I use GitLab for almost everything: https://gitlab.com/treyzania\r\n\r\nbc1q9z2vngl0gwuj3l6exv7stt5j52sdmdeeu35k4j"
+  commits: 325
+  top_repos:
+  - alpen
+  - ckt
+  - mosaic
+  - strata-common
+  - moho
+- id: person:sapinb
+  github_handle: sapinb
+  full_name: Sapin Bajracharya
+  email: sapinb@alpenlabs.io
+  role: ops
+  level: ic
+  team: team:ops
+  started_at: '2024-06-05'
+  last_active: '2026-05-13'
+  twitter: null
+  blog_url: null
+  bio: ''
+  commits: 269
+  top_repos:
+  - alpen
+  - mosaic
+  - strata-bridge
+  - .github
+  - alpen-dashboards
+- id: person:Zk2u
+  github_handle: Zk2u
+  full_name: azz
+  email: Zk2u@alpenlabs.io
+  role: infra
+  level: ic
+  team: team:research
+  started_at: '2024-09-11'
+  last_active: '2026-05-20'
+  twitter: null
+  blog_url: https://zk2u.com
+  bio: systems engineer
+  commits: 235
+  top_repos:
+  - ckt
+  - faucet-api
+  - strata-bridge
+  - mosaic
+  - alpen
+- id: person:uncomputable
+  github_handle: uncomputable
+  full_name: Christian Lewe
+  email: uncomputable@alpenlabs.io
+  role: research
+  level: ic
+  team: team:bridge
+  started_at: '2025-08-06'
+  last_active: '2026-05-07'
+  twitter: null
+  blog_url: null
+  bio: Computer science, mathematics, logic, cryptography, complexity theory, philosophy, languages.
+  commits: 223
+  top_repos:
+  - strata-bridge
+  - bridge-sm-design-docs
+  - alpen
+  - bitcoin-bosd
+- id: person:purusang
+  github_handle: purusang
+  full_name: Purushotam Sangroula
+  email: purusang@alpenlabs.io
+  role: engineer
+  level: ic
+  team: team:infra
+  started_at: '2024-10-02'
+  last_active: '2026-05-28'
+  twitter: null
+  blog_url: null
+  bio: ''
+  commits: 222
+  top_repos:
+  - checkpoint-explorer
+  - alpen
+  - alpen-dashboards
+  - faucet-api
+  - alpen-faucet
+- id: person:bewakes
+  github_handle: bewakes
+  full_name: Bibek Pandey
+  email: bewakes@alpenlabs.io
+  role: engineer
+  level: ic
+  team: team:protocol
+  started_at: '2024-05-20'
+  last_active: '2026-05-19'
+  twitter: null
+  blog_url: https://bewakes.com
+  bio: 'Miles to go before I sleep.. '
+  commits: 186
+  top_repos:
+  - alpen
+  - typed-sled
+  - strata-bridge
+  - strata-common
+  - bitcoin-bosd
+- id: person:voidash
+  github_handle: voidash
+  full_name: needs:review
+  email: voidash@alpenlabs.io
+  role: engineer
+  level: ic
+  team: team:protocol
+  started_at: '2024-07-01'
+  last_active: '2026-05-27'
+  twitter: null
+  blog_url: https://voidash.github.io/blog/archives/
+  bio: ''
+  commits: 180
+  top_repos:
+  - alpen
+  - strata-common
+  - checkpoint-explorer
+  - strata-bridge
+  - faucet-api
+- id: person:mukeshdroid
+  github_handle: mukeshdroid
+  full_name: Mukesh Tiwari
+  email: mukeshdroid@alpenlabs.io
+  role: research
+  level: ic
+  team: team:research
+  started_at: '2025-02-20'
+  last_active: '2026-05-26'
+  twitter: null
+  blog_url: null
+  bio: ''
+  commits: 117
+  top_repos:
+  - strata-bridge
+  - bridge-sm-design-docs
+  - garbled-circuits
+  - verifiable-garbling
+  - g16
+- id: person:Hakkush-07
+  github_handle: Hakkush-07
+  full_name: Hakan Karakuş
+  email: Hakkush-07@alpenlabs.io
+  role: research
+  level: ic
+  team: team:research
+  started_at: '2025-05-15'
+  last_active: '2025-09-18'
+  twitter: null
+  blog_url: null
+  bio: Mathematician
+  commits: 113
+  top_repos:
+  - g16
+- id: person:evgenyzdanovich
+  github_handle: evgenyzdanovich
+  full_name: Evgeny Zdanovich
+  email: zdanovichevgeny@gmail.com
+  role: engineer
+  level: ic
+  team: team:protocol
+  started_at: '2024-11-18'
+  last_active: '2026-05-22'
+  twitter: null
+  blog_url: null
+  bio: ''
+  commits: 111
+  top_repos:
+  - alpen
+  - asm
+  - strata-common
+  - zkaleido
+  - moho
+- id: person:bbist
+  github_handle: bbist
+  full_name: Belove Bist
+  email: bbist@alpenlabs.io
+  role: engineer
+  level: ic
+  team: team:bridge
+  started_at: '2024-10-28'
+  last_active: '2024-11-23'
+  ended_at: '2024-12-20'
+  twitter: null
+  blog_url: null
+  bio: ''
+  commits: 93
+  top_repos:
+  - strata-bridge
+- id: person:AaronFeickert
+  github_handle: AaronFeickert
+  full_name: Aaron Feickert
+  email: AaronFeickert@alpenlabs.io
+  role: research
+  level: ic
+  team: team:research
+  started_at: '2024-10-09'
+  last_active: '2026-05-15'
+  twitter: null
+  blog_url: https://www.alpenlabs.io/
+  bio: Cryptographer. Mathematician. Physicist.
+  commits: 90
+  top_repos:
+  - alpen
+  - mosaic
+  - ckt
+  - bitcoin-bosd
+  - g16
+- id: person:nakkstar123
+  github_handle: nakkstar123
+  full_name: Nakul Khambhati
+  email: nakulkhambhati@g.ucla.edu
+  role: research
+  level: ic
+  team: team:research
+  started_at: '2025-11-11'
+  last_active: '2026-05-07'
+  twitter: null
+  blog_url: null
+  bio: CS Ph.D. @ UCLA. Researching garbled circuits.
+  commits: 73
+  top_repos:
+  - ckt
+  - mosaic
+  - duty-free-bits
+  - g16
+- id: person:sistemd
+  github_handle: sistemd
+  full_name: needs:review
+  email: sistemd@alpenlabs.io
+  role: engineer
+  level: ic
+  team: team:bridge
+  started_at: '2025-11-14'
+  last_active: '2025-12-15'
+  twitter: null
+  blog_url: null
+  bio: ''
+  commits: 43
+  top_repos:
+  - strata-bridge
+  - alpen
+- id: person:irnb
+  github_handle: irnb
+  full_name: Hamid
+  email: irnb@alpenlabs.io
+  role: engineer
+  level: ic
+  team: team:protocol
+  started_at: '2025-05-08'
+  last_active: '2026-05-25'
+  twitter: null
+  blog_url: null
+  bio: ''
+  commits: 37
+  top_repos:
+  - alpen
+  - strata-common
+  - moho
+  - asm
+  - ssz-gen
+- id: person:ProofOfKeags
+  github_handle: ProofOfKeags
+  full_name: Keags
+  email: keagan.mcclelland@gmail.com
+  role: engineer
+  level: ic
+  team: team:bridge
+  started_at: '2025-01-01'
+  last_active: '2025-08-21'
+  ended_at: '2025-09-15'
+  twitter: ProofOfKeags
+  blog_url: proofofkeags.com
+  bio: Pursuing the purity of thought
+  commits: 35
+  top_repos:
+  - strata-bridge
+  - strata-p2p
+- id: person:manishbista28
+  github_handle: manishbista28
+  full_name: needs:review
+  email: manishbista28@alpenlabs.io
+  role: research
+  level: ic
+  team: team:research
+  started_at: '2025-08-19'
+  last_active: '2026-05-27'
+  twitter: manishbista28
+  blog_url: null
+  bio: ''
+  commits: 34
+  top_repos:
+  - g16
+  - mosaic
+  - ckt
+  - dv-pari
+  - dv-pari-circuit
+- id: person:john-light
+  github_handle: john-light
+  full_name: John Light
+  email: john-light@alpenlabs.io
+  role: devrel
+  level: ic
+  team: team:devrel
+  started_at: '2024-10-01'
+  last_active: '2025-08-19'
+  twitter: null
+  blog_url: https://www.lightco.in
+  bio: ''
+  commits: 19
+  top_repos:
+  - docs-archive
+  - alpen
+  - bitcoind-async-client
+  - strata-bridge
+- id: person:just-erray
+  github_handle: just-erray
+  full_name: erray
+  email: just-erray@alpenlabs.io
+  role: research
+  level: ic
+  team: team:research
+  started_at: '2025-06-13'
+  last_active: '2025-10-03'
+  twitter: null
+  blog_url: null
+  bio: ''
+  commits: 17
+  top_repos:
+  - g16
+- id: person:cyphersnake
+  github_handle: cyphersnake
+  full_name: cyphersnake
+  email: cyphersnake@alpenlabs.io
+  role: engineer
+  level: ic
+  team: team:research
+  started_at: '2025-07-02'
+  last_active: '2025-10-03'
+  twitter: cypherserpent
+  blog_url: null
+  bio: '🦀 ProgCrypto Developer '
+  commits: 13
+  top_repos:
+  - g16
+- id: person:barakshani
+  github_handle: barakshani
+  full_name: needs:review
+  email: barakshani@alpenlabs.io
+  role: engineer
+  level: ic
+  team: team:protocol
+  started_at: '2025-05-21'
+  last_active: '2026-01-16'
+  twitter: null
+  blog_url: null
+  bio: ''
+  commits: 11
+  top_repos:
+  - alpen
+  - strata-bridge
+  - alpen-faucet
+  - alpen-dashboards
+- id: person:chhetri22
+  github_handle: chhetri22
+  full_name: Abishkar Chhetri
+  email: chhetri22@alpenlabs.io
+  role: engineer
+  level: ic
+  team: COO
+  started_at: '2023-02-01'
+  last_active: '2024-06-06'
+  ended_at: '2024-07-15'
+  twitter: null
+  blog_url: null
+  bio: ''
+  commits: 9
+  top_repos:
+  - Technical-Whitepaper
+- id: person:ceyhunsen
+  github_handle: ceyhunsen
+  full_name: Ceyhun Şen
+  email: ceyhuusen@gmail.com
+  role: engineer
+  level: ic
+  team: team:research
+  started_at: '2025-06-10'
+  last_active: '2025-06-10'
+  twitter: ceyhusen
+  blog_url: null
+  bio: Low level software engineer
+  commits: 9
+  top_repos:
+  - g16
+- id: person:sampkaALP
+  github_handle: sampkaALP
+  full_name: needs:review
+  email: sampkaALP@alpenlabs.io
+  role: ops
+  level: ic
+  team: team:ops
+  started_at: '2025-05-05'
+  last_active: '2025-08-14'
+  twitter: null
+  blog_url: null
+  bio: ''
+  commits: 7
+  top_repos:
+  - alpen-dashboards
+  - alpen
+  - checkpoint-explorer
+- id: person:alexhui01
+  github_handle: alexhui01
+  full_name: Alex Yang
+  email: alexhui01@alpenlabs.io
+  role: engineer
+  level: ic
+  team: team:protocol
+  started_at: '2026-03-27'
+  last_active: '2026-05-14'
+  twitter: null
+  blog_url: null
+  bio: ''
+  commits: 5
+  top_repos:
+  - alpen
+- id: person:pramodkandel
+  github_handle: pramodkandel
+  full_name: Pramod Kandel
+  email: pramodkandel@alpenlabs.io
+  role: devrel
+  level: ic
+  team: team:devrel
+  started_at: '2023-02-01'
+  last_active: '2024-10-07'
+  twitter: null
+  blog_url: null
+  bio: Trying to build useful things
+  commits: 5
+  top_repos:
+  - Technical-Whitepaper
+  - docs-archive
+- id: person:aunth
+  github_handle: aunth
+  full_name: Vlad Maslianko
+  email: aunth@alpenlabs.io
+  role: engineer
+  level: ic
+  team: team:protocol
+  started_at: '2025-09-04'
+  last_active: '2025-09-29'
+  twitter: null
+  blog_url: null
+  bio: 'Write code for rockets to bomb russian federation '
+  commits: 5
+  top_repos:
+  - strata-p2p
+- id: person:madan-oss
+  github_handle: madan-oss
+  full_name: needs:review
+  email: madan-oss@alpenlabs.io
+  role: research
+  level: ic
+  team: team:research
+  started_at: '2026-01-08'
+  last_active: '2026-05-19'
+  twitter: null
+  blog_url: null
+  bio: ''
+  commits: 4
+  top_repos:
+  - mosaic
+  - alpen
+  - strata-bridge
+- id: person:ali-rezai
+  github_handle: ali-rezai
+  full_name: Ali
+  email: ali-rezai@alpenlabs.io
+  role: engineer
+  level: ic
+  team: team:protocol
+  started_at: '2025-06-11'
+  last_active: '2025-07-21'
+  twitter: null
+  blog_url: null
+  bio: ''
+  commits: 4
+  top_repos:
+  - ssz-gen
+- id: person:arminsabouri
+  github_handle: arminsabouri
+  full_name: Armin Sabouri
+  email: arminsabouri@alpenlabs.io
+  role: infra
+  level: ic
+  team: team:infra
+  started_at: '2025-06-10'
+  last_active: '2025-12-23'
+  twitter: arminsdev
+  blog_url: https://arminsabouri.com/
+  bio: Bitcoin engineer and researcher | Co-Host of Boston Bitdevs | Embedded Systems Enthusiast
+  commits: 3
+  top_repos:
+  - bitcoind-async-client
+- id: person:Arniiiii
+  github_handle: Arniiiii
+  full_name: Arniiiii
+  email: lg3dx6fd@gmail.com
+  role: engineer
+  level: ic
+  team: team:protocol
+  started_at: '2025-09-04'
+  last_active: '2025-10-01'
+  twitter: null
+  blog_url: null
+  bio: ''
+  commits: 3
+  top_repos:
+  - strata-p2p
+teams_template:
+- id: team:protocol
+  name: Protocol Engineering
+- id: team:research
+  name: Research
+- id: team:bridge
+  name: Bridge
+- id: team:infra
+  name: Infrastructure
+- id: team:devrel
+  name: DevRel
+- id: team:ops
+  name: Operations

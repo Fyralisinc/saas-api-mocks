@@ -1,0 +1,236 @@
+id: THR-008-alpen
+title: Strata Node Maturation in alpen
+window:
+  start: 2024-05-03
+  end: 2025-05-03
+driver: person:prajwolrg
+cast:
+- person:delbonis
+- person:bewakes
+- person:prajwolrg
+- person:MdTeach
+- person:Rajil1213
+- person:AaronFeickert
+- person:storopoli
+- person:krsnapaudel
+linked_anchors:
+- repo:alpen
+linked_products:
+- product:strata
+linked_repos:
+- repo:alpen
+- repo:strata-common
+- repo:bitcoind-async-client
+- repo:checkpoint-explorer
+beats:
+- id: B1
+  start: 2024-05-03
+  end: 2024-05-31
+  kind: kickoff
+  summary: delbonis and bewakes map the existing alpen node skeleton into a checkpoint-driven Strata execution plan, with
+    prajwolrg joining late in the month to own the first consensus plumbing slice.
+  participants:
+  - person:delbonis
+  - person:bewakes
+  - person:prajwolrg
+  tensions:
+  - unclear boundary between node state and common types
+  - missing owner for Bitcoin RPC assumptions
+- id: B2
+  start: 2024-06-03
+  end: 2024-06-28
+  kind: design
+  summary: The team writes down the first pass of the block import, L1 checkpoint, and state transition interfaces while MdTeach
+    starts reviewing how those choices affect protocol invariants.
+  participants:
+  - person:delbonis
+  - person:bewakes
+  - person:prajwolrg
+  - person:MdTeach
+  tensions:
+  - review queue grows around consensus traits
+  - checkpoint naming differs across repos
+  - initial milestone slips one week
+- id: B3
+  start: 2024-07-01
+  end: 2024-07-26
+  kind: impl
+  summary: prajwolrg lands the state transition executor scaffolding, bewakes wires basic persistence, and delbonis keeps
+    the test harness moving with smaller but frequent fixes.
+  participants:
+  - person:delbonis
+  - person:bewakes
+  - person:prajwolrg
+  - person:MdTeach
+  tensions:
+  - fixture format churn
+  - persistent store APIs still too broad
+  - slow feedback from integration tests
+- id: B4
+  start: 2024-07-29
+  end: 2024-08-23
+  kind: impl
+  summary: Rajil1213 joins the thread from bridge engineering to make deposit-facing checkpoint data explicit, forcing alpen
+    to separate internal checkpoint state from bridge-observable commitments.
+  participants:
+  - person:Rajil1213
+  - person:prajwolrg
+  - person:MdTeach
+  - person:delbonis
+  tensions:
+  - bridge needs stable fields earlier than protocol wanted
+  - serialization versioning debated
+  - PRs blocked on shared type migration
+- id: B5
+  start: 2024-08-26
+  end: 2024-09-27
+  kind: review
+  summary: MdTeach drives a design review that replaces the original monolithic node loop with separate sync, execution, and
+    checkpoint tasks after early tests show retry behavior is too tangled.
+  participants:
+  - person:MdTeach
+  - person:prajwolrg
+  - person:bewakes
+  - person:delbonis
+  - person:Rajil1213
+  tensions:
+  - three open PRs need rebasing
+  - task boundaries change after implementation started
+  - bridge integration waits on finalized checkpoint API
+- id: B6
+  start: 2024-09-30
+  end: 2024-10-25
+  kind: impl
+  summary: delbonis and bewakes split the node loop while prajwolrg patches the executor to tolerate reorg-like L1 input changes
+    in local simulations.
+  participants:
+  - person:delbonis
+  - person:bewakes
+  - person:prajwolrg
+  - person:MdTeach
+  tensions:
+  - simulated Bitcoin headers expose hidden assumptions
+  - executor errors are too opaque
+  - test runtime crosses CI budget
+- id: B7
+  start: 2024-10-28
+  end: 2024-11-22
+  kind: audit
+  summary: AaronFeickert reviews the checkpoint verification path and pushes for clearer proof obligation notes before the
+    team calls the node path ready for wider internal use.
+  participants:
+  - person:AaronFeickert
+  - person:MdTeach
+  - person:prajwolrg
+  - person:delbonis
+  tensions:
+  - research notes lag behind code
+  - proof terminology inconsistent with whitepaper
+  - two consensus edge cases reopened
+- id: B8
+  start: 2024-11-25
+  end: 2024-12-20
+  kind: impl
+  summary: With storopoli joining in December, the team moves repeated encoding and hashing helpers into stricter common modules
+    and removes several ad hoc conversions inside alpen.
+  participants:
+  - person:storopoli
+  - person:prajwolrg
+  - person:bewakes
+  - person:MdTeach
+  tensions:
+  - holiday availability thins reviewers
+  - common-module cleanup touches more files than planned
+  - older fixtures become invalid
+- id: B9
+  start: 2025-01-06
+  end: 2025-01-31
+  kind: review
+  summary: krsnapaudel begins helping from infrastructure as local node runs are promoted into repeatable CI jobs with bitcoind-backed
+    smoke tests.
+  participants:
+  - person:krsnapaudel
+  - person:prajwolrg
+  - person:storopoli
+  - person:delbonis
+  tensions:
+  - CI runners lack predictable disk performance
+  - bitcoind startup makes failures noisy
+  - infra work competes with feature PR reviews
+- id: B10
+  start: 2025-02-03
+  end: 2025-02-28
+  kind: design
+  summary: A late design correction narrows the checkpoint explorer feed to finalized summaries instead of streaming every
+    intermediate node event.
+  participants:
+  - person:prajwolrg
+  - person:Rajil1213
+  - person:krsnapaudel
+  - person:MdTeach
+  tensions:
+  - explorer consumers wanted richer data
+  - bridge team asks for explicit compatibility notes
+  - internal API freeze moves to March
+- id: B11
+  start: 2025-03-03
+  end: 2025-03-28
+  kind: ship
+  summary: The alpen repo reaches an internal dogfood milestone with documented node startup, checkpoint sync, and smoke-test
+    instructions, though bridge-facing automation remains manual.
+  participants:
+  - person:prajwolrg
+  - person:storopoli
+  - person:krsnapaudel
+  - person:bewakes
+  - person:Rajil1213
+  tensions:
+  - manual bridge validation
+  - flaky long-running sync test
+  - release notes need protocol and infra signoff
+- id: B12
+  start: 2025-03-31
+  end: 2025-05-03
+  kind: retro
+  summary: The team closes the year-long thread by documenting what shipped, splitting the remaining work into node reliability,
+    checkpoint explorer, and bridge integration follow-ups.
+  participants:
+  - person:prajwolrg
+  - person:MdTeach
+  - person:delbonis
+  - person:storopoli
+  - person:krsnapaudel
+  - person:Rajil1213
+  tensions:
+  - original milestone over-scoped alpen as both node and integration surface
+  - ownership of cross-repo types still fragile
+  - dogfood runbooks depend on a few people
+artifacts:
+- kind: rfc
+  title: alpen Node Execution and Checkpoint Interfaces
+  beat: B2
+  author: person:prajwolrg
+- kind: design_doc
+  title: Bridge-Observable Checkpoint Commitments
+  beat: B4
+  author: person:Rajil1213
+- kind: design_doc
+  title: Splitting Sync, Execution, and Checkpoint Tasks
+  beat: B5
+  author: person:MdTeach
+- kind: rfc
+  title: Checkpoint Verification Obligations for Internal Dogfood
+  beat: B7
+  author: person:AaronFeickert
+- kind: design_doc
+  title: bitcoind-backed Smoke Tests for alpen CI
+  beat: B9
+  author: person:krsnapaudel
+- kind: retro
+  title: alpen Dogfood Milestone Retro and Follow-up Plan
+  beat: B12
+  author: person:prajwolrg
+tensions:
+- internal node work repeatedly exposed cross-repo type ownership gaps
+- bridge and explorer consumers needed stable outputs before protocol internals felt settled
+- CI reliability lagged behind feature development until late in the arc

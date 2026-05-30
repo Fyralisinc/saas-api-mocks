@@ -1,0 +1,200 @@
+id: THR-009-strata-bridge
+title: Strata Bridge State Machine Hardening
+window:
+  start: 2024-10-27
+  end: 2025-10-27
+driver: person:Rajil1213
+cast:
+- person:Rajil1213
+- person:prajwolrg
+- person:MdTeach
+- person:krsnapaudel
+- person:ProofOfKeags
+- person:AaronFeickert
+- person:uncomputable
+linked_anchors:
+- repo:strata-bridge
+linked_products:
+- product:strata-bridge
+- product:strata
+linked_repos:
+- repo:strata-bridge
+- repo:bridge-sm-design-docs
+- repo:bitcoin-bosd
+- repo:bitcoind-async-client
+- repo:alpen
+beats:
+- id: B1
+  start: 2024-10-27
+  end: 2024-11-17
+  kind: kickoff
+  summary: Rajil scoped the bridge work around a minimal deposit-withdraw state machine, with Prajwol and MdTeach pushing
+    to keep Strata node integration explicit rather than hidden behind mocks.
+  participants:
+  - person:Rajil1213
+  - person:prajwolrg
+  - person:MdTeach
+  tensions:
+  - state machine boundary unclear
+  - Strata RPC assumptions still moving
+- id: B2
+  start: 2024-11-18
+  end: 2024-12-15
+  kind: design
+  summary: The first bridge state machine design moved into bridge-sm-design-docs, but review exposed that peg-out cancellation
+    and reorg handling were underspecified.
+  participants:
+  - person:Rajil1213
+  - person:prajwolrg
+  - person:AaronFeickert
+  tensions:
+  - reorg depth policy debated
+  - cancellation semantics missing
+  - review backlog during protocol sprint
+- id: B3
+  start: 2024-12-16
+  end: 2025-01-19
+  kind: impl
+  summary: Rajil landed the deposit watcher skeleton in strata-bridge while MdTeach wired bitcoind-async-client calls, though
+    the initial end-to-end test missed the holiday target.
+  participants:
+  - person:Rajil1213
+  - person:MdTeach
+  - person:krsnapaudel
+  tensions:
+  - bitcoind polling latency
+  - flaky local regtest setup
+- id: B4
+  start: 2025-01-20
+  end: 2025-02-23
+  kind: impl
+  summary: ProofOfKeags picked up withdrawal transaction construction and produced a fast burst of PRs, with Rajil spending
+    most of the period turning them into a coherent bridge crate API.
+  participants:
+  - person:Rajil1213
+  - person:ProofOfKeags
+  - person:MdTeach
+  tensions:
+  - PRs landing out of order
+  - duplicate transaction builder helpers
+- id: B5
+  start: 2025-02-24
+  end: 2025-03-30
+  kind: review
+  summary: Prajwol reviewed the bridge-to-Strata handoff and forced a change from implicit checkpoint reads to an explicit
+    event subscription interface in alpen.
+  participants:
+  - person:prajwolrg
+  - person:Rajil1213
+  - person:ProofOfKeags
+  - person:krsnapaudel
+  tensions:
+  - protocol interface churn
+  - infra waiting on stable event names
+  - two stale branches rebased twice
+- id: B6
+  start: 2025-03-31
+  end: 2025-05-04
+  kind: audit
+  summary: Aaron walked through bridge safety assumptions and identified that deposit finality, withdrawal liveness, and operator
+    key rotation needed separate invariants in the design doc.
+  participants:
+  - person:AaronFeickert
+  - person:Rajil1213
+  - person:ProofOfKeags
+  tensions:
+  - safety claims stronger than implementation
+  - key rotation deferred
+- id: B7
+  start: 2025-05-05
+  end: 2025-06-15
+  kind: impl
+  summary: The team replaced ad hoc persistence with typed state snapshots and replay tests, trading a planned UI-facing milestone
+    for a more reliable recovery path.
+  participants:
+  - person:Rajil1213
+  - person:krsnapaudel
+  - person:ProofOfKeags
+  - person:MdTeach
+  tensions:
+  - scope traded away from explorer integration
+  - migration format bikeshedding
+- id: B8
+  start: 2025-06-16
+  end: 2025-07-27
+  kind: review
+  summary: Integration review found that bridge restart behavior diverged between regtest and long-running devnet, leading
+    Krsna to add dashboard probes before the next devnet cut.
+  participants:
+  - person:krsnapaudel
+  - person:Rajil1213
+  - person:prajwolrg
+  tensions:
+  - devnet-only failure
+  - observability added late
+  - slow CI on bridge integration tests
+- id: B9
+  start: 2025-07-28
+  end: 2025-08-31
+  kind: design
+  summary: After Christian joined, the withdrawal path was reframed around a smaller operator responsibility surface and a
+    follow-up RFC split emergency pause from normal peg-out flow.
+  participants:
+  - person:uncomputable
+  - person:Rajil1213
+  - person:AaronFeickert
+  - person:ProofOfKeags
+  tensions:
+  - late design direction change
+  - pause authority questioned
+- id: B10
+  start: 2025-09-01
+  end: 2025-10-12
+  kind: ship
+  summary: A devnet bridge release shipped with deposit detection, replay-safe state recovery, basic peg-out construction,
+    and dashboards, while operator key rotation and full fault proofs remained follow-up work.
+  participants:
+  - person:Rajil1213
+  - person:ProofOfKeags
+  - person:krsnapaudel
+  - person:prajwolrg
+  tensions:
+  - release notes narrower than original plan
+  - manual operator runbook still required
+- id: B11
+  start: 2025-10-13
+  end: 2025-10-27
+  kind: retro
+  summary: The retro captured that the bridge made real devnet progress, but also that state machine design, protocol event
+    contracts, and infra probes should be versioned before implementation sprints begin.
+  participants:
+  - person:Rajil1213
+  - person:prajwolrg
+  - person:krsnapaudel
+  - person:ProofOfKeags
+  - person:uncomputable
+  tensions:
+  - ownership split across teams
+  - design review started too late
+artifacts:
+- kind: rfc
+  title: Bridge State Machine MVP and Strata Event Boundaries
+  beat: B2
+  author: person:Rajil1213
+- kind: design_doc
+  title: Deposit Finality and Withdrawal Liveness Invariants
+  beat: B6
+  author: person:AaronFeickert
+- kind: rfc
+  title: Emergency Pause and Operator Responsibility Split
+  beat: B9
+  author: person:uncomputable
+- kind: retro
+  title: Strata Bridge Devnet Release Retro
+  beat: B11
+  author: person:Rajil1213
+tensions:
+- bridge ownership crossed protocol, infra, and research boundaries
+- early delivery plan assumed stable Strata event contracts too soon
+- safety documentation lagged behind implementation until audit review
+- devnet release shipped useful coverage but not the full original bridge scope

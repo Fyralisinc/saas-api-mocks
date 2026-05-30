@@ -1,0 +1,39 @@
+# Troubleshooting
+
+## Common issues and solutions <a href="#common-issues-and-solutions" id="common-issues-and-solutions"></a>
+
+### 1. Contract calls fail with `EVM error: NotActivated` <a href="#id-1-contract-calls-fail-with-evm-error-notactivated" id="id-1-contract-calls-fail-with-evm-error-notactivated"></a>
+
+The contract has been compiled at a newer EVM version than supported by Alpen. Ensure the EVM version of the compiler is set to `Prague`.
+
+### 2. I get `Could Not Fetch chain ID` error on my wallet <a href="#id-1-contract-calls-fail-with-evm-error-notactivated" id="id-1-contract-calls-fail-with-evm-error-notactivated"></a>
+
+Alpen testnet was updated from Shanghai to Prague specifications on December 4, 2025, doing a network regenesis with a different chain ID. Check that your wallet is using the [current chain ID](/welcome/get-started.md#network-details).
+
+### 3. Alpen CLI returns `Failed to sync signet wallet` error <a href="#id-1-contract-calls-fail-with-evm-error-notactivated" id="id-1-contract-calls-fail-with-evm-error-notactivated"></a>
+
+Check that your Alpen CLI configuration file `~/.config/alpen/config.toml` uses the correct endpoints from [Using the Alpen CLI](/welcome/using-the-alpen-cli.md#user-content-configure-the-cli), then follow the instructions to backup, restore, and scan your CLI wallet balances.
+
+### 4. My full node's strata\_client exits with a `fork_choice_manager` error <a href="#id-1-contract-calls-fail-with-evm-error-notactivated" id="id-1-contract-calls-fail-with-evm-error-notactivated"></a>
+
+Verify that in your configuration file `~/alpen/docker/configs/config.fn.toml` the parameter `sync_endpoint` correctly points to `ws://fnclient675f9eff3a682b8c0ea7423.testnet.alpenlabs.io` .
+
+After you update the file, shut down all containers, delete the contents of `~/alpen/docker/data` folder, and let it resync from zero.
+
+
+---
+
+# Agent Instructions: Querying This Documentation
+
+If you need additional information that is not directly available in this page, you can query the documentation dynamically by asking a question.
+
+Perform an HTTP GET request on the current page URL with the `ask` query parameter:
+
+```
+GET https://docs.alpenlabs.io/build-alpen-apps/troubleshooting.md?ask=<question>
+```
+
+The question should be specific, self-contained, and written in natural language.
+The response will contain a direct answer to the question and relevant excerpts and sources from the documentation.
+
+Use this mechanism when the answer is not explicitly present in the current page, you need clarification or additional context, or you want to retrieve related documentation sections.

@@ -175,19 +175,20 @@
   <!-- ===================== BOOT VIEW ===================== -->
   <section id="boot">
     <div class="brief">
-      This console runs a self-hosted <b>spammer</b>: mock Slack, GitHub and Discord services that are
-      wire-compatible with the real APIs, populated with a deterministic synthetic company — people,
-      teams, projects, channels, repos and a full history of activity. Pick a company profile and
-      <b>Initialize</b>; the mocks come up fresh on <code>:7001</code> <code>:7002</code>
-      <code>:7003</code>. <b>Terminate</b> wipes everything back to zero.
+      This console runs <b>Gharelu-Alpen</b> — a homemade high-fidelity simulation of Alpen Labs
+      (BitVM / Strata, ~36 people, ~18 months of replayed history). Eight wire-compatible mocks
+      (Slack, GitHub, Discord, Gmail, Calendar, Notion, Drive, Jira) come up on
+      <code>:7001</code>–<code>:7008</code> backed by a frozen corpus of real-mirror GitHub data
+      and LLM-generated narrative threads. <b>Initialize</b> backfills the corpus into the mock
+      DBs; <b>Terminate</b> wipes everything back to zero.
     </div>
 
     <div class="bootmain">
       <div class="bootleft">
-        <div class="label">// select target organization</div>
+        <div class="label">// target organization</div>
         <div id="companies" class="grid"></div>
         <div class="bar">
-          <button id="startBtn" disabled>► Initialize</button>
+          <button id="startBtn">► Initialize</button>
           <span id="phase" class="phase"></span>
         </div>
         <div id="bootErr" class="err"></div>
@@ -261,17 +262,9 @@ const BRAND={
 };
 const brandSvg=(p,cls)=>`<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="${BRAND[p]}"/></svg>`;
 
-// per-company line-glyphs (stroke = currentColor), themed to each org's vibe
+// Gharelu-Alpen icon — Bitcoin-orange-vibed angular mountain (Alpen = Alps; Bitcoin protocol)
 const ICONS={
-  seedling:'<path d="M12 22V11"/><path d="M12 14C8 14 5 12 5 8c4 0 7 2 7 6z"/><path d="M12 12c0-3 2.5-5 6-5 0 3-2.5 5-6 5z"/>',
-  tinker:'<path d="M14.5 6.5a4 4 0 0 0-5.2 5.2l-5 5a1.8 1.8 0 1 0 2.5 2.5l5-5a4 4 0 0 0 5.2-5.2l-2.4 2.4-2-2 1.9-2.5z"/>',
-  garage:'<path d="M3 10l9-6 9 6"/><path d="M5 10v10h14V10"/><path d="M9 20v-6h6v6"/>',
-  vertex:'<polyline points="22 7 13 16 9 12 2 19"/><polyline points="16 7 22 7 22 13"/>',
-  quanta:'<circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><ellipse cx="12" cy="12" rx="10" ry="4"/><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(60 12 12)"/><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(120 12 12)"/>',
-  meridian:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c3.6 3.6 3.6 14.4 0 18M12 3c-3.6 3.6-3.6 14.4 0 18"/>',
-  hyperion:'<circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1l2.1-2.1M17 7l2.1-2.1"/>',
-  olympus:'<path d="M3 20l6-11 4 6 2-3 6 8z"/>',
-  atlas:'<path d="M4 21V7l6-3v17"/><path d="M10 21V11l8-2.5V21"/><path d="M3 21h18"/>',
+  'gharelu-alpen':'<path d="M3 20l5-9 3 5 4-7 6 11z"/><path d="M3 20h18"/><circle cx="17" cy="6" r="2.2"/>',
 };
 const coIcon=k=>`<svg class="clogo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[k]||''}</svg>`;
 
@@ -284,27 +277,26 @@ function toast(msg,bad){const t=$('#toast');t.textContent=msg;t.className='toast
 
 let COMPANIES={};
 async function loadCompanies(){
+  // Only one company now (Gharelu-Alpen). Render its card pre-selected; no picker.
   const {companies}=await api('/api/companies');
   COMPANIES={};companies.forEach(c=>COMPANIES[c.key]=c);
-  $('#companies').innerHTML=companies.map(c=>`
-    <div class="card" data-key="${c.key}" style="position:relative">
+  const c=companies[0];
+  selected=c.key;
+  $('#companies').innerHTML=`
+    <div class="card sel" data-key="${c.key}" style="position:relative">
       <div class="chead">${coIcon(c.key)}<div class="nm">${c.name}</div></div>
       <div class="stg">${c.stage}</div>
       <div class="tag">${c.tagline}</div>
       <div class="meta">${c.headcount} · ${c.span} · ⏱ init ${c.est}</div>
-    </div>`).join('');
-  document.querySelectorAll('.card').forEach(el=>el.onclick=()=>{
-    document.querySelectorAll('.card').forEach(e=>e.classList.remove('sel'));
-    el.classList.add('sel');selected=el.dataset.key;$('#startBtn').disabled=false;
-    typeFeed(companyBriefing(COMPANIES[selected]));
-  });
+    </div>`;
+  typeFeed(companyBriefing(c));
 }
 
 const SPIN=['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏'];
 const DEPLOY_STEPS=[
   {k:'resetting', doing:'wiping previous state',           done:'previous state wiped'},
-  {k:'seeding',   doing:'generating synthetic org',        done:'synthetic org generated'},
-  {k:'launching', doing:'launching slack · github · discord · gmail · calendar · notion', done:'mock services online'},
+  {k:'seeding',   doing:'replaying Gharelu-Alpen corpus into mock DBs', done:'corpus backfilled'},
+  {k:'launching', doing:'launching slack · github · discord · gmail · calendar · notion · drive · jira', done:'mock services online'},
 ];
 const PHASE_ORDER=['stopping','resetting','seeding','launching','running'];
 
@@ -329,8 +321,7 @@ $('#startBtn').onclick=async()=>{
       else            out+=`<span class="dim">[  ] ${s.doing}</span>\n`;
     }
     if(phase==='seeding'){
-      out+=`\n<span class="dim">     ${esc(comp.headcount)} · projects · repos · channels</span>\n`;
-      if(comp.size==='large') out+=`<span class="dim">     big org — millions of events, sit tight</span>\n`;
+      out+=`\n<span class="dim">     ${esc(comp.headcount)} · ${esc(comp.span)} · ~23k events</span>\n`;
     }
     $('#feed').innerHTML=out+'<span class="cursor">▋</span>';
   }
@@ -358,8 +349,8 @@ function enterConsole(){
 }
 function exitConsole(){
   clearInterval(statePoll);$('#console').classList.add('hidden');$('#boot').classList.remove('hidden');
-  selected=null;$('#startBtn').disabled=true;document.querySelectorAll('.card').forEach(e=>e.classList.remove('sel'));
-  typeFeed(WELCOME);
+  // selected stays set to gharelu-alpen; card stays in sel state; button stays enabled.
+  if(COMPANIES[selected])typeFeed(companyBriefing(COMPANIES[selected]));
 }
 
 $('#stopBtn').onclick=async()=>{
@@ -578,21 +569,19 @@ function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','
 
 //============================ system feed (typewriter, 1 cancelable timer) ============================
 const WELCOME=[
-  {t:"spammer@matrix:~$ welcome",c:"pmpt"},
+  {t:"gharelu-alpen@matrix:~$ welcome",c:"pmpt"},
   {t:"",c:""},
-  {t:"wire-faithful slack · github · discord · gmail · calendar · notion",c:"ok"},
-  {t:"deterministic synthetic org generator",c:"ok"},
+  {t:"wire-faithful slack · github · discord · gmail · calendar · notion · drive · jira",c:"ok"},
+  {t:"corpus-driven replay of a 4-year homemade Alpen Labs simulation",c:"ok"},
   {t:"",c:""},
-  {t:"9 organization profiles loaded",c:"ok"},
-  {t:"↳ select a target for its dossier",c:"pmpt"},
+  {t:"target loaded · ready to initialize",c:"pmpt"},
 ];
 function companyBriefing(c){
   return [
-    {t:"> TARGET ACQUIRED",c:"pmpt"},
+    {t:"> TARGET LOADED",c:"pmpt"},
     {t:"",c:""},
     {t:c.name,c:"ok"},
     {t:"class ...... "+c.stage.toLowerCase(),c:""},
-    {t:"profile .... "+c.size+" / "+c.runtime,c:""},
     {t:"headcount .. "+c.headcount,c:""},
     {t:"history .... "+c.span,c:""},
     {t:"est. init .. "+c.est,c:"wn"},
@@ -651,7 +640,7 @@ function startScope(){
 }
 
 (async function(){
-  $('#logos').innerHTML=['github','slack','discord','gmail','calendar','notion'].map(p=>brandSvg(p,'')).join('');
+  $('#logos').innerHTML=['slack','github','discord','gmail','calendar','notion','drive','jira'].map(p=>brandSvg(p,'')).join('');
   typeFeed(WELCOME);startScope();
   await loadCompanies();
   const s=await api('/api/status');

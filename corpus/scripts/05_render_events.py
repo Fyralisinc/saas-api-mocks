@@ -419,11 +419,13 @@ EMOJI_NEUTRAL = ["eyes", "thinking_face", "wave", "raised_hand", "saluting_face"
 
 
 def _is_dm_heavy(thread_id: str) -> bool:
-    """~30% of threads have most of the discussion in private DMs — only the
-    significant moments (kickoff, ship, postmortem) bubble up to the channel.
-    A real common pattern Fyralis should detect as a 'low-channel-density'
-    thread that still reaches its milestones."""
-    return _hash_int(thread_id, "dm-heavy", n=10) < 3
+    """A minority of threads — ~10% — have most of the discussion in private
+    DMs. Sensitive HR / legal / pre-announce stuff, basically. The vast
+    majority of engineering threads happen in channels (Slack-default-open
+    ethos). Fyralis should still detect the DM-shadow pattern on the few
+    that have it as a 'low-channel-density' thread that still reaches its
+    milestones."""
+    return _hash_int(thread_id, "dm-heavy", n=10) < 1
 
 
 def _build_manager_map(facts: dict) -> None:
@@ -803,13 +805,14 @@ def thread_events(thread: dict, facts: dict) -> Iterator[dict]:
         fallback = BEAT_SLACK.get(kind, BEAT_SLACK["impl"])
         msg_count = min(15, max(5, days * 2))
 
-        # DM-shadow: ~30% of threads have most of the work-discussion in
+        # DM-shadow: ~10% of threads have most of the work-discussion in
         # private DMs; only kickoff/ship/postmortem moments surface in the
-        # channel. Fyralis should detect this as a "low channel-density"
-        # thread that still reaches its milestones.
+        # channel. Fyralis should detect these as "low channel-density"
+        # threads that still reach their milestones. The reduction is ~half
+        # of normal — the channel doesn't go silent, it just gets terser.
         dm_heavy = _is_dm_heavy(thread["id"])
         if dm_heavy and kind not in ("kickoff", "ship", "postmortem", "all_hands_recap"):
-            msg_count = max(2, msg_count // 4)
+            msg_count = max(3, msg_count // 2)
         # Remember the first top-level message per beat — used as thread_ts
         # anchor for any threaded replies inside this beat window.
         anchor_ts: str | None = None

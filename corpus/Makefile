@@ -56,9 +56,11 @@ office-life:
 chatter:
 	$(LOAD_ENV) LLM_PROVIDER=$${LLM_PROVIDER:-codex} $(PY) scripts/09_generate_chatter.py --budget-usd 999
 
-# L5: render events.jsonl from everything above (real github mirror + rituals + chatter).
+# L5: render events.jsonl from everything above. --include-all turns on every
+# category: github mirror, rituals, chatter, 1:1s, ci flakes, hiring, gmail
+# external comms, notion edit history.
 render:
-	$(LOAD_ENV) $(PY) scripts/05_render_events.py --include-mirror --include-rituals --include-chatter
+	$(LOAD_ENV) $(PY) scripts/05_render_events.py --include-all
 
 # Full pipeline.
 corpus: scrape facts timeline threads artifacts voices patterns office-life chatter render

@@ -19,10 +19,8 @@ PY="$VENV/bin/python"
 SPAMMER="$VENV/bin/spammer"
 ENV_FILE=.env
 
-# Defaults for `prepare` (override inline, e.g. SEED=7 ./dev.sh prepare).
-SIZE="${SIZE:-small}"
-RUNTIME="${RUNTIME:-few_months}"
-SEED="${SEED:-42}"
+# Default port for `serve`. Corpus + as-of are configurable via env overrides
+# in cmd_prepare below.
 PORT="${PORT:-7001}"
 
 # Candidate DB credentials, tried in order during setup.
@@ -123,27 +121,18 @@ cmd_test() {
 
 cmd_prepare() {
     require_setup; load_env
-    local tid; tid="$("$PY" -c 'import uuid; print(uuid.uuid4())')"
-    echo "Preparing run (size=$SIZE runtime=$RUNTIME seed=$SEED, tenant=$tid)..."
-    "$SPAMMER" prepare \
-        --size="$SIZE" --runtime="$RUNTIME" --seed="$SEED" \
-        --tenant-id="$tid" --fyralis-base=http://localhost:8000 "$@"
-}
-
-cmd_prepare_alpen() {
-    require_setup; load_env
-    local corpus="${ALPEN_CORPUS_PATH:-$HOME/alpen-corpus/build/events.jsonl}"
+    local corpus="${CORPUS_PATH:-./gharelu/build/events.jsonl}"
     local as_of="${AS_OF:-2025-11-28}"      # default: 18 months back from May 2026
     if [ ! -f "$corpus" ]; then
         c_red "corpus file not found: $corpus"
-        c_red "  override with ALPEN_CORPUS_PATH=/abs/path/to/events.jsonl"
+        c_red "  generate it with: (cd gharelu && make corpus)"
+        c_red "  or override with: CORPUS_PATH=/abs/path/to/events.jsonl ./dev.sh prepare"
         exit 1
     fi
     local tid; tid="$("$PY" -c 'import uuid; print(uuid.uuid4())')"
-    echo "Preparing Alpen Labs corpus run (as-of=$as_of, tenant=$tid)..."
+    echo "Preparing Gharelu-Alpen run (as-of=$as_of, tenant=$tid)..."
     echo "  corpus: $corpus"
     "$SPAMMER" prepare \
-        --size=small --runtime=few_years --seed=43 \
         --tenant-id="$tid" --fyralis-base=http://localhost:8000 \
         --corpus="$corpus" --as-of="$as_of" "$@"
 }
@@ -201,11 +190,12 @@ PY
 
 usage() {
     cat <<EOF
-dev.sh — setup + task runner for the spammer mocks
+dev.sh — setup + task runner for the Gharelu-Alpen spammer
 
   ./dev.sh setup              Build everything (venv, deps, Postgres, .env). Run once.
-  ./dev.sh test [pytest args] Run the Slack fidelity suite
-  ./dev.sh prepare            Seed a synthetic org + historical timeline
+  ./dev.sh test [pytest args] Run the fidelity suite
+  ./dev.sh prepare            Backfill the Gharelu-Alpen corpus into the mock DBs
+                              (CORPUS_PATH and AS_OF env vars override defaults)
   ./dev.sh serve [slack|discord|github|gmail|calendar|notion|drive|jira]
                               Start a mock (slack:7001 discord:7002 github:7003
                               gmail:7004 calendar:7005 notion:7006 drive:7007
@@ -215,11 +205,11 @@ dev.sh — setup + task runner for the spammer mocks
   ./dev.sh token              Print a bot token for curl-ing the mock
   ./dev.sh status             Show run + clock + counts
   ./dev.sh inject --text=… --channel=#general
-  ./dev.sh emit --speed=1.0 --live-rate=10
+  ./dev.sh emit --speed=1.0
   ./dev.sh reset --confirm=yes
   ./dev.sh install --provider=slack ...
 
-Overrides: SIZE, RUNTIME, SEED, PORT, SPAMMERS_DB_CREDS (e.g. SEED=7 ./dev.sh prepare)
+Overrides: PORT, CORPUS_PATH, AS_OF, SPAMMERS_DB_CREDS
 EOF
 }
 
@@ -228,7 +218,6 @@ case "$cmd" in
     setup)   cmd_setup "$@" ;;
     test)    cmd_test "$@" ;;
     prepare) cmd_prepare "$@" ;;
-    prepare-alpen) cmd_prepare_alpen "$@" ;;
     serve)   cmd_serve "$@" ;;
     studio)  cmd_studio "$@" ;;
     stop)    cmd_stop ;;

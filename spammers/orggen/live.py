@@ -1,18 +1,12 @@
-"""Live event generator.
+"""Live event injection helpers.
 
-While the historical timeline (compile.py) populates events backwards from
-virtual_now and marks them is_historical=TRUE (pull-API only), this module
-generates NEW events that are dated forward of virtual_now and marked
-is_historical=FALSE — the emission loop picks them up and delivers them as
-signed webhooks.
-
-Two entry points:
-  - ``inject_slack_message(...)``  — one-off, fully parameterized
-  - ``LiveEventGenerator(...)``    — long-running, samples at a target rate
+One-off injection of forward-dated (is_historical=FALSE) events into each
+provider's tables, so the emission loop picks them up and delivers them as
+signed webhooks. Used by the ``inject`` CLI subcommand and the Studio
+control panel.
 """
 from __future__ import annotations
 
-import asyncio
 import json
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -26,9 +20,6 @@ from spammers.common.ids import (
     drive_file_id, gcal_event_id, gcal_ical_uid, github_sha,
     gmail_message_id, gmail_thread_id, notion_id,
 )
-from spammers.orggen.profiles import resolve
-from spammers.orggen.render import render
-from spammers.orggen.seed import RunRandom
 
 
 log = structlog.get_logger("spammers.orggen.live")
@@ -756,94 +747,3 @@ async def inject_jira_issue(
     return event_id
 
 
-class LiveEventGenerator:
-    """Long-running generator that produces live slack messages.
-
-    Targets ``msgs_per_minute`` events per minute (drawn from a Poisson-ish
-    distribution). Each event gets a virtual_ts slightly ahead of the current
-    virtual_now so the emission loop picks it up on the next tick.
-    """
-
-    def __init__(
-        self,
-        pool: asyncpg.Pool,
-        run_id: UUID,
-        *,
-        msgs_per_minute: float = 6.0,
-        seed_extra: int = 0,
-    ) -> None:
-        self._pool = pool
-        self._run_id = run_id
-        self._msgs_per_minute = msgs_per_minute
-        self._stop = asyncio.Event()
-        self._task: Optional[asyncio.Task] = None
-        self._seed_extra = seed_extra
-
-    async def _loop(self) -> None:
-        # mean wait between events = 60 / rate
-        # We pick from people/projects deterministically per run + a tick counter
-        row = await self._pool.fetchrow(
-            "SELECT size, runtime, seed FROM org.runs WHERE id = $1",
-            self._run_id,
-        )
-        if row is None:
-            return
-        spec = resolve(row["size"], row["runtime"])
-        rng = RunRandom(int(row["seed"]) + self._seed_extra, "live")
-
-        people = [dict(r) for r in await self._pool.fetch(
-            "SELECT id, handle, team_name FROM org.people p "
-            "LEFT JOIN org.teams t ON t.id = p.team_id "
-            "WHERE p.run_id = $1",
-            self._run_id,
-        )]
-        if not people:
-            return
-
-        tick = 0
-        while not self._stop.is_set():
-            tick += 1
-            interval = max(0.2, 60.0 / self._msgs_per_minute * rng.uniform(0.5, 1.5))
-            try:
-                await asyncio.wait_for(self._stop.wait(), timeout=interval)
-                break
-            except asyncio.TimeoutError:
-                pass
-
-            person = rng.choice(people)
-            text = render(
-                "slack/work_update.j2",
-                persona=type("P", (), {"voice_signature": {"formality": "casual"}})(),
-                event_kind="ask",
-                pr_link="",
-                pr_title="",
-                channel="",
-                incident_summary="",
-                question=rng.choice([
-                    "anyone seen the build break on main?",
-                    "is the cache ttl configurable from env?",
-                    "what's the canonical way to log a tenant id?",
-                    "do we have a runbook for the gateway timeout?",
-                ]),
-                default_text="",
-            )
-            try:
-                await inject_slack_message(
-                    self._pool,
-                    self._run_id,
-                    handle=person["handle"],
-                    channel="#general",
-                    text=text,
-                )
-            except Exception as exc:
-                log.warning("live_inject_failed", error=str(exc))
-
-    def start(self) -> None:
-        if self._task is None:
-            self._task = asyncio.create_task(self._loop())
-
-    async def stop(self) -> None:
-        self._stop.set()
-        if self._task is not None:
-            await self._task
-            self._task = None

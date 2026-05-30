@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Literal, Optional
+from typing import Optional
 from uuid import UUID, uuid4
 
 import asyncpg
@@ -11,14 +11,9 @@ import asyncpg
 async def create_run(
     pool: asyncpg.Pool,
     *,
-    size: Literal["small", "medium", "large"],
-    runtime: Literal["few_months", "one_year", "few_years"],
-    seed: int,
     fyralis_tenant_id: UUID,
     fyralis_base_url: str,
-    archetype: str = "early_saas",
     virtual_now: Optional[datetime] = None,
-    profile_kind: Literal["profile", "corpus"] = "profile",
     corpus_path: Optional[str] = None,
 ) -> UUID:
     rid = uuid4()
@@ -30,10 +25,10 @@ async def create_run(
         INSERT INTO org.runs
             (id, size, runtime, seed, archetype, fyralis_tenant_id, fyralis_base_url,
              virtual_now, mode, speed_multiplier, profile_kind, corpus_path)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'frozen', 1.0, $9, $10)
+        VALUES ($1, 'small', 'few_years', 43, 'gharelu-alpen', $2, $3, $4,
+                'frozen', 1.0, 'corpus', $5)
         """,
-        rid, size, runtime, seed, archetype, fyralis_tenant_id, fyralis_base_url, vn,
-        profile_kind, corpus_path,
+        rid, fyralis_tenant_id, fyralis_base_url, vn, corpus_path,
     )
     return rid
 

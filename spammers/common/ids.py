@@ -30,10 +30,11 @@ _HEX = string.hexdigits.lower()[:16]
 
 
 # Module-level RNG for all generated IDs. Random by default (system entropy), so
-# ad-hoc / live-injection calls stay unique. ``compile_run`` calls ``seed_ids``
-# with the run seed, making every backfill object ID (and PK) byte-identical
-# across reseeds of the same seed — so a consumer's dedup key (external_id) is
-# stable run-to-run and re-ingestion collapses instead of accumulating.
+# ad-hoc / live-injection calls stay unique. The corpus replayer calls
+# ``seed_ids`` with the run seed, making every backfill object ID (and PK)
+# byte-identical across reseeds of the same seed — so a consumer's dedup key
+# (external_id) is stable run-to-run and re-ingestion collapses instead of
+# accumulating.
 _RNG = random.Random()
 _RNG.seed(secrets.randbits(128))
 

@@ -1,8 +1,0 @@
-{%- set p = persona.handle -%}
-{%- if event_idx == 0 -%}
-good morning! yesterday: {{ yesterday_summary }} — today: {{ today_plan }}{% if blockers %} — blockers: {{ blockers }}{% endif %}
-{%- elif event_idx == 1 -%}
-standup from me: {{ today_plan }}. {{ yesterday_summary }} done.
-{%- else -%}
-[update] {{ today_plan }}
-{%- endif -%}

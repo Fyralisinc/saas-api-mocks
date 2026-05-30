@@ -161,12 +161,11 @@ class Controller:
                 await self._run_cli("reset", "--confirm", "yes")
 
                 self.state.phase = "seeding"
-                # Big profiles generate millions of rows — large/few_years can
-                # take ~30 min. Allow up to an hour so it doesn't false-fail.
+                # Corpus backfill — ~22k events across ~18mo of Alpen history.
+                # Generous timeout so a cold DB still completes.
                 await self._run_cli(
-                    "prepare", "--size", comp.size, "--runtime", comp.runtime,
-                    "--seed", str(comp.seed), "--tenant-id", str(uuid.uuid4()),
-                    timeout=3600.0,
+                    "prepare", "--tenant-id", str(uuid.uuid4()),
+                    timeout=600.0,
                 )
 
                 self.state.phase = "launching"

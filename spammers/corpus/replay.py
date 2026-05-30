@@ -28,7 +28,7 @@ from spammers.common.ids import (
     gmail_message_id, gmail_thread_id,
     jira_account_id, jira_api_token, jira_cloud_id,
     notion_id, notion_token, notion_verification_token,
-    rand_hex,
+    rand_hex, seed_ids,
     slack_app_id, slack_bot_token, slack_channel_id, slack_client_id,
     slack_client_secret, slack_signing_secret, slack_team_id, slack_ts,
     slack_user_id,
@@ -873,6 +873,9 @@ async def backfill(
     inserts nothing new. Re-running with a later cursor adds only the
     newly-due events.
     """
+    seed_row = await pool.fetchrow("SELECT seed FROM org.runs WHERE id = $1", run_id)
+    seed_ids(int(seed_row["seed"]) if seed_row else 43)
+
     idmap = IdMap(pool, run_id)
     await idmap.warm()
     ctx = ReplayContext(pool=pool, run_id=run_id, idmap=idmap)

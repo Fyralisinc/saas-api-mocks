@@ -5,10 +5,8 @@ The mock is DB-backed (asyncpg → SPAMMERS_DB_URL). These fixtures:
   1. Point the mock at a dedicated, auto-created test DB.
   2. Apply the migration and insert a small, *hand-built deterministic*
      dataset (one workspace, three users, four channels, a threaded
-     conversation in #general). We deliberately do NOT use
-     ``orggen.compile_run`` to seed: it is non-deterministic and currently
-     crashes on most seeds (see ``tests/behavior/test_compile_flow.py``),
-     and precise contract assertions need exact, known ts/counts.
+     conversation in #general). Contract assertions need exact, known
+     ts/counts, so we hand-seed rather than replay the Gharelu-Alpen corpus.
   3. Wire the Slack ``state`` singleton to that pool + run, then expose an
      in-process ASGI client (httpx ASGITransport — note it does NOT run
      FastAPI lifespan events, so we set state ourselves).

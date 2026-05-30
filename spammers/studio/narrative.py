@@ -17,7 +17,7 @@ from spammers.studio.companies import Company
 
 async def build(pool: asyncpg.Pool, run_id: UUID, company: Company) -> dict:
     run = await pool.fetchrow(
-        "SELECT size, runtime, archetype, virtual_now, seed FROM org.runs WHERE id=$1", run_id)
+        "SELECT virtual_now FROM org.runs WHERE id=$1", run_id)
     now = run["virtual_now"]
 
     teams = [dict(r) for r in await pool.fetch(
@@ -78,9 +78,6 @@ async def build(pool: asyncpg.Pool, run_id: UUID, company: Company) -> dict:
         "name": company.name,
         "stage": company.stage,
         "tagline": company.tagline,
-        "size": run["size"],
-        "runtime": run["runtime"],
-        "archetype": run["archetype"],
         "as_of": now.isoformat(),
         "headcount": headcount,
         "teams": teams,

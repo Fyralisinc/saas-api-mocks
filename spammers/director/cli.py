@@ -1,7 +1,7 @@
 """Director CLI.
 
 Subcommands:
-  prepare   — ensure DB exists, apply migrations, create a run, run OrgGen
+  prepare   — ensure DB exists, apply migrations, replay the Gharelu-Alpen corpus
   install   — walk Slack OAuth flow into Fyralis
   emit      — start the live-emission loop
   jump      — advance virtual time
@@ -24,12 +24,11 @@ import structlog
 
 from spammers.common.clock import advance, get_clock, jump_to, set_mode
 from spammers.common.db import apply_migrations, create_pool, ensure_database_exists
+from spammers.corpus.replay import backfill
 from spammers.director.installer import install_slack
 from spammers.director.orchestrator import EmissionLoop
 from spammers.director.runs import create_run, get_run, latest_run
-from spammers.orggen.compile import compile_run
 from spammers.orggen.live import (
-    LiveEventGenerator,
     inject_calendar_event,
     inject_discord_interaction,
     inject_discord_message,
@@ -60,46 +59,26 @@ async def _cmd_prepare(args: argparse.Namespace) -> int:
         return 2
     tenant_id = UUID(args.tenant_id)
 
-    # Corpus replay path — bypass profile-driven OrgGen entirely.
-    if getattr(args, "corpus", None):
-        from spammers.corpus.replay import backfill
-        corpus_path = os.path.abspath(args.corpus)
-        if not os.path.exists(corpus_path):
-            _eprint(f"error: corpus file not found: {corpus_path}")
-            await pool.close()
-            return 2
-        as_of_str = getattr(args, "as_of", None) or datetime.now(timezone.utc).date().isoformat()
-        as_of = datetime.fromisoformat(as_of_str).replace(tzinfo=timezone.utc)
-
-        rid = await create_run(
-            pool, size=args.size, runtime=args.runtime, seed=args.seed,
-            fyralis_tenant_id=tenant_id, fyralis_base_url=args.fyralis_base,
-            virtual_now=as_of,
-            profile_kind="corpus", corpus_path=corpus_path,
-        )
-        _eprint(f"run created: {rid} (corpus mode, as-of {as_of_str})")
-        counts = await backfill(pool, rid, corpus_path, until=as_of)
-        _eprint(f"backfill summary: total={sum(counts.values())} kinds={len(counts)}")
-        for k, v in sorted(counts.items(), key=lambda x: -x[1])[:8]:
-            _eprint(f"  {v:>6d}  {k}")
-        print(str(rid))
+    corpus_path = os.path.abspath(args.corpus)
+    if not os.path.exists(corpus_path):
+        _eprint(f"error: corpus file not found: {corpus_path}")
+        _eprint("  generate it with: (cd gharelu && make corpus)")
         await pool.close()
-        return 0
+        return 2
+    as_of_str = args.as_of or datetime.now(timezone.utc).date().isoformat()
+    as_of = datetime.fromisoformat(as_of_str).replace(tzinfo=timezone.utc)
 
-    # Profile-driven path (unchanged).
     rid = await create_run(
         pool,
-        size=args.size,
-        runtime=args.runtime,
-        seed=args.seed,
-        fyralis_tenant_id=tenant_id,
-        fyralis_base_url=args.fyralis_base,
+        fyralis_tenant_id=tenant_id, fyralis_base_url=args.fyralis_base,
+        virtual_now=as_of, corpus_path=corpus_path,
     )
-    _eprint(f"run created: {rid}")
-
-    summary = await compile_run(pool, rid)
-    _eprint(f"orggen summary: {json.dumps(summary)}")
-    print(str(rid))                  # only the run id on stdout
+    _eprint(f"run created: {rid} (as-of {as_of_str})")
+    counts = await backfill(pool, rid, corpus_path, until=as_of)
+    _eprint(f"backfill summary: total={sum(counts.values())} kinds={len(counts)}")
+    for k, v in sorted(counts.items(), key=lambda x: -x[1])[:8]:
+        _eprint(f"  {v:>6d}  {k}")
+    print(str(rid))
     await pool.close()
     return 0
 
@@ -170,12 +149,6 @@ async def _cmd_emit(args: argparse.Namespace) -> int:
             f"discord:{discord_interactions_url} notion:{notion_webhook_url} "
             f"gmail:{gmail_pubsub_url} jira:{jira_webhook_url} (Ctrl-C to stop)")
 
-    live_gen: LiveEventGenerator | None = None
-    if args.live_rate > 0:
-        live_gen = LiveEventGenerator(pool, rid, msgs_per_minute=args.live_rate)
-        live_gen.start()
-        _eprint(f"live event generator running at {args.live_rate} msgs/min")
-
     try:
         stop = asyncio.Event()
         try:
@@ -183,8 +156,6 @@ async def _cmd_emit(args: argparse.Namespace) -> int:
         except asyncio.CancelledError:
             pass
     finally:
-        if live_gen is not None:
-            await live_gen.stop()
         await loop.stop()
         await ticker.stop()
         await set_mode(pool, rid, mode="frozen")
@@ -330,14 +301,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(prog="spammers")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
-    p_prep = sub.add_parser("prepare", help="apply migrations, create a run, OrgGen")
-    p_prep.add_argument("--size", choices=["small", "medium", "large"], required=True)
-    p_prep.add_argument("--runtime", choices=["few_months", "one_year", "few_years"], required=True)
-    p_prep.add_argument("--seed", type=int, default=42)
+    p_prep = sub.add_parser("prepare", help="apply migrations, create a run, backfill the corpus")
     p_prep.add_argument("--tenant-id", required=True)
     p_prep.add_argument("--fyralis-base", default="http://localhost:8000")
-    p_prep.add_argument("--corpus", default=None,
-                        help="path to a corpus events.jsonl (replay mode)")
+    p_prep.add_argument("--corpus", default="./gharelu/build/events.jsonl",
+                        help="path to a corpus events.jsonl (default: ./gharelu/build/events.jsonl)")
     p_prep.add_argument("--as-of", default=None,
                         help="YYYY-MM-DD cursor for corpus replay (default: today)")
     p_prep.set_defaults(func=_cmd_prepare)
@@ -365,8 +333,6 @@ def main() -> None:
                         help="defaults to {fyralis_base}/webhooks/gmail/pubsub")
     p_emit.add_argument("--jira-webhook-url", default=None,
                         help="defaults to {fyralis_base}/webhooks/jira")
-    p_emit.add_argument("--live-rate", type=float, default=0.0,
-                        help="msgs/minute to generate live (default 0 = none)")
     p_emit.set_defaults(func=_cmd_emit)
 
     p_inj = sub.add_parser("inject", help="inject a one-off live event")

@@ -93,6 +93,31 @@
   @media(max-width:580px){.hero{flex-direction:column;gap:14px;padding:20px}.hero-logo{width:84px;height:84px}
     .hero-name{font-size:23px}}
 
+  /* speed selector chips */
+  .speedrow{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+  .speedchip{border:1px solid var(--line);background:var(--panel);color:var(--ink);
+    padding:7px 13px;border-radius:4px;font-family:inherit;font-size:12px;letter-spacing:.5px;
+    cursor:pointer;transition:.12s;display:flex;flex-direction:column;align-items:flex-start;line-height:1.2}
+  .speedchip:hover{border-color:var(--line-bri);background:var(--panel-2)}
+  .speedchip.sel{border-color:var(--neon);box-shadow:0 0 0 1px var(--neon),0 0 10px rgba(0,255,102,.30);
+    color:var(--head)}
+  .speedchip b{color:var(--neon);font-size:13px;letter-spacing:.8px}
+  .speedchip span{color:var(--ink-dim);font-size:10.5px;margin-top:2px}
+
+  /* speed badge in console topbar */
+  .speed-badge{color:var(--ink-dim);font-size:11.5px;letter-spacing:1.2px;
+    border:1px solid var(--line);background:var(--panel-2);padding:4px 9px;border-radius:3px}
+  .speed-badge b{color:var(--neon);font-weight:700}
+  .speed-badge.paused{border-color:var(--amber);color:var(--amber)}
+  .speed-badge.paused b{color:var(--amber)}
+
+  /* paused state — dim every stat panel + show overlay banner */
+  body.paused #panels{opacity:.55;filter:saturate(.7)}
+  body.paused #panels::before{content:"⏸ PAUSED — virtual time + corpus replay frozen";
+    display:block;color:var(--amber);letter-spacing:2px;font-size:12px;text-align:center;
+    padding:10px 16px;margin-bottom:14px;border:1px solid var(--amber);border-radius:4px;
+    background:rgba(255,179,71,.08);opacity:1;grid-column:1/-1}
+
   .bar{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-top:16px}
   button{font-family:inherit;background:var(--neon);color:#032611;border:1px solid var(--neon);
     padding:11px 22px;letter-spacing:1.5px;cursor:pointer;transition:.12s;font-size:14px;font-weight:700;border-radius:4px}
@@ -195,6 +220,8 @@
       <div class="bootleft">
         <div class="label">// target organization</div>
         <div id="companies" class="grid"></div>
+        <div class="label">// virtual clock speed</div>
+        <div id="speeds" class="speedrow"></div>
         <div class="bar">
           <button id="startBtn">► Initialize</button>
           <span id="phase" class="phase"></span>
@@ -218,6 +245,8 @@
       </div>
       <div class="bar" style="margin:0">
         <span id="health"></span>
+        <span id="speedBadge" class="speed-badge"></span>
+        <button id="pauseBtn" class="ghost">⏸ Pause</button>
         <button id="stopBtn" class="danger">■ Terminate</button>
       </div>
     </div>
@@ -280,7 +309,29 @@ const coIcon=k=>`<svg class="clogo" viewBox="0 0 24 24" fill="none" stroke="curr
 
 //============================ app ============================
 const $=s=>document.querySelector(s), api=(p,o)=>fetch(p,o).then(r=>r.json());
-let selected=null, statePoll=null;
+let selected=null, statePoll=null, selectedSpeed=1800, paused=false;
+
+// Speed presets. value = multiplier passed to /api/start.
+const SPEEDS = [
+  {label:"1×",    sub:"real time",   value:1},
+  {label:"60×",   sub:"1m/sec",      value:60},
+  {label:"600×",  sub:"10m/sec",     value:600},
+  {label:"1800×", sub:"30m/sec",     value:1800},
+  {label:"3600×", sub:"1h/sec",      value:3600},
+  {label:"10000×",sub:"~3h/sec",     value:10000},
+];
+function renderSpeeds(){
+  const el=$('#speeds'); if(!el)return;
+  el.innerHTML = SPEEDS.map(s=>`
+    <button class="speedchip${s.value===selectedSpeed?' sel':''}" data-v="${s.value}">
+      <b>${s.label}</b><span>${s.sub}</span>
+    </button>`).join('');
+  el.querySelectorAll('.speedchip').forEach(b=>b.onclick=()=>{
+    selectedSpeed = parseFloat(b.dataset.v);
+    el.querySelectorAll('.speedchip').forEach(x=>x.classList.remove('sel'));
+    b.classList.add('sel');
+  });
+}
 
 function toast(msg,bad){const t=$('#toast');t.textContent=msg;t.className='toast show'+(bad?' bad':'');
   clearTimeout(t._t);t._t=setTimeout(()=>t.className='toast',2600);}
@@ -350,7 +401,7 @@ $('#startBtn').onclick=async()=>{
   const poll=setInterval(async()=>{try{const s=await api('/api/status');if(s.phase)phase=s.phase;}catch(e){}},600);
 
   const res=await api('/api/start',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({company:selected})}).catch(e=>({error:String(e)}));
+    body:JSON.stringify({company:selected, speed:selectedSpeed})}).catch(e=>({error:String(e)}));
   clearInterval(tick);clearInterval(poll);
   $('#startBtn').textContent='► Initialize';
   if(res.error){
@@ -378,6 +429,33 @@ $('#stopBtn').onclick=async()=>{
   await api('/api/stop',{method:'POST'});
   $('#stopBtn').disabled=false;exitConsole();toast('Terminated · state wiped');
 };
+
+$('#pauseBtn').onclick=async()=>{
+  $('#pauseBtn').disabled=true;
+  const path = paused ? '/api/resume' : '/api/pause';
+  const res = await api(path,{method:'POST'}).catch(e=>({error:String(e)}));
+  $('#pauseBtn').disabled=false;
+  if(res && !res.error){
+    applyPausedFlag(!!res.paused);
+    toast(paused ? 'Paused · clock + corpus frozen' : 'Resumed');
+  }
+};
+
+function speedLabel(v){
+  const s = SPEEDS.find(x=>Math.abs(x.value-v)<0.5);
+  return s ? s.label : (v+'×');
+}
+function applyPausedFlag(p){
+  paused = !!p;
+  document.body.classList.toggle('paused', paused);
+  const btn = $('#pauseBtn');
+  if(btn){
+    btn.textContent = paused ? '▶ Resume' : '⏸ Pause';
+    btn.classList.toggle('danger', false);
+  }
+  const badge = $('#speedBadge');
+  if(badge) badge.classList.toggle('paused', paused);
+}
 
 let CACHE={people:[],channels:{},repos:[],notion_databases:[],jira_projects:[]};
 
@@ -583,6 +661,14 @@ async function refreshStatus(){
   PROVIDERS.forEach(p=>{const el=$(`#stat-${p.id}`);if(el)el.innerHTML=statHTML(p.id,s.status[p.id]);});
   const sv=await api('/api/status');
   $('#health').innerHTML=Object.entries(sv.servers).map(([k,v])=>`<span class="dot ${v==='up'?'up':'down'}"></span>${k}:${sv.ports[k]}`).join('&nbsp;&nbsp;');
+  // Speed badge + paused flag follow whatever the controller reports.
+  const badge=$('#speedBadge');
+  if(badge && sv.speed){
+    badge.innerHTML = paused
+      ? `⏸ <b>${speedLabel(sv.speed)}</b> · frozen`
+      : `⚡ <b>${speedLabel(sv.speed)}</b>`;
+  }
+  applyPausedFlag(!!sv.paused);
 }
 
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
@@ -662,9 +748,14 @@ function startScope(){
 (async function(){
   $('#logos').innerHTML=['slack','github','discord','gmail','calendar','notion','drive','jira'].map(p=>brandSvg(p,'')).join('');
   typeFeed(WELCOME);startScope();
+  renderSpeeds();
   await loadCompanies();
   const s=await api('/api/status');
-  if(s.running)enterConsole();
+  if(s.running){
+    if(s.speed)selectedSpeed=s.speed;
+    applyPausedFlag(!!s.paused);
+    enterConsole();
+  }
 })();
 </script>
 </body>

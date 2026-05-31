@@ -18,6 +18,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import os
+import signal
 import socket
 import subprocess
 import sys
@@ -48,6 +49,8 @@ class State:
     company_key: Optional[str] = None
     error: Optional[str] = None
     servers: dict = field(default_factory=dict)   # provider -> "up"|"down"
+    speed: float = 1800.0           # virtual-time multiplier the emit loop runs at
+    paused: bool = False            # emit subprocess is currently SIGSTOPped
 
     def public(self) -> dict:
         comp = companies.get(self.company_key).as_dict() if self.company_key else None
@@ -56,6 +59,7 @@ class State:
             "company": comp, "error": self.error,
             "servers": self.servers or {p: "down" for p in SERVERS},
             "ports": SERVERS,
+            "speed": self.speed, "paused": self.paused,
         }
 
 
@@ -165,10 +169,14 @@ class Controller:
 
     # ---- public API --------------------------------------------------------
 
-    async def start(self, company_key: str) -> dict:
+    async def start(self, company_key: str, speed: float = 1800.0) -> dict:
         comp = companies.get(company_key)
         if comp is None:
             raise ValueError(f"unknown company: {company_key}")
+        # Clamp to sensible bounds: 1× (real-time, virtual-clock matches wall)
+        # up to 10000× (corpus exhausts in ~1 hour). Above 10000× the loop
+        # spends more time querying than landing events.
+        speed = max(1.0, min(10000.0, float(speed)))
         async with self._lock:
             if self.state.busy:
                 raise RuntimeError("a start/stop is already in progress")
@@ -204,15 +212,16 @@ class Controller:
                 if any(v == "down" for v in healthy.values()):
                     raise RuntimeError(f"some servers failed to start: {healthy}")
 
-                # Start emit: clock ticker + corpus forward-replay + webhook
-                # emission. Speed 1800× → 1 virtual day per ~48 real-sec.
-                # The corpus is sparse (~10k slack msgs across 47mo = ~0.3
-                # events/virtual-hour on average), so anything slower means
-                # multi-second stretches of static UI even during workday
-                # hours. At 1800× peak hours land an event per ~1s of real
-                # time and a 24h day finishes in under a minute. The
-                # remaining ~11mo of corpus exhausts in ~5 real hours.
-                self._spawn_emit(speed=1800.0)
+                # Start emit at the user-chosen speed multiplier.
+                #   1×    real-time (1 virtual sec per 1 real sec)
+                #   60×   1 virtual minute per real sec
+                #   600×  1 virtual day per ~2.4 real min
+                #   1800× 1 virtual day per ~48 real sec (Studio default)
+                #   3600× 1 virtual day per ~24 real sec
+                #   10000×fast burn (~11mo corpus exhausts in ~80 real min)
+                self._spawn_emit(speed=speed)
+                self.state.speed = speed
+                self.state.paused = False
 
                 self.state.running = True
                 self.state.phase = "running"
@@ -234,6 +243,13 @@ class Controller:
             self.state.busy = True
             self.state.phase = "stopping"
             try:
+                # If we're paused, resume first so the emit subprocess can
+                # exit cleanly on terminate — SIGSTOPped processes can't
+                # handle SIGTERM.
+                if self.state.paused:
+                    with contextlib.suppress(Exception):
+                        self._signal_emit(signal.SIGCONT)
+                    self.state.paused = False
                 self._kill_emit()
                 self._kill_servers()
                 with contextlib.suppress(Exception):
@@ -246,6 +262,41 @@ class Controller:
                 return self.state.public()
             finally:
                 self.state.busy = False
+
+    def _signal_emit(self, sig: int) -> None:
+        """Send a signal to the emit subprocess (SIGSTOP / SIGCONT)."""
+        if self._emit_proc is None or self._emit_proc.poll() is not None:
+            return
+        os.kill(self._emit_proc.pid, sig)
+
+    async def pause(self) -> dict:
+        """Halt virtual time + data flow. SIGSTOPs the emit subprocess so
+        LiveClockTicker, CorpusReplayLoop, and EmissionLoop all freeze in
+        place. The provider mocks stay up — anything ingested so far is
+        still queryable + the mocks still answer their APIs. Inject is
+        still available."""
+        async with self._lock:
+            if not self.state.running:
+                raise RuntimeError("not running")
+            if self.state.paused:
+                return self.state.public()
+            self._signal_emit(signal.SIGSTOP)
+            self.state.paused = True
+            self.state.phase = "paused"
+            return self.state.public()
+
+    async def resume(self) -> dict:
+        """Unfreeze emit — virtual time resumes, corpus replay picks up
+        where it left off, webhooks resume firing."""
+        async with self._lock:
+            if not self.state.running:
+                raise RuntimeError("not running")
+            if not self.state.paused:
+                return self.state.public()
+            self._signal_emit(signal.SIGCONT)
+            self.state.paused = False
+            self.state.phase = "running"
+            return self.state.public()
 
     def refresh_server_health(self) -> None:
         if self.state.running:

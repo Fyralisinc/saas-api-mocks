@@ -73,8 +73,9 @@ async def api_start(body: dict = Body(...)):
     key = (body or {}).get("company")
     if not key:
         return JSONResponse({"error": "company is required"}, status_code=400)
+    speed = (body or {}).get("speed", 1800.0)
     try:
-        return await controller.start(key)
+        return await controller.start(key, speed=float(speed))
     except Exception as e:
         return JSONResponse({"error": str(e), **controller.state.public()}, status_code=500)
 
@@ -85,6 +86,22 @@ async def api_stop():
         return await controller.stop()
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.post("/api/pause")
+async def api_pause():
+    try:
+        return await controller.pause()
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+
+
+@app.post("/api/resume")
+async def api_resume():
+    try:
+        return await controller.resume()
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
 
 
 @app.get("/api/state")

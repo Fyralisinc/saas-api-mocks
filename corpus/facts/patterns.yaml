@@ -208,12 +208,12 @@ patterns:
     standup_attendance: 0.87
     review_thoroughness: 0.88
   person:chhetri22:
-    ship_lag_hours: 27.0
-    review_response_hours: 11.6
+    ship_lag_hours: 17.0
+    review_response_hours: 7.6
     msg_hour_peak: 18
     msg_hour_spread: 2.0
     weekend_msg_factor: 0.28
-    standup_attendance: 0.85
+    standup_attendance: 0.95
     review_thoroughness: 0.79
   person:ceyhunsen:
     ship_lag_hours: 62.4
@@ -240,12 +240,12 @@ patterns:
     standup_attendance: 0.89
     review_thoroughness: 0.83
   person:pramodkandel:
-    ship_lag_hours: 21.0
-    review_response_hours: 9.9
+    ship_lag_hours: 11.0
+    review_response_hours: 5.9
     msg_hour_peak: 15
     msg_hour_spread: 3.0
     weekend_msg_factor: 0.38
-    standup_attendance: 0.9
+    standup_attendance: 1.0
     review_thoroughness: 0.5
   person:aunth:
     ship_lag_hours: 16.8
@@ -287,3 +287,19 @@ patterns:
     weekend_msg_factor: 0.52
     standup_attendance: 0.81
     review_thoroughness: 0.91
+  person:simanta-gautam:
+    ship_lag_hours: 62.7
+    review_response_hours: 4.0
+    msg_hour_peak: 14
+    msg_hour_spread: 3.0
+    weekend_msg_factor: 0.37
+    standup_attendance: 1.0
+    review_thoroughness: 0.6
+  person:chandansharmasubedi:
+    ship_lag_hours: 22.2
+    review_response_hours: 8.8
+    msg_hour_peak: 14
+    msg_hour_spread: 3.0
+    weekend_msg_factor: 0.46
+    standup_attendance: 0.89
+    review_thoroughness: 0.6

@@ -1835,3 +1835,98 @@ chatter_by_person:
     - offline most of saturday, doing normal life stuff
     - 'weekend plan is simple: sleep, groceries, maybe logs'
     - hiking sunday if the weather stops flapping
+  person:simanta-gautam:
+    reactions:
+    - love this
+    - exactly
+    - 👍
+    - great point
+    - agreed
+    - lets ship
+    - nice
+    - 'yes — let''s do it'
+    random:
+    - thinking about the next quarter, where are we vs the plan?
+    - 'investor call went well — main question: distribution timeline'
+    - 'reminder: i''m picking the all-hands theme this month'
+    - the bitcoin dollar story is starting to land with new partners
+    - heard great feedback on the testnet from a hedge fund this week
+    - team, please prioritize the customer pilot blockers this sprint
+    - i love the energy this week, we're moving fast
+    - 'few investor intros coming through this week — i''ll route them'
+    - long flight tomorrow, will be slow on slack
+    - quick reminder we have an all-hands friday, please prep updates
+    pto_announce:
+    - traveling next 3 days for fundraising meetings, slow on slack
+    - offline tomorrow morning, board prep
+    - out friday for a partner offsite, abishkar covers ops
+    - 'in NYC monday/tuesday: investor + partner meetings'
+    return_from_pto:
+    - back, catching up on threads now
+    - back online, will sync with leads first
+    - back from the trip, lots of good signal to share
+    - back today, doing inbox triage
+    conference_post:
+    - on stage at bitcoin++ on the credit markets panel
+    - good crowd at the alpen booth today, lots of testnet questions
+    - 'great chat with @vitalik post-panel: he gets the bitvm2 angle'
+    - heading to the bitcoin dev meetup, dm if you're around
+    incident_reaction:
+    - thanks team for jumping on this fast, let me know what i can help unblock
+    - i'll handle the external comms while you all focus on the fix
+    - keeping the board informed in real time, no surprises on their end
+    news_take:
+    - this paper is interesting but the narrative competes with our launch — let's get ahead of it
+    - the new fed rate signals matter for credit markets timing
+    - the strata mention in the wsj piece was well-placed
+    weekend_chatter:
+    - 'family hike sunday, phone away: don''t panic if i''m slow'
+    - 'sat morning: long run + reading the testnet retro'
+    - 'cooking experiment failed in interesting ways this weekend'
+  person:chandansharmasubedi:
+    reactions:
+    - yeah makes sense
+    - good thinking
+    - 'fair: ship it'
+    - love it
+    - same
+    - i'd push back gently
+    - solid
+    - 'agreed: lets revisit later'
+    random:
+    - reading the strata internals post again, still find new corners
+    - quick thought on the bridge state machine, doc incoming
+    - 'spent two hours in a partner call: the developer story is what they care about'
+    - the docs site needs a top-of-funnel pass, going to draft
+    - drafting a thread on why bitvm2 unlocks new product surface
+    - thinking about hiring shape for next quarter
+    - reviewing the q3 plan, mostly aligned with the rfc
+    - some recruiter pings this week, will share the good ones
+    - investor follow-up doc going out friday
+    - want to do a session walking through the credit markets thesis
+    pto_announce:
+    - out tomorrow for a candidate lunch, slow on slack
+    - taking thursday off, family thing
+    - offline this afternoon, doc work
+    - light next monday, mostly partner calls
+    return_from_pto:
+    - back, reading the retros first
+    - back online, picking up the candidate threads
+    - back today, will respond to the partner pings
+    - back, kicking off the planning doc draft
+    conference_post:
+    - at ZK summit, mostly meeting the verifier folks
+    - bitcoin dev meetup tonight, ping me if you're there
+    - had a great chat with the starknet shared-verifier team
+    incident_reaction:
+    - keeping notes on partner-side impact while you all fix the root cause
+    - i'll handle the external messaging while the team digs in
+    - thanks for the quick triage, will mirror updates to the slack incident channel
+    news_take:
+    - the bitvm2 piece is good but glosses over the verifier sharing nuance
+    - the recent rollup-economics post applies more to ethereum than to us, worth a response
+    - new bitcoin core release notes look uncontroversial for our stack
+    weekend_chatter:
+    - 'weekend reading list got longer: yc essays + a bitcoin paper'
+    - 'sat: errands + reviewing the planning doc'
+    - 'sunday morning is doc-writing time, kettle is on'

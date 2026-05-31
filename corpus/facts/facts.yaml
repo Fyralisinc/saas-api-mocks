@@ -12,6 +12,15 @@ company:
   blog: https://www.alpenlabs.io/blog
   docs: https://docs.alpenlabs.io
   headcount_estimate: 39
+  cofounders:
+  - {id: 'person:simanta-gautam', name: Simanta Gautam, title: Cofounder & CEO,
+     linkedin: 'https://www.linkedin.com/in/simanta-gautam/'}
+  - {id: 'person:pramodkandel',   name: Pramod Kandel,   title: Cofounder & CTO,
+     linkedin: 'https://www.linkedin.com/in/pramod-kandel-a0b0922b/'}
+  - {id: 'person:chhetri22',      name: Abishkar Chhetri, title: Cofounder & COO,
+     linkedin: 'https://www.linkedin.com/in/abishkar-chhetri/'}
+  - {id: 'person:chandansharmasubedi', name: Chandan Sharma Subedi, title: Cofounder,
+     linkedin: 'https://www.linkedin.com/in/chandansharmasubedi/'}
 products:
 - id: product:strata
   name: Strata
@@ -884,16 +893,17 @@ people:
 - id: person:chhetri22
   github_handle: chhetri22
   full_name: Abishkar Chhetri
-  email: chhetri22@alpenlabs.io
-  role: engineer
-  level: ic
-  team: COO
-  started_at: '2023-02-01'
-  last_active: '2024-06-06'
-  ended_at: '2024-07-15'
+  email: abishkar@alpenlabs.io
+  role: cofounder
+  title: Cofounder & COO
+  level: senior
+  team: team:exec
+  started_at: '2022-01-01'
+  last_active: '2026-05-27'
   twitter: null
   blog_url: null
-  bio: ''
+  linkedin: https://www.linkedin.com/in/abishkar-chhetri/
+  bio: Cofounder & COO at Alpen Labs.
   commits: 9
   top_repos:
   - Technical-Whitepaper
@@ -947,15 +957,17 @@ people:
 - id: person:pramodkandel
   github_handle: pramodkandel
   full_name: Pramod Kandel
-  email: pramodkandel@alpenlabs.io
-  role: devrel
-  level: ic
-  team: team:devrel
-  started_at: '2023-02-01'
-  last_active: '2024-10-07'
+  email: pramod@alpenlabs.io
+  role: cofounder
+  title: Cofounder & CTO
+  level: senior
+  team: team:exec
+  started_at: '2022-01-01'
+  last_active: '2026-05-27'
   twitter: null
   blog_url: null
-  bio: Trying to build useful things
+  linkedin: https://www.linkedin.com/in/pramod-kandel-a0b0922b/
+  bio: Cofounder & CTO at Alpen Labs. Trying to build useful things.
   commits: 5
   top_repos:
   - Technical-Whitepaper
@@ -1037,6 +1049,38 @@ people:
   commits: 3
   top_repos:
   - strata-p2p
+- id: person:simanta-gautam
+  github_handle: simanta-gautam
+  full_name: Simanta Gautam
+  email: simanta@alpenlabs.io
+  role: cofounder
+  title: Cofounder & CEO
+  level: senior
+  team: team:exec
+  started_at: '2022-01-01'
+  last_active: '2026-05-27'
+  twitter: null
+  blog_url: null
+  linkedin: https://www.linkedin.com/in/simanta-gautam/
+  bio: Cofounder & CEO at Alpen Labs. Building Bitcoin's own financial system.
+  commits: 0
+  top_repos: []
+- id: person:chandansharmasubedi
+  github_handle: chandansharmasubedi
+  full_name: Chandan Sharma Subedi
+  email: chandan@alpenlabs.io
+  role: cofounder
+  title: Cofounder
+  level: senior
+  team: team:exec
+  started_at: '2022-01-01'
+  last_active: '2026-05-27'
+  twitter: null
+  blog_url: null
+  linkedin: https://www.linkedin.com/in/chandansharmasubedi/
+  bio: Cofounder at Alpen Labs.
+  commits: 0
+  top_repos: []
 teams_template:
 - id: team:protocol
   name: Protocol Engineering

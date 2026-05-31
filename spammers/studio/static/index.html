@@ -112,11 +112,11 @@
   .speed-badge.paused b{color:var(--amber)}
 
   /* paused state — dim every stat panel + show overlay banner */
-  body.paused #panels{opacity:.55;filter:saturate(.7)}
-  body.paused #panels::before{content:"⏸ PAUSED — virtual time + corpus replay frozen";
+  body.paused .page-area{opacity:.62;filter:saturate(.75)}
+  body.paused .page.active::before{content:"⏸ PAUSED — virtual time + corpus replay frozen";
     display:block;color:var(--amber);letter-spacing:2px;font-size:12px;text-align:center;
     padding:10px 16px;margin-bottom:14px;border:1px solid var(--amber);border-radius:4px;
-    background:rgba(255,179,71,.08);opacity:1;grid-column:1/-1}
+    background:rgba(255,179,71,.08);opacity:1}
 
   .bar{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-top:16px}
   button{font-family:inherit;background:var(--neon);color:#032611;border:1px solid var(--neon);
@@ -134,6 +134,29 @@
   /* console */
   .topbar{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:14px;
     border-bottom:1px solid var(--line);padding-bottom:14px;margin-bottom:20px}
+
+  /* console layout: vertical nav rail on the left, page content on the right */
+  .console-body{display:flex;gap:18px;align-items:flex-start}
+  .nav-rail{flex:0 0 168px;position:sticky;top:14px;border:1px solid var(--line);background:var(--panel);
+    box-shadow:var(--shadow);border-radius:5px;padding:10px 0;display:flex;flex-direction:column;gap:2px}
+  .nav-item{display:flex;align-items:center;gap:11px;padding:13px 16px;color:var(--ink);background:transparent;
+    border:0;border-left:3px solid transparent;letter-spacing:1.8px;font-size:11.5px;text-transform:uppercase;
+    cursor:pointer;font-family:inherit;text-align:left;transition:.12s;border-radius:0}
+  .nav-item:hover{background:rgba(0,255,102,.07);color:var(--head)}
+  .nav-item.active{background:rgba(0,255,102,.10);color:var(--head);border-left-color:var(--neon);
+    box-shadow:inset 0 0 16px rgba(0,255,102,.10)}
+  .nav-item .ic{font-size:16px;line-height:1;color:var(--neon);width:18px;text-align:center;
+    filter:drop-shadow(0 0 4px rgba(0,255,102,.5))}
+  .nav-item.active .ic{color:var(--head)}
+  .nav-item .lab{flex:1;min-width:0}
+  .nav-item .sub{display:block;color:var(--ink-dim);font-size:9.5px;letter-spacing:1.5px;margin-top:2px;text-transform:uppercase}
+  .nav-sep{height:1px;background:var(--line);margin:6px 12px}
+  .page-area{flex:1;min-width:0}
+  .page{display:none}
+  .page.active{display:block}
+  @media(max-width:780px){.console-body{flex-direction:column}.nav-rail{flex-direction:row;width:100%;flex-basis:auto;position:static}
+    .nav-item{flex:1;justify-content:center;border-left:0;border-bottom:3px solid transparent}
+    .nav-item.active{border-left:0;border-bottom-color:var(--neon)}}
 
   /* dossier — replaces the old summary + columns block */
   .dossier{margin-bottom:22px}
@@ -240,6 +263,117 @@
   .mn-detail .th i{color:var(--ink-dim)}
   .mn-detail .nar{color:var(--ink);margin-top:6px}
 
+  /* page 1: live ingestion stats (no inject UI) */
+  .ing-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+  .ing-tile{position:relative;border:1px solid var(--line);background:var(--panel-2);
+    padding:14px 16px;border-radius:4px;overflow:hidden}
+  .ing-tile .wm-bg{position:absolute;top:-12px;right:-14px;width:120px;height:120px;fill:var(--neon);
+    opacity:.07;pointer-events:none}
+  .ing-tile h4{margin:0 0 10px;color:var(--head);font-size:12px;letter-spacing:2.5px;
+    display:flex;align-items:center;gap:8px;position:relative;z-index:1}
+  .ing-tile h4 svg{width:18px;height:18px;fill:var(--neon);
+    filter:drop-shadow(0 0 5px rgba(0,255,102,.5))}
+  .ing-stats{display:flex;flex-wrap:wrap;gap:14px;position:relative;z-index:1}
+  .ing-stats > div{display:flex;flex-direction:column}
+  .ing-stats b{color:var(--neon);font-size:20px;line-height:1.1;font-weight:700}
+  .ing-stats span{color:var(--ink-dim);font-size:10px;letter-spacing:1.2px;text-transform:uppercase;margin-top:2px}
+
+  /* page 1: inline credentials */
+  .creds-inline{border:1px solid var(--line);background:var(--panel);box-shadow:var(--shadow);
+    padding:16px 20px;margin-bottom:14px;border-radius:4px}
+  .creds-inline > h3{margin:0 0 12px;color:var(--neon);letter-spacing:2.5px;font-size:12.5px;
+    text-transform:uppercase;border-bottom:1px solid var(--line);padding-bottom:8px}
+  .creds-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:14px}
+  .creds-card{border:1px solid var(--line);background:var(--panel-2);padding:11px 13px;border-radius:3px}
+  .creds-card h4{margin:0 0 7px;color:var(--head);font-size:11px;letter-spacing:1.8px;text-transform:uppercase}
+  .creds-card .crow{margin:5px 0}
+  .creds-card .crow .k{width:120px;font-size:11.5px}
+  .creds-card .crow .v{font-size:11.5px;padding:5px 8px}
+  .creds-card .crow .copy{padding:5px 10px;font-size:10.5px}
+
+  /* page 2: detailed person card */
+  .ppl-list{display:flex;flex-direction:column;gap:13px}
+  .ppl-detail{border:1px solid var(--line);background:var(--panel);box-shadow:var(--shadow);
+    padding:16px 20px;border-radius:4px;border-left:3px solid var(--neon)}
+  .ppl-detail.departed{border-left-color:var(--danger);opacity:.85}
+  .ppl-detail.winddown{border-left-color:var(--amber)}
+  .ppl-d-h{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:6px}
+  .ppl-d-av{width:46px;height:46px;border-radius:50%;border:1.5px solid var(--line-bri);
+    background:var(--panel-2);color:var(--head);display:flex;align-items:center;justify-content:center;
+    font-size:15px;font-weight:700;letter-spacing:.5px;flex:0 0 auto;
+    filter:drop-shadow(0 0 5px rgba(0,255,102,.18))}
+  .ppl-d-h .name{color:var(--head);font-size:19px;font-weight:700;letter-spacing:.5px}
+  .ppl-d-h .name .handle{color:var(--neon);font-size:13px;letter-spacing:.5px;font-weight:400;margin-left:8px}
+  .badge{display:inline-block;padding:3px 9px;font-size:10.5px;letter-spacing:1.5px;border:1px solid;border-radius:2px;
+    text-transform:uppercase}
+  .badge.active{color:var(--neon);border-color:var(--neon)}
+  .badge.winddown{color:var(--amber);border-color:var(--amber);background:rgba(255,212,121,.08)}
+  .badge.departed{color:var(--danger);border-color:var(--danger);background:rgba(255,107,102,.08)}
+  .ppl-d-meta{color:var(--ink-dim);font-size:11.5px;letter-spacing:.5px;margin:2px 0 9px;line-height:1.6}
+  .ppl-d-meta b{color:var(--ink)}
+  .ppl-d-warn{margin:8px 0;padding:8px 12px;border:1px dashed var(--amber);color:var(--amber);
+    font-size:12px;line-height:1.55;border-radius:3px;background:rgba(255,212,121,.05)}
+  .ppl-d-warn.dep{border-color:var(--danger);color:var(--danger);background:rgba(255,107,102,.06)}
+  .ppl-d-bio{color:var(--ink);font-size:13px;line-height:1.6;margin:8px 0;padding-left:12px;
+    border-left:2px solid var(--line);font-style:italic;opacity:.92}
+  .ppl-d-bhv{color:var(--ink);font-size:13.5px;line-height:1.65;margin:10px 0 6px}
+  .ppl-d-sub{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-top:12px;
+    border-top:1px dashed rgba(0,255,120,.18);padding-top:12px}
+  .ppl-d-sub h5{margin:0 0 6px;color:var(--neon);font-size:10.5px;letter-spacing:1.5px;text-transform:uppercase}
+  .ppl-d-sub ul,.ppl-d-sub div.body{font-size:12px;color:var(--ink);line-height:1.55;margin:0;padding:0;list-style:none}
+  .ppl-d-sub li{padding:2px 0}
+  .ppl-d-sub li b{color:var(--head)}
+  .ppl-d-sub .dim{color:var(--ink-dim)}
+
+  /* page 3: phase accordion + month accordion */
+  .ph-acc{border:1px solid var(--line);background:var(--panel);box-shadow:var(--shadow);
+    margin-bottom:11px;border-radius:4px;overflow:hidden}
+  .ph-head{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:13px 18px;
+    cursor:pointer;background:var(--panel);transition:.12s;border-bottom:1px solid transparent}
+  .ph-head:hover{background:var(--panel-2)}
+  .ph-acc.open .ph-head{border-bottom-color:var(--line);background:var(--panel-2)}
+  .ph-head .l{display:flex;flex-direction:column;min-width:0;flex:1}
+  .ph-head .title{color:var(--head);font-size:14px;letter-spacing:1.5px;font-weight:700}
+  .ph-head .title::before{content:'▸ ';color:var(--neon);transition:.15s}
+  .ph-acc.open .ph-head .title::before{content:'▾ '}
+  .ph-head .meta{color:var(--ink-dim);font-size:11px;letter-spacing:.5px;margin-top:3px}
+  .ph-head .r{text-align:right;color:var(--ink-dim);font-size:11px;letter-spacing:.8px;white-space:nowrap}
+  .ph-head .r b{color:var(--neon);font-size:14px;display:block;margin-bottom:2px}
+  .ph-body{display:none;padding:6px 14px 14px}
+  .ph-acc.open .ph-body{display:block}
+
+  .mn-acc{border:1px solid var(--line);background:var(--panel-2);margin-top:8px;border-radius:3px;overflow:hidden}
+  .mn-head{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 14px;
+    cursor:pointer;transition:.12s}
+  .mn-head:hover{background:#0d2415}
+  .mn-acc.open .mn-head{background:#0d2415;border-bottom:1px solid var(--line)}
+  .mn-acc.future .mn-head{opacity:.5}
+  .mn-head .l{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
+  .mn-head .ym{color:var(--head);font-size:13px;font-weight:700;letter-spacing:.8px}
+  .mn-head .ym::before{content:'▸ ';color:var(--neon)}
+  .mn-acc.open .mn-head .ym::before{content:'▾ '}
+  .mn-head .badge-mn{font-size:9.5px;letter-spacing:1.5px;padding:2px 6px;border:1px solid;border-radius:2px;text-transform:uppercase}
+  .mn-head .badge-mn.bf{color:var(--neon);border-color:var(--neon)}
+  .mn-head .badge-mn.ft{color:var(--amber);border-color:var(--amber)}
+  .mn-head .r{color:var(--neon);font-size:11.5px;letter-spacing:.5px;text-align:right;white-space:nowrap}
+  .mn-head .r small{color:var(--ink-dim)}
+  .mn-body{display:none;padding:10px 14px 14px;font-size:12.5px;line-height:1.6;color:var(--ink)}
+  .mn-acc.open .mn-body{display:block}
+  .mn-body h5{margin:11px 0 5px;color:var(--neon);font-size:10.5px;letter-spacing:1.5px;text-transform:uppercase}
+  .mn-body h5:first-child{margin-top:2px}
+  .mn-body ul{margin:0;padding-left:18px}
+  .mn-body li{padding:2px 0}
+  .mn-body .prov-row{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0}
+  .mn-body .prov-row span{background:var(--bg2);border:1px solid var(--line);padding:3px 8px;
+    border-radius:2px;font-size:11.5px;color:var(--ink-dim)}
+  .mn-body .prov-row span b{color:var(--head);margin-right:4px}
+  .mn-body .nar{color:var(--ink);background:var(--bg2);padding:9px 12px;border-left:2px solid var(--neon);
+    margin-top:10px;font-size:12.5px;line-height:1.6}
+  .mn-body .ext{color:var(--amber)} .mn-body .dep{color:var(--danger)} .mn-body .ms b{color:var(--head)}
+  .mn-body .th{margin-top:6px}
+  .mn-body .th b{color:var(--head)} .mn-body .th i{color:var(--ink-dim);font-style:italic}
+  .mn-body .th p{margin:3px 0;color:var(--ink);font-size:12.5px;line-height:1.55}
+
   /* credentials panel */
   .credstoggle{margin-bottom:0;font-weight:600;font-size:13px}
   .creds{border:1px solid var(--line);background:var(--panel);box-shadow:var(--shadow);
@@ -345,16 +479,34 @@
       </div>
     </div>
 
-    <div class="dossier" id="dossier">
-      <div class="label" style="margin:0 0 10px">// company dossier — derived from corpus</div>
-      <!-- filled by renderDossier(d, co) -->
+    <div class="console-body">
+      <nav class="nav-rail" id="navRail">
+        <button class="nav-item active" data-page="overview">
+          <span class="ic">⊞</span>
+          <span class="lab">Overview<span class="sub">snapshot · credentials · live ingest</span></span>
+        </button>
+        <button class="nav-item" data-page="people">
+          <span class="ic">☻</span>
+          <span class="lab">People<span class="sub">36 contributors · patterns</span></span>
+        </button>
+        <button class="nav-item" data-page="monthly">
+          <span class="ic">▦</span>
+          <span class="lab">Monthly<span class="sub">58 months · 6 phases</span></span>
+        </button>
+      </nav>
+
+      <div class="page-area">
+        <section class="page active" id="page-overview">
+          <div class="dossier" id="dossier-overview"></div>
+        </section>
+        <section class="page" id="page-people">
+          <div class="dossier" id="dossier-people"></div>
+        </section>
+        <section class="page" id="page-monthly">
+          <div class="dossier" id="dossier-monthly"></div>
+        </section>
+      </div>
     </div>
-
-    <button id="credsToggle" class="ghost credstoggle">▸ Connection credentials — point Fyralis here</button>
-    <div id="creds" class="creds hidden"></div>
-
-    <div class="label">// live injection consoles</div>
-    <div id="panels" class="panels"></div>
   </section>
 </div>
 
@@ -552,7 +704,8 @@ function applyPausedFlag(p){
 
 let CACHE={people:[],channels:{},repos:[],notion_databases:[],jira_projects:[]};
 
-//============================ credentials panel ============================
+//============================ credentials renderer ============================
+// Now inlined inside Page 1 (Overview) — no more toggle.
 let CREDS=null;
 function mask(s){if(!s)return '';s=String(s);return s.length>16?s.slice(0,9)+'…'+s.slice(-4):s;}
 function credRow(k,v,path){
@@ -565,94 +718,120 @@ function copyPath(path){
   if(v==null){toast('nothing to copy',true);return;}
   navigator.clipboard.writeText(String(v)).then(()=>toast('copied · '+path)).catch(()=>toast('copy failed',true));
 }
-async function loadCreds(){
-  const r=await api('/api/credentials');CREDS=r.credentials||{};const c=CREDS;let h='';
-  if(c.base_urls){h+='<h4>Base URLs</h4>'+Object.entries(c.base_urls).map(([k,v])=>credRow(k,v,'base_urls.'+k)).join('');}
-  if(c.slack){h+='<h4>Slack</h4>'
-    +credRow('bot token',mask(c.slack.bot_token),'slack.bot_token')
-    +credRow('team_id',c.slack.team_id,'slack.team_id')
-    +credRow('secret-store key',c.slack.secret_store_key,'slack.secret_store_key')
-    +credRow('signing secret',mask(c.slack.signing_secret),'slack.signing_secret');}
-  if(c.github){h+='<h4>GitHub</h4>'
-    +credRow('app_id',c.github.app_id,'github.app_id')
-    +credRow('installation_id',c.github.installation_id,'github.installation_id')
-    +credRow('private key',c.github.private_key_path||'(in memory)','github.private_key')
-    +credRow('webhook secret',mask(c.github.webhook_secret),'github.webhook_secret');}
-  if(c.discord){h+='<h4>Discord</h4>'
-    +credRow('bot token',mask(c.discord.bot_token),'discord.bot_token')
-    +credRow('application_id',c.discord.application_id,'discord.application_id')
-    +credRow('guild_id',c.discord.guild_id,'discord.guild_id');}
-  if(c.gmail){h+='<h4>Gmail (DWD)</h4>'
-    +credRow('customer_id',c.gmail.customer_id,'gmail.customer_id')
-    +credRow('domain',c.gmail.domain,'gmail.domain')
-    +credRow('service account',c.gmail.service_account_email,'gmail.service_account_email')
-    +credRow('push audience',c.gmail.push_audience,'gmail.push_audience')
-    +credRow('push SA email',c.gmail.push_sa_email,'gmail.push_sa_email');}
-  if(c.calendar){h+='<h4>Google Calendar (DWD)</h4>'
-    +credRow('customer_id',c.calendar.customer_id,'calendar.customer_id')
-    +credRow('domain',c.calendar.domain,'calendar.domain')
-    +credRow('service account',c.calendar.service_account_email,'calendar.service_account_email');}
-  if(c.notion){h+='<h4>Notion</h4>'
-    +credRow('bot token',mask(c.notion.bot_token),'notion.bot_token')
-    +credRow('workspace_id',c.notion.workspace_id,'notion.workspace_id')
-    +credRow('webhook verification token',mask(c.notion.webhook_verification_token),'notion.webhook_verification_token');}
-  if(c.drive){h+='<h4>Google Drive (DWD)</h4>'
-    +credRow('customer_id',c.drive.customer_id,'drive.customer_id')
-    +credRow('domain',c.drive.domain,'drive.domain')
-    +credRow('service account',c.drive.service_account_email,'drive.service_account_email');}
-  if(c.jira){h+='<h4>Jira</h4>'
-    +credRow('base_url',c.jira.base_url,'jira.base_url')
-    +credRow('account_email',c.jira.account_email,'jira.account_email')
-    +credRow('api token',mask(c.jira.api_token),'jira.api_token')
-    +credRow('webhook secret',mask(c.jira.webhook_secret),'jira.webhook_secret')
-    +credRow('cloud_id',c.jira.cloud_id,'jira.cloud_id');}
-  const el=$('#creds');el.innerHTML=h;
-  el.querySelectorAll('.copy').forEach(b=>b.onclick=()=>copyPath(b.dataset.copy));
+function credsCards(c){
+  // Group every per-provider creds block as its own card so they fit a grid
+  // instead of stacking into one tall column.
+  const cards = [];
+  if(c.base_urls) cards.push({title:'BASE URLS', html: Object.entries(c.base_urls).map(([k,v])=>credRow(k,v,'base_urls.'+k)).join('')});
+  if(c.slack)    cards.push({title:'SLACK', html:
+      credRow('bot token',mask(c.slack.bot_token),'slack.bot_token')
+    + credRow('team_id',c.slack.team_id,'slack.team_id')
+    + credRow('secret-store key',c.slack.secret_store_key,'slack.secret_store_key')
+    + credRow('signing secret',mask(c.slack.signing_secret),'slack.signing_secret')});
+  if(c.github)   cards.push({title:'GITHUB', html:
+      credRow('app_id',c.github.app_id,'github.app_id')
+    + credRow('installation_id',c.github.installation_id,'github.installation_id')
+    + credRow('private key',c.github.private_key_path||'(in memory)','github.private_key')
+    + credRow('webhook secret',mask(c.github.webhook_secret),'github.webhook_secret')});
+  if(c.discord)  cards.push({title:'DISCORD', html:
+      credRow('bot token',mask(c.discord.bot_token),'discord.bot_token')
+    + credRow('application_id',c.discord.application_id,'discord.application_id')
+    + credRow('guild_id',c.discord.guild_id,'discord.guild_id')});
+  if(c.gmail)    cards.push({title:'GMAIL (DWD)', html:
+      credRow('customer_id',c.gmail.customer_id,'gmail.customer_id')
+    + credRow('domain',c.gmail.domain,'gmail.domain')
+    + credRow('service account',c.gmail.service_account_email,'gmail.service_account_email')
+    + credRow('push audience',c.gmail.push_audience,'gmail.push_audience')
+    + credRow('push SA email',c.gmail.push_sa_email,'gmail.push_sa_email')});
+  if(c.calendar) cards.push({title:'GOOGLE CALENDAR', html:
+      credRow('customer_id',c.calendar.customer_id,'calendar.customer_id')
+    + credRow('domain',c.calendar.domain,'calendar.domain')
+    + credRow('service account',c.calendar.service_account_email,'calendar.service_account_email')});
+  if(c.notion)   cards.push({title:'NOTION', html:
+      credRow('bot token',mask(c.notion.bot_token),'notion.bot_token')
+    + credRow('workspace_id',c.notion.workspace_id,'notion.workspace_id')
+    + credRow('webhook verification token',mask(c.notion.webhook_verification_token),'notion.webhook_verification_token')});
+  if(c.drive)    cards.push({title:'GOOGLE DRIVE', html:
+      credRow('customer_id',c.drive.customer_id,'drive.customer_id')
+    + credRow('domain',c.drive.domain,'drive.domain')
+    + credRow('service account',c.drive.service_account_email,'drive.service_account_email')});
+  if(c.jira)     cards.push({title:'JIRA', html:
+      credRow('base_url',c.jira.base_url,'jira.base_url')
+    + credRow('account_email',c.jira.account_email,'jira.account_email')
+    + credRow('api token',mask(c.jira.api_token),'jira.api_token')
+    + credRow('webhook secret',mask(c.jira.webhook_secret),'jira.webhook_secret')
+    + credRow('cloud_id',c.jira.cloud_id,'jira.cloud_id')});
+  return cards.map(card =>
+    `<div class="creds-card"><h4>${esc(card.title)}</h4>${card.html}</div>`
+  ).join('');
 }
-function collapseCreds(){CREDS=null;$('#creds').classList.add('hidden');$('#creds').innerHTML='';
-  $('#credsToggle').textContent='▸ Connection credentials — point Fyralis here';}
-$('#credsToggle').onclick=()=>{
-  const el=$('#creds');const willShow=el.classList.contains('hidden');
-  el.classList.toggle('hidden');
-  $('#credsToggle').textContent=(willShow?'▾':'▸')+' Connection credentials — point Fyralis here';
-  if(willShow && !CREDS) loadCreds();
-};
+async function loadCreds(){
+  const host = $('#creds-block'); if(!host) return;
+  const r = await api('/api/credentials');
+  CREDS = r.credentials||{};
+  host.innerHTML = `
+    <h3>CONNECTION CREDENTIALS // POINT FYRALIS HERE</h3>
+    <div class="creds-grid">${credsCards(CREDS)}</div>`;
+  host.querySelectorAll('.copy').forEach(b=>b.onclick=()=>copyPath(b.dataset.copy));
+}
 
 async function loadState(){
   const s=await api('/api/state');
   if(!s.running){exitConsole();return;}
-  collapseCreds();
   CACHE.people=s.people;CACHE.channels=s.channels;CACHE.repos=s.repos;CACHE.notion_databases=s.notion_databases||[];CACHE.jira_projects=s.jira_projects||[];
   const co=s.company,d=s.dossier;
   $('#coName').textContent=d.name||co.name;
   $('#coSub').textContent=`${d.stage||co.stage}  ·  ${d.overview.headcount} people  ·  ${d.state.months_elapsed}/${d.state.months_total} months  ·  as of ${(d.as_of||'').slice(0,10)}`;
-  renderDossier(d, co);
-  renderPanels(s.status);
+  renderDossier(d, co, s.status);
+  loadCreds();   // populate the inline credentials card on Page 1
 }
 
-//=========================== rich dossier renderer ============================
-// Everything here is sourced from spammers.studio.narrative.build() — the
-// shape is documented there. Fyralis's model layer is evaluated against the
-// content this panel shows.
+//=========================== three-page dossier renderer =====================
+// Page 1 (Overview):  hero + state + overview + credentials + live ingestion
+// Page 2 (People):    full-width detailed person cards (no top-12 cap)
+// Page 3 (Monthly):   phase accordions → month accordions with full detail
+//
+// All data is sourced from spammers.studio.narrative.build() — Fyralis's
+// model layer is evaluated against what these three pages show.
 
 const PROV_ORDER=['slack','discord','github','gmail','calendar','notion','drive','jira'];
 const PROV_SHORT={slack:'sl',discord:'di',github:'gh',gmail:'gm',calendar:'ca',notion:'no',drive:'dr',jira:'ji'};
+const PROV_LABEL={slack:'SLACK',discord:'DISCORD',github:'GITHUB',gmail:'GMAIL',
+                  calendar:'CALENDAR',notion:'NOTION',drive:'DRIVE',jira:'JIRA'};
 const TEAM_FULL={protocol:'Protocol Engineering',research:'Research',bridge:'Bridge',
                  infra:'Infrastructure',ops:'Ops',devrel:'Developer Relations',coo:'COO Office'};
 
-let _showAllPeople=false;
+// Persist nav selection across the loadState refresh.
+let activePage = 'overview';
 
-function renderDossier(d, co){
-  const el=$('#dossier'); if(!el) return;
-  el.innerHTML = `
-    <div class="label" style="margin:0 0 10px">// company dossier — derived from corpus</div>
+function renderDossier(d, co, providerStatus){
+  $('#dossier-overview').innerHTML = `
+    <div class="label" style="margin:0 0 10px">// snapshot · credentials · live ingestion</div>
     ${heroBlock(d, co)}
     ${stateStrip(d.state)}
     ${overviewBlock(d.overview)}
-    ${peopleBlock(d.people, d.overview.teams)}
-    ${monthlyBlock(d.monthly, d.signal_notes, d.state)}
+    <div class="creds-inline" id="creds-block"></div>
+    ${ingestionStatsBlock(providerStatus, d.state)}
   `;
+  $('#dossier-people').innerHTML = `
+    <div class="label" style="margin:0 0 10px">// people · 36 contributors · behavioural patterns</div>
+    ${peoplePageContent(d.people, d.overview.teams)}
+  `;
+  $('#dossier-monthly').innerHTML = `
+    <div class="label" style="margin:0 0 10px">// monthly breakdown · 58 months · 6 phases</div>
+    ${monthlyPageContent(d.monthly, d.signal_notes, d.state)}
+  `;
+  switchPage(activePage);     // restore the page the user was on
   wireDossier();
+}
+
+function switchPage(name){
+  activePage = name;
+  document.querySelectorAll('#navRail .nav-item').forEach(b =>
+    b.classList.toggle('active', b.dataset.page === name));
+  document.querySelectorAll('.page').forEach(p =>
+    p.classList.toggle('active', p.id === 'page-' + name));
+  window.scrollTo({top: 0, behavior: 'instant'});
 }
 
 function heroBlock(d, co){
@@ -703,63 +882,21 @@ function overviewBlock(ov){
     const full = TEAM_FULL[t.name.toLowerCase()] || t.name;
     return `<li><b>${esc(full)}</b> <span class="dim">${t.headcount} · lead ${esc(t.lead||'—')}</span></li>`;
   }).join('');
+  const cofounders = (ov.cofounders||[]).map(c =>
+    `<li><b>${esc(c.name)}</b> <span class="dim">${esc(c.title||'')}</span>${c.linkedin?` · <a href="${esc(c.linkedin)}" target="_blank" rel="noopener" style="color:var(--neon);text-decoration:none">LinkedIn ↗</a>`:''}</li>`
+  ).join('');
   return `
     <div class="doss-sec">
       <h3>OVERVIEW <span class="count">// who they are, what they ship</span></h3>
       <p class="blurb">${esc(ov.blurb)}</p>
       <p class="blurb" style="font-style:italic"><b>Mission:</b> ${esc(ov.mission)}</p>
       <div class="ov-grid">
+        ${cofounders?`<div class="ov-card"><h4>Cofounders (${(ov.cofounders||[]).length})</h4><ul>${cofounders}</ul></div>`:''}
         <div class="ov-card"><h4>Products (${(ov.products||[]).length})</h4><ul>${products}</ul></div>
         <div class="ov-card"><h4>Top repos (${ov.repos.total} total)</h4><ul>${repos}</ul></div>
         <div class="ov-card"><h4>Milestones</h4><ul>${ms||'<li>—</li>'}</ul></div>
         <div class="ov-card"><h4>Teams (${(ov.teams||[]).length})</h4><ul>${teams}</ul></div>
       </div>
-    </div>`;
-}
-
-function peopleBlock(people, teams){
-  const teamPills = (teams||[]).map(t=>`<span class="pill">${esc(t.name)} · ${t.headcount}</span>`).join('');
-  const view = _showAllPeople ? people : people.slice(0, 12);
-  const more = (!_showAllPeople && people.length > 12)
-    ? `<button class="ppl-more" id="ppl-more">▾ Show all ${people.length} people</button>` : '';
-  return `
-    <div class="doss-sec">
-      <h3>PEOPLE <span class="count">// ${people.length} contributors · behavioural patterns Fyralis can identify</span></h3>
-      <p class="blurb">${teamPills}</p>
-      <div class="ppl-grid">
-        ${view.map(personCard).join('')}
-      </div>
-      ${more}
-    </div>`;
-}
-
-function personCard(p){
-  const init = (p.full_name||p.handle).split(/\s+/).map(s=>s[0]||'').slice(0,2).join('').toUpperCase();
-  const team = (p.team||'').replace(/^team:/,'');
-  const pat = p.patterns||{};
-  const peakHot = (pat.peak_hour||14) >= 21 || (pat.peak_hour||14) < 7;
-  const wendHot = (pat.weekend_factor||0) > 0.5;
-  const lvlBadge = (p.level||'').toUpperCase();
-  return `
-    <div class="ppl-card">
-      <div class="ppl-h">
-        <div class="ppl-av">${esc(init)}</div>
-        <div style="min-width:0;flex:1">
-          <div class="name">${esc(p.full_name||p.handle)}</div>
-          <div class="handle">@${esc(p.handle)} · ${esc(p.role)}${lvlBadge?' · '+esc(lvlBadge):''}</div>
-        </div>
-      </div>
-      <div class="ppl-meta"><b>${esc(team)}</b>${p.location?` · ${esc(p.location)}`:''}${p.started_at?` · joined ${esc(String(p.started_at).slice(0,7))}`:''} · <b>${num(p.commits)}</b> commits</div>
-      <div class="ppl-bhv">${esc(p.behavior_summary)}</div>
-      <div class="ppl-pats">
-        <span class="pat ${peakHot?'hot':''}" title="Hour of day they're most active in Slack + Discord (their local timezone).">peak ${fmtHr(pat.peak_hour)} local</span>
-        <span class="pat ${wendHot?'hot':''}" title="Weekend message volume as a fraction of weekday baseline. <30% = rarely works weekends; >70% = regular weekend worker.">wknd act ${Math.round((pat.weekend_factor||0)*100)}%</span>
-        <span class="pat" title="Fraction of recurring standup calendar invites they accept (app_calendar.events).">standup RSVP ${pat.standup_attendance_pct||0}%</span>
-        <span class="pat" title="Probability a PR review is non-rubber-stamp (detailed body + inline comments).">PR review depth ${pat.review_thoroughness_pct||0}%</span>
-        <span class="pat" title="Median delay from being requested as reviewer to submitting the review.">PR review resp ~${Math.round(pat.review_response_hours||0)}h</span>
-        <span class="pat ${(pat.ship_lag_hours||0)>24?'hot':''}" title="Hours late vs the planned end date on the Jira issue. Positive = closes ticket after the planned date.">Jira slip ${(pat.ship_lag_hours||0)>=0?'+':''}${Math.round(pat.ship_lag_hours||0)}h vs plan</span>
-      </div>
-      ${p.top_repos&&p.top_repos.length?`<div class="ppl-meta" style="font-size:10.5px"><b>repos:</b> ${esc(p.top_repos.slice(0,4).join(', '))}</div>`:''}
     </div>`;
 }
 
@@ -769,35 +906,186 @@ function fmtHr(h){
   return h<12 ? `${h}am` : `${h-12}pm`;
 }
 
-function monthlyBlock(mn, signalNotes, st){
-  const months = mn.months||[];
-  // Group consecutive months by phase title (phases never overlap).
-  const groups=[];
-  let cur=null;
-  for(const m of months){
-    if(!cur || cur.title!==m.phase){
-      cur = {title: m.phase, blurb: m.phase_blurb, months: []};
-      groups.push(cur);
+//---------- Page 1: live ingestion stats (counts only — no inject UI) -------
+function ingestionStatsBlock(status, st){
+  status = status || {};
+  const tiles = PROV_ORDER.map(p => {
+    const s = status[p] || {};
+    const inner = ingestStatsFor(p, s);
+    return `
+      <div class="ing-tile">
+        ${brandSvg(p, 'wm-bg')}
+        <h4>${brandSvg(p,'brand')} ${PROV_LABEL[p]}</h4>
+        <div class="ing-stats">${inner}</div>
+      </div>`;
+  }).join('');
+  return `
+    <div class="doss-sec">
+      <h3>LIVE INGESTION <span class="count">// rows currently in the mock APIs · ${num(st.db_signals_total)} total</span></h3>
+      <p class="blurb">What Fyralis would see right now if it pulled every provider. Backfilled-month signals are already here; future-month signals land as the virtual clock advances and forward-replay emits them.</p>
+      <div class="ing-grid">${tiles}</div>
+    </div>`;
+}
+
+function ingestStatsFor(id, st){
+  st = st || {};
+  if(id==='github') return `
+    <div><b>${num(st.repos||0)}</b><span>REPOS</span></div>
+    <div><b>${num(st.commits||0)}</b><span>COMMITS</span></div>
+    <div><b>${num(st.pull_requests||0)}</b><span>PRs</span></div>
+    <div><b>${num(st.issues||0)}</b><span>ISSUES</span></div>`;
+  if(id==='gmail') return `
+    <div><b>${num(st.mailboxes||0)}</b><span>MAILBOXES</span></div>
+    <div><b>${num(st.threads||0)}</b><span>THREADS</span></div>
+    <div><b>${num(st.messages||0)}</b><span>MESSAGES</span></div>`;
+  if(id==='calendar') return `
+    <div><b>${num(st.calendars||0)}</b><span>CALENDARS</span></div>
+    <div><b>${num(st.events||0)}</b><span>EVENTS</span></div>`;
+  if(id==='notion') return `
+    <div><b>${num(st.databases||0)}</b><span>DATABASES</span></div>
+    <div><b>${num(st.pages||0)}</b><span>PAGES</span></div>
+    <div><b>${num(st.comments||0)}</b><span>COMMENTS</span></div>`;
+  if(id==='drive') return `
+    <div><b>${num(st.drives||0)}</b><span>DRIVES</span></div>
+    <div><b>${num(st.files||0)}</b><span>FILES</span></div>
+    <div><b>${num(st.comments||0)}</b><span>COMMENTS</span></div>`;
+  if(id==='jira') return `
+    <div><b>${num(st.projects||0)}</b><span>PROJECTS</span></div>
+    <div><b>${num(st.issues||0)}</b><span>ISSUES</span></div>
+    <div><b>${num(st.comments||0)}</b><span>COMMENTS</span></div>`;
+  // slack + discord
+  return `
+    <div><b>${num(st.messages||0)}</b><span>MESSAGES</span></div>
+    <div><b>${num(st.channels||0)}</b><span>CHANNELS</span></div>`;
+}
+
+//---------- Page 2: detailed people list (no top-12 cap) --------------------
+function peoplePageContent(people, teams){
+  const teamPills = (teams||[]).map(t=>`<span class="pill">${esc(t.name)} · ${t.headcount}</span>`).join('');
+  const winddown = people.filter(p => p.decline_window).length;
+  const departed = people.filter(p => p.status==='departed').length;
+  const intro = `${people.length} contributors across ${(teams||[]).length} teams. ${departed} have departed, ${winddown} are currently in (or have completed) a 42-day pre-departure activity decline — the renderer linearly tapers their message-emission probability from 1.0 → 0.3 across those 6 weeks, so the model layer can pick up on the slowdown before the formal departure date.`;
+  return `
+    <div class="doss-sec">
+      <h3>PEOPLE <span class="count">// behavioural patterns Fyralis can identify</span></h3>
+      <p class="blurb">${esc(intro)}</p>
+      <p class="blurb" style="margin-bottom:18px">${teamPills}</p>
+      <div class="ppl-list">${people.map(personDetailCard).join('')}</div>
+    </div>`;
+}
+
+function personDetailCard(p){
+  const init = (p.full_name||p.handle).split(/\s+/).map(s=>s[0]||'').slice(0,2).join('').toUpperCase();
+  const team = (p.team||'').replace(/^team:/,'');
+  const teamFull = TEAM_FULL[team.toLowerCase()] || team;
+  const pat = p.patterns||{};
+  const peakHot = (pat.peak_hour||14) >= 21 || (pat.peak_hour||14) < 7;
+  const wendHot = (pat.weekend_factor||0) > 0.5;
+  const lvlBadge = (p.level||'').toLowerCase()==='ic' ? 'IC' : (p.level||'').charAt(0).toUpperCase()+(p.level||'').slice(1);
+  // Cofounders/execs have a title like "Cofounder & CEO" — show that instead
+  // of the generic "Senior cofounder on Exec" sub-header.
+  const roleLine = p.title
+    ? `<b>${esc(p.title)}</b>`
+    : `${esc(lvlBadge)} ${esc(p.role)} on <b>${esc(teamFull)}</b>`;
+  const linkedinTag = p.linkedin
+    ? ` · <a href="${esc(p.linkedin)}" target="_blank" rel="noopener" style="color:var(--neon);text-decoration:none">LinkedIn ↗</a>`
+    : '';
+
+  // status block
+  let statusBadge = '<span class="badge active">Active</span>';
+  let warnBlock = '';
+  let cardCls = '';
+  if(p.status==='departed'){
+    statusBadge = `<span class="badge departed">Departed ${esc(p.ended_at)}</span>`;
+    cardCls = ' departed';
+    if(p.decline_window){
+      warnBlock = `
+        <div class="ppl-d-warn dep">
+          <b>Pre-departure activity decline:</b> ${esc(p.decline_window.start)} → ${esc(p.decline_window.end)} (42 days).
+          ${esc(p.decline_window.anchor)}.
+        </div>`;
     }
+  }
+
+  // pto roll-up
+  const pto = p.pto_summary || {total_days: 0, by_year: {}};
+  const ptoYears = Object.keys(pto.by_year||{}).sort();
+  const ptoLines = ptoYears.map(y => {
+    const d = pto.by_year[y];
+    return `<li><b>${esc(y)}</b> <span class="dim">— ${d.vacation_blocks} vacation block${d.vacation_blocks===1?'':'s'} (${d.vacation_days}d) + ${d.sick_days} sick day${d.sick_days===1?'':'s'}</span></li>`;
+  }).join('') || '<li class="dim">no PTO recorded</li>';
+
+  // conference travel
+  const travel = (p.conference_travel||[]).map(t =>
+    `<li><b>${esc(t.date)}</b> ${esc(t.label)} <span class="dim">(${t.days}d)</span></li>`
+  ).join('') || '<li class="dim">no conference travel</li>';
+
+  return `
+    <div class="ppl-detail${cardCls}">
+      <div class="ppl-d-h">
+        <div class="ppl-d-av">${esc(init)}</div>
+        <div style="flex:1;min-width:0">
+          <div class="name">${esc(p.full_name)} <span class="handle">@${esc(p.handle)}</span></div>
+          <div class="ppl-d-meta">
+            ${roleLine}
+            ${p.location?` · ${esc(p.location)}`:''}
+            ${p.started_at?` · joined <b>${esc(String(p.started_at).slice(0,10))}</b>`:''}
+            ${p.last_active?` · last active <b>${esc(String(p.last_active).slice(0,10))}</b>`:''}
+            · <b>${num(p.commits)}</b> commits${linkedinTag}
+          </div>
+        </div>
+        ${statusBadge}
+      </div>
+      ${warnBlock}
+      ${p.bio?`<div class="ppl-d-bio">${esc(p.bio)}</div>`:''}
+      <div class="ppl-d-bhv">${esc(p.behavior_summary)}</div>
+      <div class="ppl-pats">
+        <span class="pat ${peakHot?'hot':''}" title="Hour of day they're most active in Slack + Discord (their local timezone).">peak ${fmtHr(pat.peak_hour)} local</span>
+        <span class="pat ${wendHot?'hot':''}" title="Weekend message volume as a fraction of weekday baseline.">wknd act ${Math.round((pat.weekend_factor||0)*100)}%</span>
+        <span class="pat" title="Fraction of recurring standup calendar invites they accept (app_calendar.events).">standup RSVP ${pat.standup_attendance_pct||0}%</span>
+        <span class="pat" title="Probability a PR review is non-rubber-stamp (detailed body + inline comments).">PR review depth ${pat.review_thoroughness_pct||0}%</span>
+        <span class="pat" title="Median delay from being requested as reviewer to submitting the review.">PR review resp ~${Math.round(pat.review_response_hours||0)}h</span>
+        <span class="pat ${(pat.ship_lag_hours||0)>24?'hot':''}" title="Hours late vs the planned end date on the Jira issue.">Jira slip ${(pat.ship_lag_hours||0)>=0?'+':''}${Math.round(pat.ship_lag_hours||0)}h vs plan</span>
+      </div>
+      <div class="ppl-d-sub">
+        <div>
+          <h5>Top repos</h5>
+          <ul>${(p.top_repos||[]).slice(0,5).map(r=>`<li><b>${esc(r)}</b></li>`).join('') || '<li class="dim">—</li>'}</ul>
+        </div>
+        <div>
+          <h5>PTO (total ${pto.total_days}d)</h5>
+          <ul>${ptoLines}</ul>
+        </div>
+        <div>
+          <h5>Conference travel</h5>
+          <ul>${travel}</ul>
+        </div>
+      </div>
+    </div>`;
+}
+
+//---------- Page 3: phase accordion → month accordion -----------------------
+function monthlyPageContent(mn, signalNotes, st){
+  const months = mn.months||[];
+  // group consecutive months by phase
+  const groups=[]; let cur=null;
+  for(const m of months){
+    if(!cur || cur.title!==m.phase){ cur = {title:m.phase, blurb:m.phase_blurb, months:[]}; groups.push(cur); }
     cur.months.push(m);
   }
-  const phaseLegend = (mn.phase_legend||[]).map(p=>
-    `<span class="mn-phase"><b>${esc(p.title)}</b> — ${esc(p.start)} → ${esc(p.end)}</span>`).join('');
+  // collapse all phases initially; open the phase containing current virtual_now
+  const nowYm = (st.now_virtual||'').slice(0,7);
+  const groupsHtml = groups.map((g, idx) => phaseAccordion(g, idx, nowYm)).join('');
+  const notesHtml = PROV_ORDER.map(p=>`<div><b>${esc(p)}</b> — ${esc(signalNotes[p]||'')}</div>`).join('');
   const totalsRow = PROV_ORDER.map(p=>{
     const n = mn.totals_corpus[p]||0;
     const ing = mn.ingest_corpus[p]||n;
     return `<li><b>${esc(p)}</b> <span class="dim">${num(n)} unique · ${num(ing)} ingest</span></li>`;
   }).join('');
-  const notesHtml = PROV_ORDER.map(p=>`<div><b>${esc(p)}</b> — ${esc(signalNotes[p]||'')}</div>`).join('');
-  const groupsHtml = groups.map(g=>`
-    <div class="mn-phase-h">▸ ${esc(g.title)}<span class="blurb"> · ${esc(g.blurb||'')}</span></div>
-    <div class="mn-grid">${g.months.map(monthCard).join('')}</div>
-  `).join('');
   return `
     <div class="doss-sec">
       <h3>MONTHLY BREAKDOWN <span class="count">// ${months.length} months · ${num(st.signals_corpus)} unique signals total</span></h3>
       <p class="blurb">${esc(mn.overview_blurb)}</p>
-      <div class="mn-legend">${phaseLegend}</div>
       <span class="mn-notes-tg" id="mn-notes-tg">▸ Signal accounting notes (per-provider unique vs ingest)</span>
       <div class="mn-notes" id="mn-notes">
         ${notesHtml}
@@ -810,166 +1098,123 @@ function monthlyBlock(mn, signalNotes, st){
     </div>`;
 }
 
-function monthCard(m){
-  const cls = m.in_backfill ? 'bf' : 'ft';
-  const lbl = m.in_backfill ? 'BACKFILLED' : 'FUTURE';
-  const provChips = PROV_ORDER.filter(p=>(m.signals[p]||0)>0).map(p=>{
-    const u = m.signals[p]||0;
-    const i = m.ingest_signals[p]||u;
-    const ingHint = (i!==u) ? ` (${i})` : '';
-    return `<span><b>${PROV_SHORT[p]}</b>${u}${ingHint}</span>`;
-  }).join('');
-  const ms = (m.milestones||[]).map(x=>`<li class="ms">${esc(x.date)} — ${esc(x.title)}</li>`).join('');
-  const nh = (m.new_hires||[]).map(x=>`<li class="nh">@${esc(x.handle)} <i>${esc(x.role)} · ${esc((x.team||'').replace(/^team:/,''))}</i></li>`).join('');
-  const th = (m.threads_active||[]).map(t=>`<li class="th"><b>${esc(t.title||t.id)}</b> <i>${esc(t.beat_kind||'')}</i><br>${esc(t.summary||'')}</li>`).join('');
-  const future = m.is_future ? ' future' : '';
+function phaseAccordion(g, idx, nowYm){
+  const phaseTotal = g.months.reduce((s,m) => s + m.unique_total, 0);
+  const bfCount = g.months.filter(m => m.in_backfill).length;
+  const isCurrent = g.months.some(m => m.ym === nowYm);
+  const openCls = isCurrent ? ' open' : '';
   return `
-    <div class="mn-card${future}" data-ym="${esc(m.ym)}">
-      <div class="mn-row">
-        <span class="mn-month">${esc(m.label)}</span>
-        <span class="mn-state ${cls}">${lbl}</span>
+    <div class="ph-acc${openCls}" data-phase="${idx}">
+      <div class="ph-head">
+        <div class="l">
+          <div class="title">${esc(g.title)}</div>
+          <div class="meta">${esc(g.months[0].ym)} → ${esc(g.months[g.months.length-1].ym)} · ${g.months.length} months · ${bfCount} backfilled, ${g.months.length-bfCount} future · ${esc(g.blurb||'')}</div>
+        </div>
+        <div class="r"><b>${num(phaseTotal)}</b>signals</div>
       </div>
-      <div class="mn-row">
-        <span class="mn-tot">${num(m.unique_total)} unique <small>· ${num(m.ingest_total)} ingest</small></span>
-      </div>
-      <div class="mn-prov">${provChips||'<span><b>·</b>silence</span>'}</div>
-      <div class="mn-detail">
-        ${ms?`<h5>Milestones</h5><ul style="margin:0;padding-left:16px">${ms}</ul>`:''}
-        ${nh?`<h5>Hires</h5><ul style="margin:0;padding-left:16px">${nh}</ul>`:''}
-        ${th?`<h5>Active threads</h5><ul style="margin:0;padding-left:16px">${th}</ul>`:''}
-        ${(m.top_repos&&m.top_repos.length)?`<h5>Top repo activity</h5><div>${m.top_repos.map(r=>`<span class="pat">${esc(r.repo)} · ${r.commits}</span>`).join('')}</div>`:''}
-        <div class="nar">${esc(m.narrative)}</div>
-      </div>
+      <div class="ph-body">${g.months.map(m => monthAccordion(m, m.ym===nowYm)).join('')}</div>
     </div>`;
 }
 
+function monthAccordion(m, isCurrent){
+  const badgeCls = m.in_backfill ? 'bf' : 'ft';
+  const badgeLbl = m.in_backfill ? 'BACKFILLED' : 'FUTURE';
+  const futureCls = m.is_future ? ' future' : '';
+  const openCls = isCurrent ? ' open' : '';
+  return `
+    <div class="mn-acc${futureCls}${openCls}" data-ym="${esc(m.ym)}">
+      <div class="mn-head">
+        <div class="l">
+          <span class="ym">${esc(m.label)}</span>
+          <span class="badge-mn ${badgeCls}">${badgeLbl}</span>
+        </div>
+        <div class="r">${num(m.unique_total)} unique <small>· ${num(m.ingest_total)} ingest</small></div>
+      </div>
+      <div class="mn-body">${monthBody(m)}</div>
+    </div>`;
+}
+
+function monthBody(m){
+  const provRow = PROV_ORDER.filter(p=>(m.signals[p]||0)>0).map(p=>{
+    const u = m.signals[p]||0;
+    const i = m.ingest_signals[p]||u;
+    const ingHint = (i!==u) ? ` (${i} ingest)` : '';
+    return `<span><b>${PROV_LABEL[p]}</b>${num(u)}${ingHint}</span>`;
+  }).join('') || '<span class="dim">no signals this month</span>';
+
+  const ms = (m.milestones||[]).map(x=>`<li class="ms"><b>${esc(x.date)}</b> — ${esc(x.title)}</li>`).join('');
+  const ext = (m.external_events||[]).map(x=>`<li class="ext"><b>${esc(x.date)}</b> ${esc(x.label)} <span class="dim">(${esc(x.kind)} · ${esc(x.impact||'')} · ${x.days}d)</span></li>`).join('');
+  const dep = (m.departures||[]).map(x=>`<li class="dep"><b>${esc(x.full_name)}</b> @${esc(x.handle)} <span class="dim">${esc(x.role)} · ${esc((x.team||'').replace(/^team:/,''))} · ended ${esc(x.ended_at)}</span></li>`).join('');
+  const nh = (m.new_hires||[]).map(x=>`<li><b>${esc(x.full_name||x.handle)}</b> @${esc(x.handle)} <span class="dim">${esc(x.role)} · ${esc((x.team||'').replace(/^team:/,''))}</span></li>`).join('');
+  const pto = (m.pto_this_month||[]).slice(0,10).map(p=>`<li><b>@${esc(p.handle)}</b> <span class="dim">${esc(p.label||p.kind)} · ${esc(p.start)} → ${esc(p.end)}</span></li>`).join('');
+  const ptoMore = (m.pto_this_month||[]).length > 10 ? `<li class="dim">…and ${m.pto_this_month.length - 10} more</li>` : '';
+
+  const ta = (m.top_actors||[]).map(a=>`<span class="pat">@${esc(a.handle)} · ${num(a.commits)}</span>`).join('');
+  const tr = (m.top_repos||[]).map(r=>`<span class="pat">${esc(r.repo)} · ${num(r.commits)}</span>`).join('');
+
+  const threads = (m.threads_active||[]).map(t=>`
+    <div class="th">
+      <b>${esc(t.title||t.id)}</b> <i>${esc(t.beat_kind||'')}</i>
+      <p>${esc(t.summary||'')}</p>
+    </div>`).join('');
+
+  return `
+    <h5>Signal volume by provider</h5>
+    <div class="prov-row">${provRow}</div>
+
+    ${m.milestones&&m.milestones.length?`<h5>Milestones</h5><ul>${ms}</ul>`:''}
+    ${m.external_events&&m.external_events.length?`<h5>External events</h5><ul>${ext}</ul>`:''}
+    ${m.departures&&m.departures.length?`<h5>Departures</h5><ul>${dep}</ul>`:''}
+    ${m.new_hires&&m.new_hires.length?`<h5>New hires</h5><ul>${nh}</ul>`:''}
+    ${m.pto_this_month&&m.pto_this_month.length?`<h5>People on PTO (${m.pto_this_month.length})</h5><ul>${pto}${ptoMore}</ul>`:''}
+    ${ta?`<h5>Top contributors</h5><div>${ta}</div>`:''}
+    ${tr?`<h5>Top repos by commit volume</h5><div>${tr}</div>`:''}
+    ${threads?`<h5>Active threads</h5>${threads}`:''}
+    <div class="nar">${esc(m.narrative)}</div>`;
+}
+
+//---------- wiring ---------------------------------------------------------
 function wireDossier(){
-  const more = $('#ppl-more');
-  if(more) more.onclick = () => { _showAllPeople = true; loadState(); };
+  // nav rail
+  document.querySelectorAll('#navRail .nav-item').forEach(b =>
+    b.onclick = () => switchPage(b.dataset.page));
+  // signal accounting notes (Page 3)
   const tg = $('#mn-notes-tg');
   if(tg) tg.onclick = () => {
     const box = $('#mn-notes'); if(!box) return;
     const open = box.classList.toggle('show');
     tg.textContent = (open?'▾':'▸')+' Signal accounting notes (per-provider unique vs ingest)';
   };
-  document.querySelectorAll('.mn-card').forEach(c => {
-    c.onclick = () => c.classList.toggle('open');
-  });
+  // phase + month accordions (Page 3)
+  document.querySelectorAll('.ph-acc .ph-head').forEach(h =>
+    h.onclick = () => h.parentElement.classList.toggle('open'));
+  // wire month heads — clicking the head toggles the body. stopPropagation
+  // so the click doesn't bubble up and re-toggle the parent phase.
+  document.querySelectorAll('.mn-acc .mn-head').forEach(h =>
+    h.onclick = (e) => { e.stopPropagation(); h.parentElement.classList.toggle('open'); });
 }
 
 function num(n){ n = Number(n)||0; return n.toLocaleString('en-US'); }
 
-const PROVIDERS=[
-  {id:'slack',label:'SLACK',icon:'#'},
-  {id:'discord',label:'DISCORD',icon:'#'},
-  {id:'github',label:'GITHUB',icon:'◇'},
-  {id:'gmail',label:'GMAIL',icon:'✉'},
-  {id:'calendar',label:'CALENDAR',icon:'▦'},
-  {id:'notion',label:'NOTION',icon:'▢'},
-  {id:'drive',label:'DRIVE',icon:'△'},
-  {id:'jira',label:'JIRA',icon:'◆'},
-];
-
-// per-provider: where the target dropdown's options come from, its label, the
-// inject body field it maps to, and the textarea placeholder.
-const PANEL={
-  slack:    {label:'channel',     field:'channel',   ph:'type a message as the selected actor…', opts:()=>CACHE.channels.slack||[]},
-  discord:  {label:'channel',     field:'channel',   ph:'type a message as the selected actor…', opts:()=>CACHE.channels.discord||[]},
-  github:   {label:'repository',  field:'repo',      ph:'issue title to open as the selected actor…', opts:()=>CACHE.repos||[]},
-  gmail:    {label:'recipient',   field:'recipient', ph:'first line = subject, rest = body…',     opts:()=>peopleHandles()},
-  calendar: {label:'attendee',    field:'attendee',  ph:'event title (e.g. "Roadmap sync")…',     opts:()=>peopleHandles()},
-  notion:   {label:'database',    field:'database',  ph:'page title to create…',                  opts:()=>CACHE.notion_databases||[]},
-  drive:    {label:'drive',       field:'drive',     ph:'file name to create on the actor’s My Drive…', opts:()=>['My Drive']},
-  jira:     {label:'project',     field:'project',   ph:'issue summary to create…',               opts:()=>CACHE.jira_projects||[]},
-};
-function peopleHandles(){return (CACHE.people||[]).map(p=>p.handle);}
-
-function renderPanels(status){
-  $('#panels').innerHTML=PROVIDERS.map(p=>{
-    const cfg=PANEL[p.id];
-    const targets=cfg.opts();
-    const tgtLabel=cfg.label;
-    return `
-    <div class="panel" data-prov="${p.id}">
-      ${brandSvg(p.id,'wm')}
-      <div class="pbody">
-        <h3>${brandSvg(p.id,'brand')} ${p.label}</h3>
-        <div class="stat" id="stat-${p.id}">${statHTML(p.id,status[p.id])}</div>
-        <div class="field">Impersonate actor</div>
-        <select class="who" data-prov="${p.id}">${peopleOpts()}</select>
-        <div class="field">${tgtLabel}</div>
-        <select class="tgt" data-prov="${p.id}">${targets.map(t=>`<option>${esc(t)}</option>`).join('')||'<option>—</option>'}</select>
-        <div class="field">Suggestions — click to use</div>
-        <div class="sugs" id="sug-${p.id}"></div>
-        <textarea class="msg" data-prov="${p.id}" placeholder="${esc(cfg.ph)}"></textarea>
-        <div class="row"><button class="ghost send" data-prov="${p.id}">⇪ Inject message</button></div>
-      </div>
-    </div>`;
-  }).join('');
-  document.querySelectorAll('.who').forEach(sel=>sel.onchange=()=>loadSuggestions(sel.dataset.prov));
-  document.querySelectorAll('.send').forEach(b=>b.onclick=()=>doInject(b.dataset.prov));
-  PROVIDERS.forEach(p=>loadSuggestions(p.id));
-}
-
-function statHTML(id,st){
-  st=st||{};
-  if(id==='github') return `
-    <div><b>${st.repos||0}</b><span>REPOS</span></div><div><b>${st.issues||0}</b><span>ISSUES</span></div>
-    <div><b>${st.pull_requests||0}</b><span>PRs</span></div><div><b>${st.commits||0}</b><span>COMMITS</span></div>`;
-  if(id==='gmail') return `
-    <div><b>${st.mailboxes||0}</b><span>MAILBOXES</span></div><div><b>${st.threads||0}</b><span>THREADS</span></div>
-    <div><b>${st.messages||0}</b><span>MESSAGES</span></div>`;
-  if(id==='calendar') return `
-    <div><b>${st.calendars||0}</b><span>CALENDARS</span></div><div><b>${st.events||0}</b><span>EVENTS</span></div>`;
-  if(id==='notion') return `
-    <div><b>${st.databases||0}</b><span>DATABASES</span></div><div><b>${st.pages||0}</b><span>PAGES</span></div>
-    <div><b>${st.comments||0}</b><span>COMMENTS</span></div>`;
-  if(id==='drive') return `
-    <div><b>${st.drives||0}</b><span>DRIVES</span></div><div><b>${st.files||0}</b><span>FILES</span></div>
-    <div><b>${st.comments||0}</b><span>COMMENTS</span></div>`;
-  if(id==='jira') return `
-    <div><b>${st.projects||0}</b><span>PROJECTS</span></div><div><b>${st.issues||0}</b><span>ISSUES</span></div>
-    <div><b>${st.comments||0}</b><span>COMMENTS</span></div>`;
-  return `<div><b>${st.messages||0}</b><span>MESSAGES</span></div><div><b>${st.channels||0}</b><span>CHANNELS</span></div>`;
-}
-
-function peopleOpts(){
-  return CACHE.people.map(p=>`<option value="${esc(p.handle)}">${esc(p.handle)} — ${esc(p.role||'?')}${p.team?(' · '+esc(p.team)):''}</option>`).join('');
-}
-
-async function loadSuggestions(prov){
-  const who=document.querySelector(`.who[data-prov="${prov}"]`);
-  if(!who||!who.value)return;
-  const {suggestions}=await api(`/api/suggest?handle=${encodeURIComponent(who.value)}&provider=${prov}`);
-  const box=$(`#sug-${prov}`);
-  box.innerHTML=(suggestions||[]).map(s=>`<span class="sug">${esc(s)}</span>`).join('');
-  box.querySelectorAll('.sug').forEach(el=>el.onclick=()=>{
-    document.querySelector(`.msg[data-prov="${prov}"]`).value=el.textContent;
-  });
-}
-
-async function doInject(prov){
-  const who=document.querySelector(`.who[data-prov="${prov}"]`).value;
-  const tgt=document.querySelector(`.tgt[data-prov="${prov}"]`).value;
-  const msg=document.querySelector(`.msg[data-prov="${prov}"]`).value.trim();
-  if(!msg){toast('message is empty',true);return;}
-  const body={provider:prov,handle:who,text:msg};
-  body[PANEL[prov].field]=tgt;
-  const res=await api('/api/inject',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  if(res.error){toast('ERR: '+res.error,true);return;}
-  document.querySelector(`.msg[data-prov="${prov}"]`).value='';
-  toast(`✓ injected as ${who} → ${prov}`);
-  refreshStatus();
-}
-
 async function refreshStatus(){
-  const s=await api('/api/state');
-  if(!s.running){exitConsole();return;}
-  PROVIDERS.forEach(p=>{const el=$(`#stat-${p.id}`);if(el)el.innerHTML=statHTML(p.id,s.status[p.id]);});
-  const sv=await api('/api/status');
-  $('#health').innerHTML=Object.entries(sv.servers).map(([k,v])=>`<span class="dot ${v==='up'?'up':'down'}"></span>${k}:${sv.ports[k]}`).join('&nbsp;&nbsp;');
-  // Speed badge + paused flag follow whatever the controller reports.
-  const badge=$('#speedBadge');
+  const s = await api('/api/state');
+  if(!s.running){ exitConsole(); return; }
+  // Live-update the state strip + ingestion stats without throwing away the
+  // user's current page selection or open accordions.
+  const co = s.company, d = s.dossier;
+  const strip = $('#dossier-overview .state-strip');
+  if(strip) strip.outerHTML = stateStrip(d.state);
+  const ing = $('#dossier-overview .ing-grid');
+  if(ing){
+    ing.outerHTML = `<div class="ing-grid">${PROV_ORDER.map(p => {
+      const ps = s.status[p]||{};
+      return `<div class="ing-tile">${brandSvg(p,'wm-bg')}<h4>${brandSvg(p,'brand')} ${PROV_LABEL[p]}</h4><div class="ing-stats">${ingestStatsFor(p, ps)}</div></div>`;
+    }).join('')}</div>`;
+  }
+  const sv = await api('/api/status');
+  $('#health').innerHTML = Object.entries(sv.servers).map(([k,v]) =>
+    `<span class="dot ${v==='up'?'up':'down'}"></span>${k}:${sv.ports[k]}`).join('&nbsp;&nbsp;');
+  const badge = $('#speedBadge');
   if(badge && sv.speed){
     badge.innerHTML = paused
       ? `⏸ <b>${speedLabel(sv.speed)}</b> · frozen`

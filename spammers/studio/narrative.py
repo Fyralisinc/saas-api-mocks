@@ -92,6 +92,7 @@ async def build(pool: asyncpg.Pool, run_id: UUID, company: Company) -> dict:
             "blog":      profile["company"]["blog"],
             "github_org": profile["company"]["github_org"],
             "headcount": profile["company"]["headcount"],
+            "cofounders": profile["company"]["cofounders"],
             "products":  profile["products"],
             "repos":     profile["repos"],
             "milestones": profile["milestones"],

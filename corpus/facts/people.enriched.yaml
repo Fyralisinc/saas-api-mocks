@@ -548,19 +548,21 @@ people:
 - id: person:chhetri22
   github_handle: chhetri22
   full_name: Abishkar Chhetri
-  email: chhetri22@alpenlabs.io
-  role: engineer
-  level: ic
-  team: needs:review
-  started_at: '2023-02-01'
-  last_active: '2024-06-06'
+  email: abishkar@alpenlabs.io
+  role: cofounder
+  title: Cofounder & COO
+  level: senior
+  team: team:exec
+  started_at: '2022-01-01'
+  last_active: '2026-05-27'
   twitter: ''
   blog_url: ''
-  bio: ''
+  linkedin: https://www.linkedin.com/in/abishkar-chhetri/
+  bio: Cofounder & COO at Alpen Labs.
   commits: 9
   top_repos:
   - Technical-Whitepaper
-  company_self_reported: ''
+  company_self_reported: 'Alpen Labs'
   location: ''
   likely_external: false
 - id: person:ceyhunsen
@@ -622,20 +624,22 @@ people:
 - id: person:pramodkandel
   github_handle: pramodkandel
   full_name: Pramod Kandel
-  email: pramodkandel@alpenlabs.io
-  role: devrel
-  level: ic
-  team: team:devrel
-  started_at: '2023-02-01'
-  last_active: '2024-10-07'
+  email: pramod@alpenlabs.io
+  role: cofounder
+  title: Cofounder & CTO
+  level: senior
+  team: team:exec
+  started_at: '2022-01-01'
+  last_active: '2026-05-27'
   twitter: ''
   blog_url: ''
-  bio: Trying to build useful things
+  linkedin: https://www.linkedin.com/in/pramod-kandel-a0b0922b/
+  bio: Cofounder & CTO at Alpen Labs. Trying to build useful things.
   commits: 5
   top_repos:
   - Technical-Whitepaper
   - docs-archive
-  company_self_reported: ''
+  company_self_reported: 'Alpen Labs'
   location: ''
   likely_external: false
 - id: person:aunth
@@ -728,5 +732,43 @@ people:
   top_repos:
   - strata-p2p
   company_self_reported: ''
+  location: ''
+  likely_external: false
+- id: person:simanta-gautam
+  github_handle: simanta-gautam
+  full_name: Simanta Gautam
+  email: simanta@alpenlabs.io
+  role: cofounder
+  title: Cofounder & CEO
+  level: senior
+  team: team:exec
+  started_at: '2022-01-01'
+  last_active: '2026-05-27'
+  twitter: ''
+  blog_url: ''
+  linkedin: https://www.linkedin.com/in/simanta-gautam/
+  bio: Cofounder & CEO at Alpen Labs. Building Bitcoin's own financial system.
+  commits: 0
+  top_repos: []
+  company_self_reported: 'Alpen Labs'
+  location: ''
+  likely_external: false
+- id: person:chandansharmasubedi
+  github_handle: chandansharmasubedi
+  full_name: Chandan Sharma Subedi
+  email: chandan@alpenlabs.io
+  role: cofounder
+  title: Cofounder
+  level: senior
+  team: team:exec
+  started_at: '2022-01-01'
+  last_active: '2026-05-27'
+  twitter: ''
+  blog_url: ''
+  linkedin: https://www.linkedin.com/in/chandansharmasubedi/
+  bio: Cofounder at Alpen Labs.
+  commits: 0
+  top_repos: []
+  company_self_reported: 'Alpen Labs'
   location: ''
   likely_external: false

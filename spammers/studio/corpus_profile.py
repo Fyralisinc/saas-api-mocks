@@ -90,6 +90,10 @@ def _build_profile(events_jsonl: Path) -> dict:
     patterns_raw = _yaml(corpus_root / "facts" / "patterns.yaml")
     patterns = (patterns_raw or {}).get("patterns", {})
     threads = _load_threads(corpus_root / "threads")
+    office = _yaml(corpus_root / "facts" / "office_life.yaml") or {}
+    pto_by_pid = (office.get("pto") or {})
+    external_events = (office.get("external_events") or [])
+    conference_travel = (office.get("conference_travel") or {})
 
     company = (facts or {}).get("company", {})
     products = (facts or {}).get("products", [])
@@ -101,7 +105,16 @@ def _build_profile(events_jsonl: Path) -> dict:
     enriched_by_id = {p["id"]: p for p in people_enriched}
     facts_by_id = {p["id"]: p for p in people_facts}
 
-    # ---- people, with behavior summary ----
+    # ---- people, with behavior summary + status (active / departed / winding down) ----
+    # invert conference_travel into per-person trips for richer per-person view
+    travel_by_pid: dict[str, list[dict]] = defaultdict(list)
+    for ev in external_events:
+        if ev.get("kind") != "conference":
+            continue
+        attendees = conference_travel.get(ev["label"], []) or []
+        for pid in attendees:
+            travel_by_pid[pid].append({"label": ev["label"], "date": ev["date"], "days": ev.get("days", 4)})
+
     people = []
     for pid in sorted(set(list(enriched_by_id) + list(facts_by_id)),
                       key=lambda i: -(_safe_int(facts_by_id.get(i, {}).get("commits")) or
@@ -109,7 +122,9 @@ def _build_profile(events_jsonl: Path) -> dict:
         f = facts_by_id.get(pid, {})
         e = enriched_by_id.get(pid, {})
         pat = patterns.get(pid, {}) or {}
-        people.append(_person(pid, f, e, pat))
+        pto = pto_by_pid.get(pid, []) or []
+        travel = travel_by_pid.get(pid, [])
+        people.append(_person(pid, f, e, pat, pto, travel))
 
     # ---- monthly signal roll-up from events.jsonl ----
     # signals[ym][provider] = unique count (corpus events)
@@ -171,7 +186,13 @@ def _build_profile(events_jsonl: Path) -> dict:
         phase = _phase_for(ym)
         thread_beats = _active_beats(threads, ym)
         new_hires = [p for p in people if _ym(p.get("started_at")) == ym]
+        departures = [p for p in people if _ym(p.get("ended_at")) == ym]
         ms = [m for m in milestones if _ym(m.get("date")) == ym]
+        ext = [{"date": ev.get("date"), "kind": ev.get("kind"),
+                "label": ev.get("label"), "impact": ev.get("impact"),
+                "days": ev.get("days", 1)}
+               for ev in external_events if _ym(ev.get("date")) == ym]
+        pto_this_month = _pto_in_month(pto_by_pid, ym, people)
         sig = {k: int(v) for k, v in signals.get(ym, {}).items()}
         ing = {k: int(round(v)) for k, v in ingest.get(ym, {}).items()}
         top_repos = sorted(repo_activity.get(ym, {}).items(),
@@ -189,13 +210,18 @@ def _build_profile(events_jsonl: Path) -> dict:
             "ingest_total": sum(ing.values()),
             "milestones": [{"date": m.get("date"), "title": m.get("title"),
                             "kind": m.get("kind")} for m in ms],
+            "external_events": ext,
             "threads_active": [
                 {"id": b["thread_id"], "title": b["thread_title"],
                  "beat_kind": b["beat_kind"], "summary": b["beat_summary"]}
-                for b in thread_beats[:4]
+                for b in thread_beats
             ],
             "new_hires": [{"handle": p["handle"], "full_name": p["full_name"],
                            "role": p["role"], "team": p["team"]} for p in new_hires],
+            "departures": [{"handle": p["handle"], "full_name": p["full_name"],
+                            "role": p["role"], "team": p["team"],
+                            "ended_at": p["ended_at"]} for p in departures],
+            "pto_this_month": pto_this_month,
             "top_repos": [{"repo": r, "commits": n} for r, n in top_repos],
             "top_actors": [
                 {"handle": _handle_for_pid(people, pid), "commits": n}
@@ -203,6 +229,7 @@ def _build_profile(events_jsonl: Path) -> dict:
             ],
             "narrative": _month_narrative(
                 ym, sig, ing, ms, thread_beats, new_hires, top_repos, top_actors, people,
+                ext, departures,
             ),
         })
 
@@ -224,6 +251,11 @@ def _build_profile(events_jsonl: Path) -> dict:
             "github_org": company.get("github_org"),
             "headcount": len(people),
             "overview_blurb": overview_blurb,
+            "cofounders": [
+                {"id": c.get("id"), "name": c.get("name"),
+                 "title": c.get("title"), "linkedin": c.get("linkedin")}
+                for c in (company.get("cofounders") or [])
+            ],
         },
         "products": [{"name": p.get("name"), "description": p.get("description")}
                      for p in products],
@@ -359,6 +391,33 @@ def _active_beats(threads: list[dict], ym: str) -> list[dict]:
     return out
 
 
+def _pto_in_month(pto_by_pid: dict[str, list[dict]], ym: str,
+                  people: list[dict]) -> list[dict]:
+    """List PTO windows whose [start, end] overlaps month YM, with the
+    person's handle attached so Page 3 can render 'Rajil1213 — summer pto
+    Aug 9–18'."""
+    out = []
+    name_by_pid = {p["id"]: (p["full_name"], p["handle"]) for p in people}
+    for pid, windows in (pto_by_pid or {}).items():
+        nm = name_by_pid.get(pid)
+        if not nm:
+            continue
+        full_name, handle = nm
+        for w in windows or []:
+            s, e = str(w.get("start", "")), str(w.get("end", ""))
+            if not s or not e:
+                continue
+            if _ym(s) > ym or _ym(e) < ym:
+                continue
+            out.append({
+                "handle": handle, "full_name": full_name,
+                "start": s, "end": e,
+                "kind": w.get("kind"), "label": w.get("label"),
+            })
+    # Sort by start date so consecutive vacations group naturally.
+    return sorted(out, key=lambda w: (w["start"], w["handle"]))
+
+
 def _handle_for_pid(people: list[dict], pid: str) -> str:
     for p in people:
         if p["id"] == pid:
@@ -374,7 +433,9 @@ def _format_hours(peak: float, spread: float) -> str:
     return f"{fmt(lo)}–{fmt(hi)} local"
 
 
-def _person(pid: str, f: dict, e: dict, pat: dict) -> dict:
+def _person(pid: str, f: dict, e: dict, pat: dict,
+            pto: list[dict] | None = None,
+            travel: list[dict] | None = None) -> dict:
     handle = f.get("github_handle") or e.get("github_handle") or pid.removeprefix("person:")
     full_name = e.get("full_name") or f.get("full_name") or handle
     if full_name == "needs:review":
@@ -382,11 +443,17 @@ def _person(pid: str, f: dict, e: dict, pat: dict) -> dict:
     role = f.get("role") or e.get("role") or "?"
     level = f.get("level") or e.get("level") or "ic"
     team = (f.get("team") or e.get("team") or "team:?")
+    title = (f.get("title") or e.get("title") or "").strip()
+    linkedin = (f.get("linkedin") or e.get("linkedin") or "").strip()
     started = f.get("started_at") or e.get("started_at")
+    ended = f.get("ended_at") or e.get("ended_at")
+    last_active = f.get("last_active") or e.get("last_active")
     commits = _safe_int(f.get("commits")) or _safe_int(e.get("commits")) or 0
     bio = (e.get("bio") or f.get("bio") or "").strip()
     location = (e.get("location") or "").strip()
     top_repos = list((f.get("top_repos") or e.get("top_repos") or []))
+    pto = pto or []
+    travel = travel or []
 
     peak = float(pat.get("msg_hour_peak", 14))
     spread = float(pat.get("msg_hour_spread", 2.5))
@@ -443,23 +510,59 @@ def _person(pid: str, f: dict, e: dict, pat: dict) -> dict:
     # else gets normal title-case.
     level_disp = "IC" if level.lower() == "ic" else level.capitalize()
     role_disp = "developer relations" if role == "devrel" else role
+
+    # Cofounders carry a `title` field (e.g. "Cofounder & CEO") — render
+    # that verbatim instead of the generic "Senior cofounder on Exec".
+    if title:
+        prefix = title
+    else:
+        prefix = f"{level_disp} {role_disp}"
+        if team.startswith("team:") and team.removeprefix("team:") != "exec":
+            prefix += f" on {team.removeprefix('team:').capitalize()}"
     behavior = (
-        f"{level_disp} {role_disp}"
-        + (f" on {team.removeprefix('team:').capitalize()}" if team.startswith("team:") else "")
+        prefix
         + (f", based in {location}" if location else "")
         + f". Most active {_format_hours(peak, spread)}; {weekend_blurb}. "
         + f"{attend_blurb}, {resp_blurb}, {review_blurb}; "
         + f"{ship_blurb}."
     )
 
+    # ---- status: active / winding down / departed -----------------------
+    # Pre-departure decline window is 42 days (renderer linear-tapers from
+    # 100% → 30% over those 6 weeks). Exposing this as an explicit status
+    # so Page 2 can label "winding down (pre-departure window 2024-11-08 →
+    # 2024-12-20)" — the exact thing Fyralis should detect in the data.
+    decline_window: dict | None = None
+    if ended:
+        try:
+            from datetime import date as _date, timedelta as _td
+            end_d = _date.fromisoformat(str(ended)[:10])
+            decline_window = {
+                "start": (end_d - _td(days=42)).isoformat(),
+                "end": end_d.isoformat(),
+                "duration_days": 42,
+                "anchor": "renderer linearly tapers message-emission probability from 1.0 → 0.3 across these 42 days",
+            }
+        except (ValueError, TypeError):
+            pass
+    status = ("departed" if ended else "active")
+
+    # ---- pto roll-up: total days off per year + sick vs vacation split --
+    pto_summary = _pto_summary(pto)
+
     return {
         "id": pid,
         "handle": handle,
         "full_name": full_name,
         "role": role,
+        "title": title,
+        "linkedin": linkedin,
         "level": level,
         "team": team,
         "started_at": started,
+        "ended_at": ended,
+        "last_active": last_active,
+        "status": status,
         "location": location,
         "bio": bio,
         "commits": commits,
@@ -475,7 +578,37 @@ def _person(pid: str, f: dict, e: dict, pat: dict) -> dict:
             "review_thoroughness_pct": int(round(review_thor * 100)),
         },
         "behavior_summary": behavior,
+        "decline_window": decline_window,
+        "pto": pto,
+        "pto_summary": pto_summary,
+        "conference_travel": travel,
     }
+
+
+def _pto_summary(pto: list[dict]) -> dict:
+    """Roll up per-person PTO windows into a per-year tally + total days,
+    so the per-person card can show "took 18 days off in 2024 (3 vacation
+    blocks + 2 sick days)" without rendering every individual window."""
+    from datetime import date as _date
+    by_year: dict[str, dict[str, int]] = defaultdict(lambda: {
+        "vacation_blocks": 0, "vacation_days": 0, "sick_days": 0,
+    })
+    total_days = 0
+    for w in pto:
+        try:
+            s = _date.fromisoformat(str(w.get("start", ""))[:10])
+            e = _date.fromisoformat(str(w.get("end", ""))[:10])
+        except (ValueError, TypeError):
+            continue
+        days = (e - s).days + 1
+        y = str(s.year)
+        total_days += days
+        if w.get("kind") == "sick":
+            by_year[y]["sick_days"] += days
+        else:
+            by_year[y]["vacation_blocks"] += 1
+            by_year[y]["vacation_days"] += days
+    return {"total_days": total_days, "by_year": dict(by_year)}
 
 
 def _teams(people: list[dict]) -> list[dict]:
@@ -518,12 +651,26 @@ def _month_narrative(
     milestones: list[dict], beats: list[dict],
     new_hires: list[dict], top_repos: list[tuple[str, int]],
     top_actors: list[tuple[str, int]], people: list[dict],
+    external_events: list[dict] | None = None,
+    departures: list[dict] | None = None,
 ) -> str:
     parts: list[str] = []
 
     if milestones:
         ms = ", ".join(m.get("title", "?") for m in milestones)
         parts.append(f"Milestone: {ms}.")
+
+    if external_events:
+        # Surface industry events the team had to react to (CVEs, halving,
+        # conferences, winter break) — those create signal patterns Fyralis
+        # should disambiguate from real internal work.
+        ev = ", ".join(f"{e['label']}" for e in external_events[:3])
+        parts.append(f"External: {ev}.")
+
+    if departures:
+        dep = ", ".join(f"{p['full_name']} ({p['team'].removeprefix('team:')})"
+                        for p in departures)
+        parts.append(f"Departure: {dep}.")
 
     if new_hires:
         nh = ", ".join(f"{p['full_name']} ({p['role']}, {p['team'].removeprefix('team:')})"

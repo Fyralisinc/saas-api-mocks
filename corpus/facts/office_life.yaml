@@ -966,10 +966,6 @@ pto:
     end: '2023-07-19'
     kind: sick
     label: sick day
-  - start: '2023-09-14'
-    end: '2023-09-19'
-    kind: vacation
-    label: long weekend
   - start: '2023-12-27'
     end: '2024-01-01'
     kind: vacation
@@ -978,10 +974,6 @@ pto:
     end: '2024-04-15'
     kind: sick
     label: sick day
-  - start: '2024-05-16'
-    end: '2024-05-18'
-    kind: vacation
-    label: long weekend
   - start: '2024-06-08'
     end: '2024-06-15'
     kind: vacation
@@ -990,10 +982,6 @@ pto:
     end: '2024-08-18'
     kind: sick
     label: sick day
-  - start: '2025-04-18'
-    end: '2025-04-21'
-    kind: vacation
-    label: long weekend
   - start: '2025-07-19'
     end: '2025-07-19'
     kind: sick
@@ -1006,10 +994,6 @@ pto:
     end: '2025-12-27'
     kind: vacation
     label: winter break
-  - start: '2026-03-20'
-    end: '2026-03-22'
-    kind: vacation
-    label: long weekend
   - start: '2026-07-20'
     end: '2026-07-26'
     kind: vacation
@@ -1175,6 +1159,96 @@ pto:
     end: '2027-01-01'
     kind: vacation
     label: winter break
+  person:simanta-gautam:
+  - start: '2023-08-01'
+    end: '2023-08-01'
+    kind: sick
+    label: sick day
+  - start: '2023-08-10'
+    end: '2023-08-18'
+    kind: vacation
+    label: summer pto
+  - start: '2023-08-12'
+    end: '2023-08-12'
+    kind: sick
+    label: sick day
+  - start: '2023-12-22'
+    end: '2023-12-28'
+    kind: vacation
+    label: winter break
+  - start: '2024-08-08'
+    end: '2024-08-16'
+    kind: vacation
+    label: summer pto
+  - start: '2024-08-23'
+    end: '2024-08-23'
+    kind: sick
+    label: sick day
+  - start: '2025-06-02'
+    end: '2025-06-02'
+    kind: sick
+    label: sick day
+  - start: '2025-06-19'
+    end: '2025-06-28'
+    kind: vacation
+    label: summer pto
+  - start: '2026-07-19'
+    end: '2026-07-19'
+    kind: sick
+    label: sick day
+  - start: '2026-08-15'
+    end: '2026-08-22'
+    kind: vacation
+    label: summer pto
+  - start: '2026-12-03'
+    end: '2026-12-03'
+    kind: sick
+    label: sick day
+  - start: '2026-12-24'
+    end: '2027-01-02'
+    kind: vacation
+    label: winter break
+  person:chandansharmasubedi:
+  - start: '2023-02-21'
+    end: '2023-02-21'
+    kind: sick
+    label: sick day
+  - start: '2023-08-05'
+    end: '2023-08-10'
+    kind: vacation
+    label: summer pto
+  - start: '2023-12-23'
+    end: '2023-12-29'
+    kind: vacation
+    label: winter break
+  - start: '2024-03-14'
+    end: '2024-03-14'
+    kind: sick
+    label: sick day
+  - start: '2024-08-07'
+    end: '2024-08-19'
+    kind: vacation
+    label: summer pto
+  - start: '2025-10-14'
+    end: '2025-10-14'
+    kind: sick
+    label: sick day
+  - start: '2026-08-03'
+    end: '2026-08-03'
+    kind: sick
+    label: sick day
+  - start: '2026-08-16'
+    end: '2026-08-22'
+    kind: vacation
+    label: summer pto
+  - start: '2026-11-21'
+    end: '2026-11-21'
+    kind: sick
+    label: sick day
+  - start: '2026-12-24'
+    end: '2027-01-01'
+    kind: vacation
+    label: winter break
 external_events:
 - date: '2024-04-19'
   kind: halving
@@ -1293,6 +1367,7 @@ conference_travel:
   - person:manishbista28
   - person:cyphersnake
   - person:Arniiiii
+  - person:chandansharmasubedi
   BTC++ Asia:
   - person:prajwolrg
   - person:MdTeach

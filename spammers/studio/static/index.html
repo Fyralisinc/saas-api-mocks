@@ -541,6 +541,7 @@ const BRAND={
   notion:"M4.459 4.208c.746.606 1.026.56 2.428.466l13.215-.793c.28 0 .047-.28-.046-.326L17.86 1.968c-.42-.326-.981-.7-2.055-.607L3.01 2.295c-.466.046-.56.28-.374.466zm.793 3.08v13.904c0 .747.373 1.027 1.214.98l14.523-.84c.841-.046.935-.56.935-1.167V6.354c0-.606-.233-.933-.748-.887l-15.177.887c-.56.047-.747.327-.747.933zm14.337.745c.093.42 0 .84-.42.887l-.7.14v10.264c-.608.327-1.168.514-1.635.514-.748 0-.935-.234-1.495-.933l-4.577-7.186v6.952l1.448.327s0 .84-1.168.84l-3.222.186c-.093-.186 0-.653.327-.746l.84-.233V9.854L7.822 9.76c-.094-.42.14-1.026.793-1.073l3.456-.233 4.764 7.279v-6.44l-1.215-.14c-.093-.513.28-.886.747-.932zM1.936 1.035l13.31-.98c1.634-.14 2.055-.047 3.082.7l4.249 2.986c.7.513.934.653.934 1.213v16.378c0 1.026-.373 1.634-1.68 1.726l-15.458.934c-.98.047-1.448-.093-1.962-.747l-3.129-4.06c-.56-.747-.793-1.306-.793-1.96V2.667c0-.839.374-1.54 1.448-1.632z",
   drive:"M7.71 3.5L1.15 15l3.43 5.5 6.56-11.5zM22.85 15L16.29 3.5H9.43l6.56 11.5zM2.88 16.5L6.31 22h11.38l3.43-5.5z",
   jira:"M11.571 11.513H0a5.218 5.218 0 0 0 5.232 5.215h2.13v2.057A5.215 5.215 0 0 0 12.575 24V12.518a1.005 1.005 0 0 0-1.005-1.005zM17.317 5.756H5.736a5.215 5.215 0 0 0 5.215 5.214h2.129v2.058a5.218 5.218 0 0 0 5.215 5.214V6.76a1.005 1.005 0 0 0-.978-1.005zM23.063 0H11.483a5.215 5.215 0 0 0 5.214 5.214h2.129v2.058a5.218 5.218 0 0 0 5.215 5.214V1.005A1.005 1.005 0 0 0 23.063 0z",
+  quickbooks:"M12 0C5.376 0 0 5.376 0 12s5.376 12 12 12 12-5.376 12-12S18.624 0 12 0zm-1.2 18.72H9.6c-3.696 0-6.72-3.024-6.72-6.72S5.904 5.28 9.6 5.28h1.2v1.92H9.6c-2.64 0-4.8 2.16-4.8 4.8s2.16 4.8 4.8 4.8h1.2v1.92zm3.6 0v-1.92h.96V8.64H10.8V6.72h3.6c1.056 0 1.92.864 1.92 1.92v8.16c0 1.056-.864 1.92-1.92 1.92z",
 };
 const brandSvg=(p,cls)=>`<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="${BRAND[p]}"/></svg>`;
 
@@ -794,10 +795,11 @@ async function loadState(){
 // All data is sourced from spammers.studio.narrative.build() — Fyralis's
 // model layer is evaluated against what these three pages show.
 
-const PROV_ORDER=['slack','discord','github','gmail','calendar','notion','drive','jira'];
-const PROV_SHORT={slack:'sl',discord:'di',github:'gh',gmail:'gm',calendar:'ca',notion:'no',drive:'dr',jira:'ji'};
+const PROV_ORDER=['slack','discord','github','gmail','calendar','notion','drive','jira','quickbooks'];
+const PROV_SHORT={slack:'sl',discord:'di',github:'gh',gmail:'gm',calendar:'ca',notion:'no',drive:'dr',jira:'ji',quickbooks:'qb'};
 const PROV_LABEL={slack:'SLACK',discord:'DISCORD',github:'GITHUB',gmail:'GMAIL',
-                  calendar:'CALENDAR',notion:'NOTION',drive:'DRIVE',jira:'JIRA'};
+                  calendar:'CALENDAR',notion:'NOTION',drive:'DRIVE',jira:'JIRA',
+                  quickbooks:'QUICKBOOKS'};
 const TEAM_FULL={protocol:'Protocol Engineering',research:'Research',bridge:'Bridge',
                  infra:'Infrastructure',ops:'Ops',devrel:'Developer Relations',coo:'COO Office'};
 
@@ -953,10 +955,22 @@ function ingestStatsFor(id, st){
     <div><b>${num(st.projects||0)}</b><span>PROJECTS</span></div>
     <div><b>${num(st.issues||0)}</b><span>ISSUES</span></div>
     <div><b>${num(st.comments||0)}</b><span>COMMENTS</span></div>`;
+  if(id==='quickbooks') return `
+    <div><b>${num(st.employees||0)}</b><span>EMPLOYEES</span></div>
+    <div><b>${num(st.deposits||0)}</b><span>DEPOSITS</span></div>
+    <div><b>${num(st.purchases||0)}</b><span>PURCHASES</span></div>
+    <div><b>$${fmtMoney(st.bank_balance_cents||0)}</b><span>BANK</span></div>`;
   // slack + discord
   return `
     <div><b>${num(st.messages||0)}</b><span>MESSAGES</span></div>
     <div><b>${num(st.channels||0)}</b><span>CHANNELS</span></div>`;
+}
+
+function fmtMoney(cents){
+  const dollars = (Number(cents)||0) / 100;
+  if(Math.abs(dollars) >= 1_000_000) return (dollars/1_000_000).toFixed(2)+'M';
+  if(Math.abs(dollars) >= 1_000)     return (dollars/1_000).toFixed(1)+'k';
+  return dollars.toFixed(0);
 }
 
 //---------- Page 2: detailed people list (no top-12 cap) --------------------

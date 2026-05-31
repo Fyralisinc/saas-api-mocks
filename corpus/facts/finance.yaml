@@ -1,0 +1,366 @@
+# Finance schedule for Gharelu-Alpen — feeds the QuickBooks mock provider.
+#
+# Hand-authored, deterministic source-of-truth:
+#   funding_rounds      — every cash-in event (founders' capital, seed, strategic, grants)
+#   salary_rules        — how monthly salary is derived from (role, level, location)
+#   opex_recurring      — monthly recurring categories with stepped amounts over time
+#   opex_one_off        — event-driven expenses (conference travel, offsites, audits,
+#                         recruiter fees, post-round legal)
+#   accounts            — chart of accounts QuickBooks will create
+#   vendors             — payees for non-payroll spend
+#
+# Read by `corpus/scripts/10_compile_finance.py`, which expands the rules
+# into per-month QuickBooks events for `05_render_events.py` to emit.
+
+# ---- Chart of accounts -----------------------------------------------------
+accounts:
+- {name: 'Operating Bank',           number: '1000', type: bank,         subtype: checking,        description: 'Primary USD operating account (JPMorgan Chase, NYC)'}
+- {name: 'Reserve Bank',             number: '1010', type: bank,         subtype: savings,         description: 'Treasury / runway buffer account'}
+- {name: 'Accounts Receivable',      number: '1100', type: receivable,   subtype: ar,              description: 'Grants pending receipt'}
+- {name: 'Accounts Payable',         number: '2000', type: payable,      subtype: ap,              description: 'Vendor invoices due'}
+- {name: 'Paid-In Capital',          number: '3000', type: equity,       subtype: paid_in_capital, description: 'Cash from priced rounds + founder capital'}
+- {name: 'Grant Income',             number: '4100', type: income,       subtype: grant_income,    description: 'Foundation / ecosystem grants'}
+- {name: 'Payroll Expense',          number: '5000', type: expense,      subtype: payroll,         description: 'Monthly salaries — all employees'}
+- {name: 'Compute & Cloud',          number: '5100', type: expense,      subtype: compute,         description: 'AWS, GCP, RPC node providers, GPUs for ZK proving'}
+- {name: 'Legal & Accounting',       number: '5200', type: expense,      subtype: professional,    description: 'Counsel, fundraising legal, audit, bookkeeping'}
+- {name: 'Office & Rent',            number: '5300', type: expense,      subtype: rent,            description: 'NYC office, utilities, Nepal coworking'}
+- {name: 'Insurance',                number: '5310', type: expense,      subtype: insurance,       description: 'D&O, business, health (US employees)'}
+- {name: 'Software & Subscriptions', number: '5400', type: expense,      subtype: software,        description: 'Slack, Notion, GitHub Enterprise, Linear, Figma, JetBrains, etc.'}
+- {name: 'Travel & Conferences',     number: '5500', type: expense,      subtype: travel,          description: 'Flights, hotels, conference fees for BTC++ / Devcon / ZK Day / partner meetings'}
+- {name: 'Team Offsites',            number: '5510', type: expense,      subtype: offsite,         description: 'Bi-annual all-team gatherings'}
+- {name: 'Learning & Books',         number: '5600', type: expense,      subtype: learning,        description: 'Courses, books, conference recordings, cryptography reference material'}
+- {name: 'Recruiting',               number: '5700', type: expense,      subtype: recruiting,      description: 'Recruiter fees, job-board postings, interview travel'}
+- {name: 'Security Audits',          number: '5800', type: expense,      subtype: audit,           description: 'External audits of Strata / Glock / bridge contracts'}
+- {name: 'Marketing & Events',       number: '5900', type: expense,      subtype: marketing,       description: 'Sponsorships, swag, blog promotion'}
+
+# ---- Funding rounds -------------------------------------------------------
+# All amounts in USD. `lead` is informational; `participants` is the named
+# investor list for round metadata in the deposit memo. The deposit itself
+# always credits Paid-In Capital and debits Operating Bank.
+funding_rounds:
+- id: round:founders-capital
+  date: '2022-01-15'
+  kind: founders_capital
+  amount_usd: 1500000
+  note: 'Cofounders + early angels (inferred). Bridge capital for 2-year stealth pre-seed period.'
+  lead: 'Founders + friends'
+  participants:
+  - 'Cofounders (Simanta, Pramod, Abishkar, Chandan)'
+  - 'Ben Davenport (angel)'
+  - 'John Pfeffer (angel)'
+  - 'Waikit Lau (angel)'
+  - 'Eric Wall (angel)'
+
+- id: round:seed
+  date: '2024-04-10'
+  kind: seed
+  amount_usd: 10600000
+  note: 'Seed round announced after ~1 year of stealth Bitcoin-rollup development.'
+  lead: 'Ribbit Capital'
+  participants:
+  - 'Ribbit Capital (lead)'
+  - 'Castle Island Ventures'
+  - 'Robot Ventures'
+  - 'Axiom Capital'
+  - 'Geometry Research'
+  - 'Village Global'
+  - 'Stillmark'
+  - 'Paxos'
+  - 'Ben Davenport (angel)'
+  - 'John Pfeffer (angel)'
+  - 'Waikit Lau (angel)'
+  - 'Eric Wall (angel)'
+
+- id: round:strategic
+  date: '2025-01-09'
+  kind: strategic
+  amount_usd: 8500000
+  note: 'Strategic round to fund mainnet launch; deliberately not framed as Series A.'
+  lead: 'DBA + Cyber Fund (co-leads)'
+  participants:
+  - 'DBA (co-lead)'
+  - 'Cyber Fund (co-lead)'
+  - 'Ribbit Capital (returning)'
+  - 'Castle Island Ventures (returning)'
+  - 'Geometry (returning)'
+  - 'Mirana Ventures'
+  - 'Credibly Neutral'
+  - 'Hasu (angel)'
+  - 'Nathan McCauley (angel)'
+  - 'John Adler (angel)'
+  - 'Uma Roy (angel)'
+
+- id: round:starknet-grant
+  date: '2025-10-15'
+  kind: grant
+  amount_usd: 250000
+  note: 'Starknet Foundation grant for shared Glock verifier work (estimated; not publicly disclosed).'
+  lead: 'Starknet Foundation'
+  participants:
+  - 'Starknet Foundation'
+
+# ---- Salary rules ---------------------------------------------------------
+# Salary lookup: (location_bucket, role, level) → annual_usd. The compiler
+# picks the most specific match (location+role+level), falling back to less
+# specific. Cofounders always use the cofounder rate regardless of location.
+#
+# Locations are bucketed by the `location` string on each person:
+#   nepal  — any location containing 'Nepal', 'Kathmandu', 'Lalitpur'
+#   us     — 'Boston', 'NYC', 'New York', 'America'
+#   eu     — 'İstanbul', 'Turkey', 'Estonia', 'Berlin', 'London'
+#   other  — anything else, including blank (defaults to nepal — most of the team)
+#
+# Default tier for unset location is 'nepal' since the team is majority Nepal-based.
+
+salary_rules:
+  cofounder:
+    any: 120000               # all 4 cofounders, regardless of location, $120k/yr
+
+  by_location:
+    nepal:
+      engineer_senior: 90000
+      engineer_ic:     75000
+      research_ic:     80000
+      research_senior: 90000
+      infra_ic:        75000
+      infra_senior:    85000
+      ops_ic:          65000
+      devrel_ic:       70000
+      devrel_senior:   90000
+      default:         70000
+    us:
+      engineer_senior: 240000
+      engineer_ic:     210000
+      research_ic:     220000
+      research_senior: 240000
+      infra_ic:        210000
+      infra_senior:    230000
+      ops_ic:          180000
+      devrel_ic:       200000
+      devrel_senior:   220000
+      default:         200000
+    eu:
+      engineer_senior: 195000
+      engineer_ic:     170000
+      research_ic:     180000
+      research_senior: 195000
+      infra_ic:        170000
+      infra_senior:    185000
+      ops_ic:          140000
+      devrel_ic:       160000
+      devrel_senior:   180000
+      default:         160000
+
+# ---- Recurring monthly opex ----------------------------------------------
+# Each entry is one expense line. `schedule` is a list of (effective_from,
+# monthly_usd) tuples; the compiler picks the most recent entry on/before
+# the month being rendered. `vendor` is the QuickBooks vendor name used on
+# the Purchase entry.
+
+opex_recurring:
+- category: compute
+  vendor: 'Amazon Web Services'
+  account: 'Compute & Cloud'
+  memo: 'Monthly AWS — EC2, S3, EKS for sequencer + indexer + provers'
+  schedule:
+  - ['2022-01-01', 1500]
+  - ['2023-01-01', 8000]
+  - ['2024-01-01', 18000]
+  - ['2025-01-01', 28000]
+  - ['2025-08-01', 42000]    # testnet launch — proving cluster ramps up
+  - ['2026-01-01', 55000]
+  - ['2026-05-01', 68000]    # Mosaic public — more retrieval traffic
+
+- category: compute
+  vendor: 'Quicknode'
+  account: 'Compute & Cloud'
+  memo: 'Bitcoin / EVM RPC nodes'
+  schedule:
+  - ['2024-04-01', 3500]
+  - ['2025-01-01', 5500]
+  - ['2025-08-01', 8500]
+
+- category: compute
+  vendor: 'CoreWeave'
+  account: 'Compute & Cloud'
+  memo: 'GPU compute for ZK proving research + benchmarks'
+  schedule:
+  - ['2024-09-01', 6000]
+  - ['2025-06-01', 12000]
+  - ['2026-01-01', 18000]
+
+- category: legal
+  vendor: 'Wilson Sonsini'
+  account: 'Legal & Accounting'
+  memo: 'Monthly legal retainer — corporate, employment, fundraising'
+  schedule:
+  - ['2022-01-01', 4500]
+  - ['2024-05-01', 9500]
+  - ['2025-02-01', 12500]
+
+- category: accounting
+  vendor: 'Pilot.com'
+  account: 'Legal & Accounting'
+  memo: 'Monthly bookkeeping + monthly close'
+  schedule:
+  - ['2022-04-01', 1200]
+  - ['2024-05-01', 2400]
+  - ['2025-02-01', 3500]
+
+- category: office
+  vendor: 'WeWork NYC'
+  account: 'Office & Rent'
+  memo: 'NYC office — Times Square office space'
+  schedule:
+  - ['2023-06-01', 4500]
+  - ['2024-09-01', 7500]
+  - ['2025-06-01', 9500]
+
+- category: office
+  vendor: 'Nawalan Coworking'
+  account: 'Office & Rent'
+  memo: 'Kathmandu coworking + utilities (Nepal team)'
+  schedule:
+  - ['2023-09-01', 800]
+  - ['2024-09-01', 1800]
+  - ['2025-09-01', 2800]
+
+- category: insurance
+  vendor: 'Chubb'
+  account: 'Insurance'
+  memo: 'D&O + business + cyber liability'
+  schedule:
+  - ['2023-01-01', 1200]
+  - ['2024-05-01', 2400]
+  - ['2025-02-01', 3200]
+
+- category: insurance
+  vendor: 'Justworks'
+  account: 'Insurance'
+  memo: 'Health insurance — US employees'
+  schedule:
+  - ['2023-01-01', 1800]
+  - ['2024-09-01', 3200]
+  - ['2025-06-01', 4500]
+
+- category: software
+  vendor: 'GitHub'
+  account: 'Software & Subscriptions'
+  memo: 'GitHub Enterprise + Copilot seats'
+  schedule:
+  - ['2022-04-01', 200]
+  - ['2024-05-01', 850]
+  - ['2025-06-01', 1450]
+
+- category: software
+  vendor: 'Slack Technologies'
+  account: 'Software & Subscriptions'
+  memo: 'Slack Business+ — all-hands workspace'
+  schedule:
+  - ['2022-04-01', 100]
+  - ['2024-05-01', 550]
+  - ['2025-06-01', 950]
+
+- category: software
+  vendor: 'Notion Labs'
+  account: 'Software & Subscriptions'
+  memo: 'Notion team plan'
+  schedule:
+  - ['2022-06-01', 60]
+  - ['2024-05-01', 400]
+  - ['2025-06-01', 720]
+
+- category: software
+  vendor: 'Atlassian'
+  account: 'Software & Subscriptions'
+  memo: 'Jira Cloud Standard'
+  schedule:
+  - ['2023-06-01', 350]
+  - ['2024-09-01', 850]
+  - ['2025-09-01', 1450]
+
+- category: software
+  vendor: 'Linear'
+  account: 'Software & Subscriptions'
+  memo: 'Linear standard plan (engineering issue tracking)'
+  schedule:
+  - ['2024-01-01', 240]
+  - ['2025-06-01', 580]
+
+- category: software
+  vendor: 'Discord'
+  account: 'Software & Subscriptions'
+  memo: 'Discord Nitro (community management)'
+  schedule:
+  - ['2024-10-01', 80]
+  - ['2025-08-01', 160]
+
+- category: software
+  vendor: 'Anthropic'
+  account: 'Software & Subscriptions'
+  memo: 'Claude Team — internal AI tools'
+  schedule:
+  - ['2024-08-01', 350]
+  - ['2025-06-01', 1100]
+
+- category: marketing
+  vendor: 'Various sponsorships'
+  account: 'Marketing & Events'
+  memo: 'Community sponsorships + content production'
+  schedule:
+  - ['2023-06-01', 1500]
+  - ['2024-09-01', 3500]
+  - ['2025-06-01', 7500]
+
+- category: learning
+  vendor: 'Various publishers'
+  account: 'Learning & Books'
+  memo: 'Books, courses, conference recordings'
+  schedule:
+  - ['2023-01-01', 600]
+  - ['2024-09-01', 1800]
+  - ['2025-09-01', 3200]
+
+# ---- One-off opex --------------------------------------------------------
+# Templated against office_life.yaml events and people facts.
+
+one_off_rules:
+  conference:
+    # For each conference in EXTERNAL_EVENTS, charge per-attendee:
+    cost_per_attendee_usd: 4500       # flights + hotel + fee + meals
+    vendor: 'Various airlines + hotels'
+    account: 'Travel & Conferences'
+    memo_template: '{conference_label} — {attendee_count} attendees'
+
+  team_offsite:
+    # Twice a year (Jun + Dec, starting 2024)
+    months: [6, 12]
+    starting_from: '2024-06'
+    cost_usd: 95000                   # venue + travel for ~25 people + food
+    vendor: 'Various venues'
+    account: 'Team Offsites'
+    memo_template: 'Team offsite — {season} {year}'
+
+  funding_legal_fee:
+    # Triggered 1 month after each priced round closes.
+    pct_of_round: 0.012               # ~1.2% of round size in legal fees
+    cap_usd: 175000
+    vendor: 'Wilson Sonsini'
+    account: 'Legal & Accounting'
+    memo_template: '{round_name} closing legal fees'
+
+  recruiter_fee:
+    # Triggered the month each non-cofounder employee starts.
+    pct_of_first_year_salary: 0.18
+    vendor: 'Various recruiters'
+    account: 'Recruiting'
+    memo_template: 'Recruiter fee — {full_name} ({role}, {team})'
+
+  security_audit:
+    # Two audits a year after testnet launch, $80k each.
+    cost_usd: 80000
+    months: [3, 9]
+    starting_from: '2025-09'
+    vendor: 'Trail of Bits'
+    account: 'Security Audits'
+    memo_template: '{quarter} security audit — Strata + Glock + bridge contracts'

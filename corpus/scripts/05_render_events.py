@@ -1509,11 +1509,62 @@ def hiring_events(facts: dict, start: str, end: str) -> Iterator[dict]:
 # Gmail external comms (Tier 3)
 # -----------------------------------------------------------------------------
 
+# Real Alpen Labs investor contacts — drawn from public sources (CoinDesk,
+# The Block, Alpen blog, crypto-fundraising.info). Used both for quarterly
+# investor updates and the per-round fundraising threads below. Emails are
+# all `.example` to be obviously non-deliverable.
 INVESTOR_EMAILS = [
-    ("investor:thiel-capital", "Eric Yu", "eric.yu@thielcapital.example"),
-    ("investor:multicoin", "Tushar Jain", "tushar@multicoin.capital.example"),
-    ("investor:variant", "Spencer Noon", "spencer@variant.fund.example"),
+    # Seed lead + follow-on
+    ("investor:ribbit",   "Micky Malka",      "micky@ribbitcapital.example"),
+    # Bitcoin-pure-play seed/strategic
+    ("investor:castle-island", "Nic Carter",  "nic@castleisland.vc.example"),
+    ("investor:stillmark", "Alyse Killeen",   "alyse@stillmark.fund.example"),
+    # Strategic round co-leads
+    ("investor:dba",      "Jason Choi",       "jason@dba.xyz.example"),
+    ("investor:cyber-fund", "Alex Felix",     "alex@cyber.fund.example"),
+    # Ecosystem
+    ("investor:geometry", "Jay Drain",        "jay@geometry.xyz.example"),
+    ("investor:robot",    "Robert Leshner",   "robert@robotventures.example"),
+    ("investor:axiom",    "Yi Sun",           "yi@axiom.xyz.example"),
+    ("investor:village",  "Erik Torenberg",   "erik@villageglobal.example"),
+    ("investor:paxos",    "Charles Cascarilla", "charles@paxos.com.example"),
+    # Strategic round new
+    ("investor:mirana",   "Lily Sun",         "lily@mirana.xyz.example"),
+    # Angels
+    ("angel:pfeffer",     "John Pfeffer",     "john@pfeffer.example"),
+    ("angel:davenport",   "Ben Davenport",    "ben@davenport.example"),
+    ("angel:waikit",      "Waikit Lau",       "waikit@lau.example"),
+    ("angel:wall",        "Eric Wall",        "eric@wall.example"),
+    ("angel:hasu",        "Hasu",             "hasu@flashbots.example"),
+    ("angel:mccauley",    "Nathan McCauley",  "nathan@anchorage.example"),
+    ("angel:adler",       "John Adler",       "john@celestia.example"),
+    ("angel:uma-roy",     "Uma Roy",          "uma@succinct.example"),
 ]
+INVESTOR_LOOKUP = {iid: (name, email) for iid, name, email in INVESTOR_EMAILS}
+
+# Maps each funding round (matches finance.yaml ids) to the investor ids that
+# participated. The first id is the lead/co-lead — drives who gets the
+# initial "let's do this" thread and the term sheet exchange.
+ROUND_PARTICIPANTS: dict[str, list[str]] = {
+    "round:founders-capital": [
+        "angel:davenport", "angel:pfeffer", "angel:waikit", "angel:wall",
+    ],
+    "round:seed": [
+        "investor:ribbit", "investor:castle-island", "investor:robot",
+        "investor:axiom", "investor:geometry", "investor:village",
+        "investor:stillmark", "investor:paxos",
+        "angel:pfeffer", "angel:davenport", "angel:waikit", "angel:wall",
+    ],
+    "round:strategic": [
+        "investor:dba", "investor:cyber-fund",
+        "investor:ribbit", "investor:castle-island", "investor:geometry",
+        "investor:mirana",
+        "angel:hasu", "angel:mccauley", "angel:adler", "angel:uma-roy",
+    ],
+    "round:starknet-grant": [
+        # Starknet Foundation is the only counterparty; using a placeholder id.
+    ],
+}
 AUDIT_FIRMS = [
     ("audit:halborn", "Steven Walbroehl", "steven@halborn.com.example"),
     ("audit:trail-of-bits", "Dan Guido", "dan@trailofbits.com.example"),
@@ -1522,6 +1573,433 @@ PARTNERS = [
     ("partner:starknet", "Eli Ben-Sasson", "eli@starkware.co.example"),
     ("partner:btcpay", "Nicolas Dorier", "nicolas@btcpay.org.example"),
 ]
+
+
+# -----------------------------------------------------------------------------
+# Fundraising gmail threads — per-round
+# -----------------------------------------------------------------------------
+# Each priced round (seed, strategic) generates a multi-thread saga: pre-close
+# pitch + term sheet exchange, closing-week wire confirmations, post-close
+# announcement to all participants, then a steady cadence of monthly board
+# updates from the CEO. Founders-capital and the Starknet grant get shorter,
+# matching forms (angel "happy to participate" threads and partnership
+# kickoff respectively).
+#
+# Author voice: Simanta (CEO, person:simanta-gautam) writes investor-facing
+# threads. Pramod (CTO) writes technical due-diligence replies. Abishkar
+# (COO) writes wire / closing logistics. The cofounders also have an internal
+# thread per round so Fyralis can see the inside view, not just the outside.
+
+CEO_FROM       = "simanta@alpenlabs.io"
+CTO_FROM       = "pramod@alpenlabs.io"
+COO_FROM       = "abishkar@alpenlabs.io"
+COFOUNDERS_TO  = ["pramod@alpenlabs.io", "abishkar@alpenlabs.io",
+                  "chandan@alpenlabs.io"]
+
+
+def _round_amount_str(amount: int) -> str:
+    if amount >= 1_000_000:
+        return f"${amount/1_000_000:.1f}M"
+    return f"${amount/1_000:.0f}K"
+
+
+def fundraising_gmail_events(facts: dict, finance: dict, start: str, end: str) -> Iterator[dict]:
+    """Per-round gmail saga around each closing date.
+
+    Threads emitted per priced round (seed + strategic):
+      1. Pre-close pitch — CEO → lead, 8 weeks out
+      2. Term sheet exchange — lead → CEO + reply, 5 weeks out
+      3. Diligence Q&A — investor → CTO (Pramod), 3-4 weeks out
+      4. Internal closing-week thread — CEO → cofounders, 1 week out
+      5. Closing-week wire confirmations — investor → COO (Abishkar)
+      6. Post-close welcome — CEO → all participants, 2 days after close
+      7. Quarterly board updates — CEO → each investor, on the 1st of every
+         quarter starting the next full quarter
+
+    For the founders-capital tranche: just (1)+(5) per angel (no term sheet,
+    no formal board) — cofounders backchannel + angel wires.
+
+    For the Starknet grant: a partnership kickoff + grant award thread to
+    the Starknet Foundation contact, around the 2025-10-15 announce date.
+    """
+    d0 = datetime.fromisoformat(start).replace(tzinfo=timezone.utc)
+    d1 = datetime.fromisoformat(end).replace(tzinfo=timezone.utc)
+
+    for rnd in finance.get("funding_rounds", []):
+        try:
+            close_d = datetime.fromisoformat(str(rnd["date"])).replace(tzinfo=timezone.utc)
+        except (TypeError, ValueError):
+            continue
+        if close_d > d1: continue
+        rid = rnd["id"]
+        amount = int(rnd["amount_usd"])
+        kind = rnd.get("kind", "round")
+        participants = ROUND_PARTICIPANTS.get(rid, [])
+
+        if kind == "founders_capital":
+            yield from _angel_threads(rid, kind, amount, close_d, participants, d0, d1)
+            yield from _cofounder_internal_thread(rid, kind, amount, close_d,
+                                                  "we're going to take a small angel round to extend runway")
+            continue
+
+        if kind == "grant":
+            yield from _starknet_grant_thread(rid, amount, close_d, d0, d1)
+            continue
+
+        # priced rounds
+        if not participants:
+            continue
+        lead = participants[0]
+        lead_name, lead_email = INVESTOR_LOOKUP[lead]
+
+        yield from _pitch_thread(rid, kind, amount, close_d, lead, lead_name, lead_email, d0, d1)
+        yield from _term_sheet_thread(rid, kind, amount, close_d, lead, lead_name, lead_email, d0, d1)
+        yield from _diligence_thread(rid, kind, close_d, participants, d0, d1)
+        yield from _cofounder_internal_thread(rid, kind, amount, close_d,
+                                              f"{kind} round is closing — final cap-table push this week")
+        yield from _wire_confirm_threads(rid, kind, close_d, participants, d0, d1)
+        yield from _welcome_thread(rid, kind, amount, close_d, participants, d0, d1)
+        yield from _board_update_threads(rid, kind, close_d, participants, d0, d1)
+
+
+def _ev_gmail(when: datetime, *, sender_actor: str | None,
+              from_addr: str, to: list[str], subject: str, body: str,
+              thread: str, category: str) -> dict:
+    return {
+        "t": _iso(when),
+        "provider": "gmail", "kind": "message",
+        "actor": sender_actor,
+        "payload": {
+            "from": from_addr, "to": to,
+            "subject": subject, "body": body,
+            "category": category, "thread": thread,
+        },
+    }
+
+
+def _pitch_thread(rid, kind, amount, close_d, lead, lead_name, lead_email, d0, d1):
+    """Initial pitch — CEO Simanta → lead investor, 8 weeks before close."""
+    t0 = close_d - timedelta(weeks=8)
+    if t0 < d0 or t0 > d1: return
+    yield _ev_gmail(t0,
+        sender_actor="person:simanta-gautam", from_addr=CEO_FROM,
+        to=[lead_email],
+        subject=f"Pitch — Alpen Labs / Strata — {kind} conversation",
+        body=(
+            f"Hi {lead_name.split()[0]},\n\n"
+            f"Wanted to share the latest on Alpen Labs and explore whether "
+            f"{lead_name} would be interested in leading our {kind} round "
+            f"(targeting ~{_round_amount_str(amount)}).\n\n"
+            f"What we've built since we last talked:\n"
+            f"- Strata — our Bitcoin ZK rollup — is past devnet, on track for "
+            f"public testnet next quarter\n"
+            f"- Glock verifier hits the latency targets we need for trust-"
+            f"minimised bridging\n"
+            f"- Team is 25+ engineers across protocol, bridge, research; "
+            f"strong public GitHub footprint on alpenlabs/*\n\n"
+            f"Deck attached. Happy to set up time with Pramod for the deep "
+            f"technical walkthrough.\n\n"
+            f"Best,\nSimanta"
+        ),
+        thread=f"{rid}-pitch-{lead}", category="fundraise_pitch",
+    )
+    # lead reply 2 days later
+    yield _ev_gmail(t0 + timedelta(days=2, hours=4),
+        sender_actor=None, from_addr=lead_email, to=[CEO_FROM],
+        subject=f"Re: Pitch — Alpen Labs / Strata — {kind} conversation",
+        body=(
+            f"Simanta — really compelling. We'd love to do the deep dive. "
+            f"Can we get on a call next week with Pramod to walk through the "
+            f"verifier internals and look at the testnet rollout plan? "
+            f"Sending diligence list separately.\n\n— {lead_name}"
+        ),
+        thread=f"{rid}-pitch-{lead}", category="fundraise_pitch_reply",
+    )
+
+
+def _term_sheet_thread(rid, kind, amount, close_d, lead, lead_name, lead_email, d0, d1):
+    """Term sheet exchange — 5 weeks before close."""
+    t0 = close_d - timedelta(weeks=5)
+    if t0 < d0 or t0 > d1: return
+    yield _ev_gmail(t0,
+        sender_actor=None, from_addr=lead_email, to=[CEO_FROM, COO_FROM],
+        subject=f"Term sheet — {lead_name} / Alpen {kind}",
+        body=(
+            f"Simanta + Abishkar,\n\n"
+            f"Attached our proposed term sheet for the {_round_amount_str(amount)} {kind} "
+            f"round. Highlights:\n"
+            f"- Round size: {_round_amount_str(amount)} (we'd commit ~60% if "
+            f"co-leading)\n"
+            f"- Standard SAFE-converting-to-preferred, MFN clause\n"
+            f"- Board observer seat, monthly reporting\n"
+            f"- 30-day exclusivity\n\n"
+            f"Let's get on a call once you've had a chance to read.\n\n— {lead_name}"
+        ),
+        thread=f"{rid}-term-sheet-{lead}", category="fundraise_term_sheet",
+    )
+    yield _ev_gmail(t0 + timedelta(days=3, hours=2),
+        sender_actor="person:simanta-gautam", from_addr=CEO_FROM,
+        to=[lead_email],
+        subject=f"Re: Term sheet — {lead_name} / Alpen {kind}",
+        body=(
+            f"Hi {lead_name.split()[0]},\n\n"
+            f"Thanks — we've reviewed with counsel (Wilson Sonsini). Two "
+            f"redlines:\n"
+            f"1. Board observer rather than seat — we want to keep the board "
+            f"compact through testnet launch\n"
+            f"2. Reporting cadence quarterly, not monthly\n\n"
+            f"Otherwise terms look great. Counter attached.\n\n"
+            f"Best,\nSimanta"
+        ),
+        thread=f"{rid}-term-sheet-{lead}", category="fundraise_term_sheet_reply",
+    )
+
+
+def _diligence_thread(rid, kind, close_d, participants, d0, d1):
+    """Technical diligence — investor → Pramod, 3-4 weeks before close.
+    Pick up to 3 participants to keep volume reasonable."""
+    for offset, inv in enumerate(participants[:3]):
+        if inv not in INVESTOR_LOOKUP:
+            continue
+        inv_name, inv_email = INVESTOR_LOOKUP[inv]
+        t0 = close_d - timedelta(weeks=4, days=-offset)
+        if t0 < d0 or t0 > d1: continue
+        yield _ev_gmail(t0,
+            sender_actor=None, from_addr=inv_email, to=[CTO_FROM],
+            subject=f"Diligence questions — Strata + Glock",
+            body=(
+                f"Pramod — diligence list:\n"
+                f"1. Liveness assumptions on the bridge happy path?\n"
+                f"2. Glock prover memory profile vs BitVM2 — apples-to-apples?\n"
+                f"3. Sequencer fault-tolerance during mainnet bring-up?\n"
+                f"4. Audit firms shortlist + timeline?\n\n"
+                f"Happy to do a working session if easier. — {inv_name.split()[0]}"
+            ),
+            thread=f"{rid}-dd-{inv}", category="fundraise_diligence",
+        )
+        yield _ev_gmail(t0 + timedelta(days=2, hours=5),
+            sender_actor="person:pramodkandel", from_addr=CTO_FROM,
+            to=[inv_email],
+            subject=f"Re: Diligence questions — Strata + Glock",
+            body=(
+                f"{inv_name.split()[0]} — replies inline. Short version:\n"
+                f"1. Bridge happy path liveness rests on the operator set + "
+                f"the Glock challenger; we have a public note on this.\n"
+                f"2. Glock prover is ~3.5GB peak vs BitVM2's ~7GB at the same "
+                f"circuit size; we'll share the benchmark spreadsheet under "
+                f"NDA.\n"
+                f"3. We have a tiered launch plan; happy to walk through.\n"
+                f"4. Trail of Bits + Halborn shortlisted, audits start once "
+                f"the bridge is feature-frozen.\n\n"
+                f"— Pramod"
+            ),
+            thread=f"{rid}-dd-{inv}", category="fundraise_diligence_reply",
+        )
+
+
+def _cofounder_internal_thread(rid, kind, amount, close_d, opener_line):
+    """Internal cofounder thread the week of close."""
+    t0 = close_d - timedelta(days=7)
+    yield _ev_gmail(t0,
+        sender_actor="person:simanta-gautam", from_addr=CEO_FROM,
+        to=COFOUNDERS_TO,
+        subject=f"[founders] {kind} round closing notes",
+        body=(
+            f"Team —\n\n{opener_line}.\n\n"
+            f"Logistics for this week:\n"
+            f"- Abishkar: confirming wire instructions with counsel today\n"
+            f"- Pramod: please send the final benchmark deck to the lead "
+            f"by EOD tomorrow\n"
+            f"- Chandan: I'll loop you on the partner notification thread "
+            f"once docs sign\n\n"
+            f"Should be done by {close_d.strftime('%a %b %d')}. Will share the "
+            f"announce blog draft separately.\n\n"
+            f"S"
+        ),
+        thread=f"{rid}-internal", category="fundraise_internal",
+    )
+    # COO replies confirming
+    yield _ev_gmail(t0 + timedelta(hours=4),
+        sender_actor="person:chhetri22", from_addr=COO_FROM,
+        to=[CEO_FROM] + [a for a in COFOUNDERS_TO if a != COO_FROM],
+        subject=f"Re: [founders] {kind} round closing notes",
+        body=(
+            f"Counsel confirmed wire instructions and the closing checklist. "
+            f"Will have the cap table updated tomorrow.\n\n— Abishkar"
+        ),
+        thread=f"{rid}-internal", category="fundraise_internal",
+    )
+    # CTO replies
+    yield _ev_gmail(t0 + timedelta(hours=8),
+        sender_actor="person:pramodkandel", from_addr=CTO_FROM,
+        to=[CEO_FROM] + [a for a in COFOUNDERS_TO if a != CTO_FROM],
+        subject=f"Re: [founders] {kind} round closing notes",
+        body=f"Deck on its way. Updated the verifier benchmark to reflect "
+             f"this week's numbers. — Pramod",
+        thread=f"{rid}-internal", category="fundraise_internal",
+    )
+
+
+def _wire_confirm_threads(rid, kind, close_d, participants, d0, d1):
+    """Closing-week wire confirmations — investor → COO."""
+    for inv in participants:
+        if inv not in INVESTOR_LOOKUP: continue
+        inv_name, inv_email = INVESTOR_LOOKUP[inv]
+        t0 = close_d - timedelta(days=1, hours=-2 - hash(inv) % 8)
+        if t0 < d0 or t0 > d1: continue
+        yield _ev_gmail(t0,
+            sender_actor=None, from_addr=inv_email, to=[COO_FROM],
+            subject=f"Wire confirmation — Alpen {kind}",
+            body=(
+                f"Abishkar — wire initiated this morning, should land "
+                f"tomorrow. Reference: ALP-{kind.upper()}-{inv.split(':')[-1].upper()}. "
+                f"Signed PA on its way separately.\n\n— {inv_name.split()[0]}"
+            ),
+            thread=f"{rid}-wire-{inv}", category="fundraise_wire",
+        )
+        yield _ev_gmail(t0 + timedelta(hours=3),
+            sender_actor="person:chhetri22", from_addr=COO_FROM,
+            to=[inv_email],
+            subject=f"Re: Wire confirmation — Alpen {kind}",
+            body=f"Confirmed receipt of signed PA. Wire instructions on "
+                 f"file. Welcome aboard.\n\n— Abishkar",
+            thread=f"{rid}-wire-{inv}", category="fundraise_wire_reply",
+        )
+
+
+def _welcome_thread(rid, kind, amount, close_d, participants, d0, d1):
+    """Post-close welcome — CEO → all participants, 2 days after close."""
+    t0 = close_d + timedelta(days=2)
+    if t0 > d1: return
+    emails = [INVESTOR_LOOKUP[inv][1] for inv in participants if inv in INVESTOR_LOOKUP]
+    if not emails: return
+    yield _ev_gmail(t0,
+        sender_actor="person:simanta-gautam", from_addr=CEO_FROM,
+        to=emails,
+        subject=f"Closed — Alpen Labs {kind} ({_round_amount_str(amount)})",
+        body=(
+            f"Team —\n\n"
+            f"We officially closed the {kind} round earlier this week. "
+            f"{_round_amount_str(amount)} in the bank. Huge thanks to everyone "
+            f"who supported.\n\n"
+            f"Next steps:\n"
+            f"- Quarterly reporting starts next month (Q+1)\n"
+            f"- Public announce blog goes live tomorrow at 9am ET\n"
+            f"- I'll send updated cap table + welcome packet within the week\n\n"
+            f"More to come.\n\nBest,\nSimanta"
+        ),
+        thread=f"{rid}-welcome", category="fundraise_welcome",
+    )
+
+
+def _board_update_threads(rid, kind, close_d, participants, d0, d1):
+    """Post-close monthly investor updates — CEO → each investor, on the
+    1st of every month starting the next full month after close, until d1."""
+    cur = (close_d.replace(day=1) + timedelta(days=32)).replace(day=1)
+    months_emitted = 0
+    while cur < d1 and months_emitted < 60:
+        for inv in participants:
+            if inv not in INVESTOR_LOOKUP: continue
+            inv_name, inv_email = INVESTOR_LOOKUP[inv]
+            yield _ev_gmail(cur + timedelta(hours=14),
+                sender_actor="person:simanta-gautam", from_addr=CEO_FROM,
+                to=[inv_email],
+                subject=f"Alpen — {cur.strftime('%B %Y')} investor update",
+                body=(
+                    f"Hi {inv_name.split()[0]},\n\n"
+                    f"Quick update for {cur.strftime('%B %Y')}:\n"
+                    f"- Strata: continuing testnet hardening; bridge throughput "
+                    f"and prover time targets on track\n"
+                    f"- Hiring: still in flow, will share specific names in "
+                    f"next quarterly\n"
+                    f"- Runway: comfortably north of 18 months at current burn\n\n"
+                    f"Happy to jump on a call if useful.\n\n— Simanta"
+                ),
+                thread=f"{rid}-board-{inv}-{cur.strftime('%Y-%m')}",
+                category="fundraise_board_update",
+            )
+        cur = (cur + timedelta(days=32)).replace(day=1)
+        months_emitted += 1
+
+
+def _angel_threads(rid, kind, amount, close_d, participants, d0, d1):
+    """Founders-capital tranche — short 'happy to participate' threads per angel."""
+    for inv in participants:
+        if inv not in INVESTOR_LOOKUP: continue
+        name, email = INVESTOR_LOOKUP[inv]
+        t0 = close_d - timedelta(days=10, hours=-2 - hash(inv) % 24)
+        if t0 < d0 or t0 > d1: continue
+        yield _ev_gmail(t0,
+            sender_actor="person:simanta-gautam", from_addr=CEO_FROM,
+            to=[email],
+            subject=f"Quick ask — Alpen bridge capital",
+            body=(
+                f"Hi {name.split()[0]},\n\n"
+                f"Spinning up Alpen Labs with three of my MIT cofounders — "
+                f"building Bitcoin-native finance infra with ZK. Looking to "
+                f"close a small angel/bridge round before we go heads-down "
+                f"on the protocol for ~year. Would love to have you in.\n\n"
+                f"Quick chat?\n\nBest,\nSimanta"
+            ),
+            thread=f"{rid}-angel-{inv}", category="fundraise_angel",
+        )
+        yield _ev_gmail(t0 + timedelta(days=2),
+            sender_actor=None, from_addr=email, to=[CEO_FROM],
+            subject=f"Re: Quick ask — Alpen bridge capital",
+            body=f"Simanta — happy to participate. Send over docs when "
+                 f"ready. — {name.split()[0]}",
+            thread=f"{rid}-angel-{inv}", category="fundraise_angel_reply",
+        )
+
+
+def _starknet_grant_thread(rid, amount, close_d, d0, d1):
+    """Starknet Foundation grant — partnership kickoff."""
+    sn_email = "grants@starknet.foundation.example"
+    sn_name  = "Tarun Tarrence"
+    # CEO outreach 4 weeks before
+    t0 = close_d - timedelta(weeks=4)
+    if t0 >= d0 and t0 <= d1:
+        yield _ev_gmail(t0,
+            sender_actor="person:simanta-gautam", from_addr=CEO_FROM,
+            to=[sn_email],
+            subject=f"Strata + Starknet — shared Glock verifier proposal",
+            body=(
+                f"Hi {sn_name.split()[0]},\n\n"
+                f"Following up on our chat about a shared Glock verifier on "
+                f"Bitcoin. We think Alpen building Glock as a public good — "
+                f"with Starknet as one of the first integrators — is the "
+                f"right shape.\n\n"
+                f"Proposal attached. Asking for a ~{_round_amount_str(amount)} grant "
+                f"over 12 months to fund the public-good verifier work plus "
+                f"integration support for Starknet.\n\n"
+                f"Pramod will reach out separately to dig into the technical "
+                f"integration.\n\nBest,\nSimanta"
+            ),
+            thread=f"{rid}-proposal", category="grant_proposal",
+        )
+        yield _ev_gmail(t0 + timedelta(days=5),
+            sender_actor=None, from_addr=sn_email, to=[CEO_FROM],
+            subject=f"Re: Strata + Starknet — shared Glock verifier proposal",
+            body=(
+                f"Simanta — Starknet Foundation approved. {_round_amount_str(amount)} "
+                f"grant signed off; will route the agreement next week.\n\n"
+                f"— {sn_name}"
+            ),
+            thread=f"{rid}-proposal", category="grant_award",
+        )
+    # Announce day — CEO emails all hands-adjacent partners
+    if close_d >= d0 and close_d <= d1:
+        yield _ev_gmail(close_d + timedelta(hours=10),
+            sender_actor="person:simanta-gautam", from_addr=CEO_FROM,
+            to=[sn_email],
+            subject=f"Starknet x Alpen — joint announce live",
+            body=(
+                f"{sn_name.split()[0]} — joint announce is live. Strata + "
+                f"Starknet as the first two chains adopting Glock for "
+                f"trust-minimised BTC bridging. Big day.\n\n— Simanta"
+            ),
+            thread=f"{rid}-announce", category="grant_announce",
+        )
 
 
 def gmail_events(facts: dict, start: str, end: str) -> Iterator[dict]:
@@ -1927,6 +2405,11 @@ def main() -> None:
                     help="include small cross-org Discord guild + chatter")
     ap.add_argument("--include-drive", action="store_true",
                     help="include occasional Drive PDFs + Google Docs")
+    ap.add_argument("--include-quickbooks", action="store_true",
+                    help="include QuickBooks finance events (funding rounds, payroll, opex)")
+    ap.add_argument("--include-fundraising", action="store_true",
+                    help="include per-round fundraising gmail threads (pitch, term sheet, "
+                         "diligence, closing, board updates)")
     ap.add_argument("--include-all", action="store_true",
                     help="shortcut: turn on every --include-*")
     ap.add_argument("--end", default="2026-05-29",
@@ -1973,6 +2456,21 @@ def main() -> None:
         events.extend(discord_events(facts, facts["company"]["founded"], args.end))
     if args.include_drive or args.include_all:
         events.extend(drive_events(facts, facts["company"]["founded"], args.end))
+    if args.include_quickbooks or args.include_all:
+        # Lazy-import so the renderer doesn't take a hard dep on the finance
+        # script (the script can be regenerated independently when finance.yaml changes).
+        sys.path.insert(0, str(Path(__file__).parent))
+        import importlib
+        fin_mod = importlib.import_module("10_compile_finance")
+        events.extend(fin_mod.quickbooks_events(
+            facts, _OFFICE, facts["company"]["founded"], args.end))
+    if args.include_fundraising or args.include_all:
+        # Reuse the finance.yaml the QuickBooks compiler reads so investor
+        # lists and round dates stay in lockstep across providers.
+        finance = yaml.safe_load(
+            (Path(__file__).parent.parent / "facts" / "finance.yaml").read_text())
+        events.extend(fundraising_gmail_events(
+            facts, finance, facts["company"]["founded"], args.end))
 
     # Stable sort by timestamp.
     events.sort(key=lambda e: e["t"])

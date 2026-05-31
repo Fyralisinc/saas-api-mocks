@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -36,6 +37,9 @@ INGEST_MULTIPLIER: dict[str, dict[str, float]] = {
     "notion":   {"page.create": 1.0, "page.update": 1.0},
     "drive":    {"file.create": 1.0},
     "jira":     {"issue.create": 1.0, "issue.transition": 1.0, "issue.assign": 1.0},
+    "quickbooks": {"company.create": 1.0, "account.create": 1.0,
+                   "vendor.create": 1.0, "employee.create": 1.0,
+                   "deposit": 1.0, "purchase": 1.0},
 }
 
 SIGNAL_NOTES = {
@@ -47,6 +51,7 @@ SIGNAL_NOTES = {
     "notion":   "page.create and page.update each = one signal. Edits to the same page count separately.",
     "drive":    "1 file create per signal. Revisions on existing files count separately.",
     "jira":     "issue.create, issue.transition, issue.assign each = one signal.",
+    "quickbooks": "Deposits (cash in: funding rounds, grants) + purchases (cash out: payroll, opex, conferences, audits). Accounts, vendors, and employees seed once.",
 }
 
 # Phase grouping — months → narrative "phase" the company was in.
@@ -229,7 +234,8 @@ def _build_profile(events_jsonl: Path) -> dict:
             ],
             "narrative": _month_narrative(
                 ym, sig, ing, ms, thread_beats, new_hires, top_repos, top_actors, people,
-                ext, departures,
+                external_events=ext, departures=departures,
+                pto_count=len(pto_this_month), phase_title=phase["title"],
             ),
         })
 
@@ -365,6 +371,16 @@ def _phase_for(ym: str) -> dict:
     return {"title": "Future", "blurb": "Beyond the current corpus window."}
 
 
+_PERSON_REF = re.compile(r"\bperson:([A-Za-z0-9_-]+)")
+
+
+def _clean_summary(text: str) -> str:
+    """LLM-authored beat summaries sometimes reference people by their corpus
+    ID (``person:cyphersnake``). Rewrite those as ``@cyphersnake`` so the
+    narrative reads naturally."""
+    return _PERSON_REF.sub(lambda m: f"@{m.group(1)}", text or "").strip()
+
+
 def _active_beats(threads: list[dict], ym: str) -> list[dict]:
     """For a given month, return all beats whose window overlaps that month.
 
@@ -386,7 +402,7 @@ def _active_beats(threads: list[dict], ym: str) -> list[dict]:
                     "thread_title": ttitle,
                     "beat_id": b.get("id"),
                     "beat_kind": b.get("kind"),
-                    "beat_summary": (b.get("summary") or "").strip(),
+                    "beat_summary": _clean_summary(b.get("summary") or ""),
                 })
     return out
 
@@ -653,61 +669,216 @@ def _month_narrative(
     top_actors: list[tuple[str, int]], people: list[dict],
     external_events: list[dict] | None = None,
     departures: list[dict] | None = None,
+    pto_count: int = 0,
+    phase_title: str = "",
 ) -> str:
-    parts: list[str] = []
+    """Two to four sentences of synthesised prose describing what's happening
+    this month. The structured sections of the UI (milestone list, hires list,
+    PTO list, active threads) carry the raw facts; this paragraph is the
+    headline — what would a Fyralis evaluator describe if asked to summarise
+    the month?"""
+    external_events = external_events or []
+    departures = departures or []
+    total = sum(sig.values())
+    has_engineering = bool(top_repos) and any(n > 0 for _, n in top_repos)
+
+    sentences: list[str] = []
+
+    # ---- 1) Opening sentence: lead with the strongest fact of the month ----
+    opener = _month_opener(milestones, external_events, departures, new_hires,
+                           phase_title, has_engineering, total, top_actors, people)
+    sentences.append(opener)
+
+    # ---- 2) Work in flight — threads + code focus ------------------------
+    work = _month_work_sentence(beats, top_repos, has_engineering, phase_title)
+    if work:
+        sentences.append(work)
+
+    # ---- 3) People-side activity (hires/departures/PTO) ------------------
+    ppl = _month_people_sentence(new_hires, departures, pto_count, milestones)
+    if ppl:
+        sentences.append(ppl)
+
+    # ---- 4) Top contributors + tempo -------------------------------------
+    tempo = _month_tempo_sentence(top_actors, people, total, sig, phase_title)
+    if tempo:
+        sentences.append(tempo)
+
+    return " ".join(s for s in sentences if s)
+
+
+# ---- _month_narrative helpers --------------------------------------------
+
+_PHASE_SHORT = {
+    "Pre-product foundations":          "pre-product",
+    "Public launch & technical thesis": "post-launch",
+    "Strategic round & Strata maturation": "post-funding",
+    "Testnet + Glock public release":   "testnet & Glock",
+    "Mosaic build-out & Prague support":"Mosaic build-out",
+    "Mosaic public + Bitcoin Dollar":   "Mosaic public",
+    "Future":                           "future",
+}
+
+
+def _month_opener(milestones: list[dict],
+                  external: list[dict],
+                  departures: list[dict],
+                  hires: list[dict],
+                  phase: str,
+                  has_eng: bool,
+                  total: int,
+                  top_actors: list[tuple[str, int]],
+                  people: list[dict]) -> str:
+    phase_short = _PHASE_SHORT.get(phase, phase.lower())
 
     if milestones:
-        ms = ", ".join(m.get("title", "?") for m in milestones)
-        parts.append(f"Milestone: {ms}.")
+        if len(milestones) == 1:
+            m = milestones[0]
+            return f"Headline event: {m.get('title', 'milestone')} ({m.get('date', '')})."
+        titles = " and ".join(_trim(m.get("title", "?"), 60) for m in milestones[:2])
+        return f"Two ship moments stack up this month — {titles}."
 
-    if external_events:
-        # Surface industry events the team had to react to (CVEs, halving,
-        # conferences, winter break) — those create signal patterns Fyralis
-        # should disambiguate from real internal work.
-        ev = ", ".join(f"{e['label']}" for e in external_events[:3])
-        parts.append(f"External: {ev}.")
+    high_impact = [e for e in external
+                   if e.get("impact") in ("response_required", "high_attention")]
+    if high_impact:
+        ev = high_impact[0]
+        impact_phrasing = {
+            "response_required": "needs a response from the team",
+            "high_attention":    "soaks up team attention",
+        }.get(ev.get("impact"), "")
+        return f"{ev.get('label', 'External event')} ({ev.get('date', '')}) {impact_phrasing}."
 
     if departures:
-        dep = ", ".join(f"{p['full_name']} ({p['team'].removeprefix('team:')})"
-                        for p in departures)
-        parts.append(f"Departure: {dep}.")
+        d = departures[0]
+        return (f"{d['full_name']} wraps up at Alpen this month "
+                f"(left {d.get('ended_at', '')}).")
 
-    if new_hires:
-        nh = ", ".join(f"{p['full_name']} ({p['role']}, {p['team'].removeprefix('team:')})"
-                       for p in new_hires[:4])
-        parts.append(f"Hires: {nh}.")
+    if len(hires) >= 2:
+        teams_set = sorted({h["team"].removeprefix("team:") for h in hires})
+        return (f"Hiring month — {len(hires)} new joiners onboard across "
+                f"{', '.join(teams_set)}.")
 
+    if len(hires) == 1:
+        h = hires[0]
+        return f"{h['full_name']} joins as {h['role']} on {h['team'].removeprefix('team:')}."
+
+    # Steady-state — anchor in phase
+    if not has_eng and phase == "Pre-product foundations":
+        return ("Pre-product foundations: company exists on paper, the four "
+                "cofounders running fundraising prep, whitepaper drafting, and "
+                "early protocol design — no public repos open yet.")
+    if total == 0:
+        return f"No corpus activity this month ({phase_short})."
+    return f"Steady-state {phase_short}, no headline events this month."
+
+
+def _month_work_sentence(beats: list[dict],
+                         top_repos: list[tuple[str, int]],
+                         has_eng: bool,
+                         phase: str) -> str:
+    if not beats and not top_repos:
+        return ""
+
+    # Pull up to two distinct threads (the structured "Active threads" block
+    # below lists them all; this is the synthesis, so 2 is enough).
     if beats:
-        # one liner per active thread/beat
-        seen_threads = set()
-        beat_lines = []
-        for b in beats[:3]:
-            if b["thread_id"] in seen_threads:
+        seen, top = set(), []
+        for b in beats:
+            if b["thread_id"] in seen:
                 continue
-            seen_threads.add(b["thread_id"])
-            kind = b["beat_kind"] or "active"
-            beat_lines.append(f"{b['thread_title']} — {kind}: {_trim(b['beat_summary'], 180)}")
-        if beat_lines:
-            parts.append(" · ".join(beat_lines))
+            seen.add(b["thread_id"])
+            top.append(b)
+            if len(top) == 2:
+                break
+        if len(top) == 1:
+            b = top[0]
+            sentence = (f"{b['thread_title']} is in {b['beat_kind'] or 'flight'}: "
+                        f"{_trim(b['beat_summary'], 180)}")
+        else:
+            b1, b2 = top
+            sentence = (f"Two threads progress in parallel — "
+                        f"{b1['thread_title']} ({b1['beat_kind']}: "
+                        f"{_trim(b1['beat_summary'], 110)}) and "
+                        f"{b2['thread_title']} ({b2['beat_kind']}: "
+                        f"{_trim(b2['beat_summary'], 110)}).")
+        if top_repos and has_eng:
+            tr = ", ".join(f"{r.removeprefix('repo:')} ({n})" for r, n in top_repos)
+            sentence = sentence.rstrip(".") + f". Code piles into {tr}."
+        return sentence
 
-    if top_repos:
-        tr = ", ".join(f"{r} ({n})" for r, n in top_repos)
-        parts.append(f"Code activity concentrated in: {tr}.")
+    # No beat data, but engineering activity — describe the work via repos.
+    if has_eng:
+        tr = ", ".join(f"{r.removeprefix('repo:')} ({n} commits)"
+                       for r, n in top_repos[:3])
+        return f"Code activity concentrates in {tr}."
+    return ""
 
-    if top_actors:
-        names = []
-        for pid, n in top_actors:
-            handle = _handle_for_pid(people, pid)
-            names.append(f"{handle} ({n})")
-        parts.append(f"Top contributors: {', '.join(names)}.")
 
-    total = sum(sig.values())
-    if total > 0:
-        breakdown = ", ".join(f"{p}={n}"
-                              for p, n in sorted(sig.items(), key=lambda kv: -kv[1])
-                              if n > 0)
-        parts.append(f"Signals: {total} unique ({breakdown}).")
+def _month_people_sentence(hires: list[dict],
+                           departures: list[dict],
+                           pto_count: int,
+                           milestones: list[dict]) -> str:
+    parts = []
+    # If the opener already used hires/departures, restate them here only for
+    # additional detail beyond a single name.
+    if hires and milestones:
+        names = ", ".join(h["full_name"] for h in hires[:3])
+        more = f" and {len(hires) - 3} others" if len(hires) > 3 else ""
+        parts.append(f"{names}{more} onboard alongside the launch")
+    if departures and len(departures) >= 1 and not milestones:
+        # Already used in opener — skip restating.
+        pass
+
+    if pto_count >= 12:
+        parts.append(f"heavy PTO month ({pto_count} people out at some point)")
+    elif pto_count >= 6:
+        parts.append(f"moderate PTO load ({pto_count} people taking time off)")
+    elif pto_count >= 3:
+        parts.append(f"a few people on PTO ({pto_count})")
+
+    if not parts:
+        return ""
+    return _capitalise(", ".join(parts)) + "."
+
+
+def _month_tempo_sentence(top_actors: list[tuple[str, int]],
+                          people: list[dict],
+                          total: int,
+                          sig: dict[str, int],
+                          phase: str) -> str:
+    if total == 0 or not top_actors:
+        return ""
+
+    # Volume framing — anchored in phase so readers know if this is loud or
+    # quiet for that era.
+    by_prov = sorted(sig.items(), key=lambda kv: -kv[1])
+    dominant = by_prov[0]
+    second   = by_prov[1] if len(by_prov) > 1 else None
+
+    # Top contributors
+    names = []
+    for pid, n in top_actors[:3]:
+        handle = _handle_for_pid(people, pid)
+        names.append(f"{handle} ({n})")
+
+    if dominant[0] == "github":
+        what = f"engineering output — {dominant[1]} github events"
+    elif dominant[0] == "slack":
+        what = f"discussion-heavy — {dominant[1]} slack messages"
+    elif dominant[0] == "calendar":
+        what = f"meeting-heavy — {dominant[1]} calendar events"
+    elif dominant[0] == "notion":
+        what = f"docs-heavy — {dominant[1]} notion edits"
     else:
-        parts.append("No corpus activity this month.")
+        what = f"{dominant[1]} {dominant[0]} events"
 
-    return " ".join(parts)
+    if second and second[1] > 0:
+        what += f", {second[1]} {second[0]}"
+
+    if names:
+        return f"{total:,} unique signals total — {what}; top voices: {', '.join(names)}."
+    return f"{total:,} unique signals total — {what}."
+
+
+def _capitalise(s: str) -> str:
+    return s[:1].upper() + s[1:] if s else s

@@ -722,43 +722,66 @@ async def _ensure_gmail_thread(ctx: ReplayContext, mailbox_pk: UUID,
 
 @register("gmail", "message")
 async def _gmail_message(ctx: ReplayContext, event: Event) -> None:
-    """External (investor / audit / partner) Gmail correspondence.
+    """Gmail correspondence — one copy lands in each alpenlabs.io mailbox
+    that appears in From or To, mirroring how a real Gmail tenant ingests:
+    the sender sees their Sent copy, every internal recipient sees an Inbox
+    copy. External addresses are dropped (we don't model investor mailboxes).
 
-    Each message lands in the local cofounder's mailbox. External thread_id
-    from payload is preserved for grouping; only the alpenlabs.io mailbox is
-    actually populated (we don't model external mailboxes — outgoing/incoming
-    both pin to the local side).
-    """
+    Per-mailbox copies get distinct message_id values so the same logical
+    event can land N times without UNIQUE violations. The `thread` payload
+    key keys the thread so all copies stay correlated."""
     p = event["payload"]
-    local_email = "delbonis@alpenlabs.io"  # the in-org side of the conversation
-    try:
-        mailbox_pk = await _ensure_gmail_mailbox(ctx, local_email)
-    except KeyError:
-        return
-    thread_key = p.get("thread") or p.get("subject", "")[:40]
-    thread_pk = await _ensure_gmail_thread(ctx, mailbox_pk, thread_key,
-                                            p.get("subject", "(no subject)"))
     when = _parse_ts(event["t"])
+
+    def _internal(addr: str) -> bool:
+        return isinstance(addr, str) and addr.endswith("@alpenlabs.io")
+
+    addrs: list[str] = []
+    sender = p.get("from") or ""
+    if _internal(sender):
+        addrs.append(sender)
+    for r in (p.get("to") or []):
+        if _internal(r):
+            addrs.append(r)
+    # Dedupe while preserving order. If no alpenlabs.io address was found
+    # (e.g. legacy fixtures), fall back to delbonis as the catch-all so we
+    # never drop data on the floor.
+    seen: set[str] = set()
+    addrs = [a for a in addrs if not (a in seen or seen.add(a))]
+    if not addrs:
+        addrs = ["delbonis@alpenlabs.io"]
+
+    thread_key = p.get("thread") or (p.get("subject", "") or "")[:40]
     headers = [
-        {"name": "From", "value": p.get("from", "")},
-        {"name": "To", "value": ", ".join(p.get("to") or [])},
+        {"name": "From",    "value": p.get("from", "")},
+        {"name": "To",      "value": ", ".join(p.get("to") or [])},
         {"name": "Subject", "value": p.get("subject", "")},
-        {"name": "Date", "value": when.isoformat()},
+        {"name": "Date",    "value": when.isoformat()},
     ]
     history_id = int(when.timestamp())
-    try:
-        await ctx.pool.execute(
-            "INSERT INTO app_gmail.messages (id, thread_pk, message_id, history_id, "
-            "rfc822_msg_id, headers, snippet, body_plain, internal_date) "
-            "VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9)",
-            uuid4(), thread_pk, gmail_message_id(), history_id,
-            f"<{gmail_message_id()}@alpenlabs.io>",
-            json.dumps(headers),
-            (p.get("body", "")[:200]),
-            p.get("body", "")[:5000], when,
+
+    for email in addrs:
+        try:
+            mailbox_pk = await _ensure_gmail_mailbox(ctx, email)
+        except KeyError:
+            continue
+        thread_pk = await _ensure_gmail_thread(
+            ctx, mailbox_pk, thread_key,
+            p.get("subject", "(no subject)"),
         )
-    except asyncpg.exceptions.UniqueViolationError:
-        pass
+        try:
+            await ctx.pool.execute(
+                "INSERT INTO app_gmail.messages (id, thread_pk, message_id, history_id, "
+                "rfc822_msg_id, headers, snippet, body_plain, internal_date) "
+                "VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9)",
+                uuid4(), thread_pk, gmail_message_id(), history_id,
+                f"<{gmail_message_id()}@alpenlabs.io>",
+                json.dumps(headers),
+                (p.get("body", "")[:200]),
+                p.get("body", "")[:5000], when,
+            )
+        except asyncpg.exceptions.UniqueViolationError:
+            pass
 
 
 @register("notion", "page.create")
@@ -1061,6 +1084,253 @@ async def _drive_file_create(ctx: ReplayContext, event: Event) -> None:
         await ctx.idmap.put(p["id"], "drive_file", pk)
     except asyncpg.exceptions.UniqueViolationError:
         pass
+
+
+# =============================================================================
+# quickbooks.*
+# =============================================================================
+
+_QB_REALM_ID = "9341453412700001"   # stable mock realm id (single-tenant per run)
+
+
+async def _ensure_qb_company(ctx: ReplayContext, name: str = "Alpen Labs",
+                             when: datetime | None = None) -> UUID:
+    """Lazy-create the QuickBooks company row for this run."""
+    pk = await ctx.idmap.get("qb_company")
+    if pk is not None:
+        return pk
+    row = await ctx.pool.fetchrow(
+        "SELECT id FROM app_quickbooks.companies WHERE run_id=$1 AND realm_id=$2",
+        ctx.run_id, _QB_REALM_ID,
+    )
+    if row is not None:
+        await ctx.idmap.put("qb_company", "quickbooks_company", row["id"])
+        return row["id"]
+    pk = uuid4()
+    await ctx.pool.execute(
+        "INSERT INTO app_quickbooks.companies "
+        "(id, run_id, realm_id, company_name, legal_name, country, currency, "
+        " fiscal_year_start, created_at) "
+        "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+        pk, ctx.run_id, _QB_REALM_ID,
+        name, "Alpen Labs, Inc.", "US", "USD", "January",
+        when or datetime.now(timezone.utc),
+    )
+    await ctx.idmap.put("qb_company", "quickbooks_company", pk)
+    return pk
+
+
+@register("quickbooks", "company.create")
+async def _qb_company_create(ctx: ReplayContext, event: Event) -> None:
+    p = event["payload"]
+    when = _parse_ts(event["t"])
+    pk = await _ensure_qb_company(ctx, name=p.get("company_name", "Alpen Labs"), when=when)
+    # If the renderer supplied a non-default realm_id, prefer it (otherwise
+    # leave the one set during _ensure_qb_company).
+    realm_id = p.get("realm_id")
+    if realm_id and realm_id != _QB_REALM_ID:
+        await ctx.pool.execute(
+            "UPDATE app_quickbooks.companies SET realm_id=$1 WHERE id=$2",
+            realm_id, pk,
+        )
+
+
+@register("quickbooks", "account.create")
+async def _qb_account_create(ctx: ReplayContext, event: Event) -> None:
+    p = event["payload"]
+    when = _parse_ts(event["t"])
+    company_pk = await _ensure_qb_company(ctx, when=when)
+    acct_pk = uuid4()
+    try:
+        await ctx.pool.execute(
+            "INSERT INTO app_quickbooks.accounts "
+            "(id, company_pk, account_id, account_number, name, type, subtype, "
+            " description, currency, created_at) "
+            "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+            acct_pk, company_pk, p["id"], p["number"], p["name"],
+            p["type"], p["subtype"], p.get("description", ""),
+            p.get("currency", "USD"), when,
+        )
+        await ctx.idmap.put(f"qb_acct:{p['number']}", "quickbooks_account", acct_pk)
+    except asyncpg.exceptions.UniqueViolationError:
+        # Already created — idempotent reseed.
+        pk = await ctx.pool.fetchval(
+            "SELECT id FROM app_quickbooks.accounts WHERE company_pk=$1 AND account_number=$2",
+            company_pk, p["number"],
+        )
+        if pk:
+            await ctx.idmap.put(f"qb_acct:{p['number']}", "quickbooks_account", pk)
+
+
+async def _qb_account_pk(ctx: ReplayContext, company_pk: UUID, number: str) -> UUID | None:
+    pk = await ctx.idmap.get(f"qb_acct:{number}")
+    if pk is not None:
+        return pk
+    pk = await ctx.pool.fetchval(
+        "SELECT id FROM app_quickbooks.accounts WHERE company_pk=$1 AND account_number=$2",
+        company_pk, number,
+    )
+    if pk:
+        await ctx.idmap.put(f"qb_acct:{number}", "quickbooks_account", pk)
+    return pk
+
+
+@register("quickbooks", "vendor.create")
+async def _qb_vendor_create(ctx: ReplayContext, event: Event) -> None:
+    p = event["payload"]
+    when = _parse_ts(event["t"])
+    company_pk = await _ensure_qb_company(ctx, when=when)
+    vendor_pk = uuid4()
+    try:
+        await ctx.pool.execute(
+            "INSERT INTO app_quickbooks.vendors "
+            "(id, company_pk, vendor_id, display_name, active, currency, created_at) "
+            "VALUES ($1, $2, $3, $4, $5, $6, $7)",
+            vendor_pk, company_pk, p["id"], p["display_name"],
+            p.get("active", True), p.get("currency", "USD"), when,
+        )
+        await ctx.idmap.put(f"qb_vendor:{p['id']}", "quickbooks_vendor", vendor_pk)
+    except asyncpg.exceptions.UniqueViolationError:
+        pk = await ctx.pool.fetchval(
+            "SELECT id FROM app_quickbooks.vendors WHERE company_pk=$1 AND vendor_id=$2",
+            company_pk, p["id"],
+        )
+        if pk:
+            await ctx.idmap.put(f"qb_vendor:{p['id']}", "quickbooks_vendor", pk)
+
+
+@register("quickbooks", "employee.create")
+async def _qb_employee_create(ctx: ReplayContext, event: Event) -> None:
+    p = event["payload"]
+    when = _parse_ts(event["t"])
+    company_pk = await _ensure_qb_company(ctx, when=when)
+    person_pk = None
+    actor = event.get("actor")
+    if actor and actor.startswith("person:"):
+        person_pk = await ctx.idmap.get(actor)
+    emp_pk = uuid4()
+    try:
+        await ctx.pool.execute(
+            "INSERT INTO app_quickbooks.employees "
+            "(id, company_pk, employee_id, person_id, display_name, email, title, "
+            " team, location_bucket, annual_salary_cents, active, hired_at, "
+            " released_at, created_at) "
+            "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)",
+            emp_pk, company_pk, p["id"], person_pk,
+            p["display_name"], p.get("email"),
+            p.get("title", ""), p.get("team", ""),
+            p.get("location_bucket", "other"),
+            int(p["annual_salary_usd"]) * 100,
+            p.get("active", True),
+            datetime.fromisoformat(p["hired_at"]).date(),
+            datetime.fromisoformat(p["released_at"]).date() if p.get("released_at") else None,
+            when,
+        )
+        await ctx.idmap.put(f"qb_emp:{p['id']}", "quickbooks_employee", emp_pk)
+    except asyncpg.exceptions.UniqueViolationError:
+        pk = await ctx.pool.fetchval(
+            "SELECT id FROM app_quickbooks.employees WHERE company_pk=$1 AND employee_id=$2",
+            company_pk, p["id"],
+        )
+        if pk:
+            await ctx.idmap.put(f"qb_emp:{p['id']}", "quickbooks_employee", pk)
+
+
+@register("quickbooks", "deposit")
+async def _qb_deposit(ctx: ReplayContext, event: Event) -> None:
+    p = event["payload"]
+    when = _parse_ts(event["t"])
+    company_pk = await _ensure_qb_company(ctx, when=when)
+    deposit_to = await _qb_account_pk(ctx, company_pk, p.get("deposit_to_account", "1000"))
+    credit     = await _qb_account_pk(ctx, company_pk, p.get("credit_account", "3000"))
+    pk = uuid4()
+    try:
+        await ctx.pool.execute(
+            "INSERT INTO app_quickbooks.deposits "
+            "(id, company_pk, deposit_id, txn_date, amount_cents, "
+            " deposit_to_account_pk, credit_account_pk, round_id, round_kind, "
+            " lead, participants, memo, created_at) "
+            "VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12,$13)",
+            pk, company_pk, p["id"],
+            datetime.fromisoformat(p["txn_date"]).date(),
+            int(p["amount_usd"]) * 100,
+            deposit_to, credit,
+            p.get("round_id"), p.get("round_kind"),
+            p.get("lead", ""),
+            json.dumps(p.get("participants", [])),
+            p.get("memo", ""),
+            when,
+        )
+        # Running balance: debit bank, credit equity/income.
+        amount_cents = int(p["amount_usd"]) * 100
+        if deposit_to:
+            await ctx.pool.execute(
+                "UPDATE app_quickbooks.accounts SET current_balance_cents = "
+                "current_balance_cents + $1 WHERE id = $2", amount_cents, deposit_to)
+        if credit:
+            await ctx.pool.execute(
+                "UPDATE app_quickbooks.accounts SET current_balance_cents = "
+                "current_balance_cents - $1 WHERE id = $2", amount_cents, credit)
+    except asyncpg.exceptions.UniqueViolationError:
+        pass
+
+
+@register("quickbooks", "purchase")
+async def _qb_purchase(ctx: ReplayContext, event: Event) -> None:
+    p = event["payload"]
+    when = _parse_ts(event["t"])
+    company_pk = await _ensure_qb_company(ctx, when=when)
+    vendor_pk = await ctx.idmap.get(f"qb_vendor:{p.get('vendor_id', '')}")
+    employee_pk = None
+    if p.get("person_id"):
+        employee_pk = await ctx.idmap.get(f"qb_emp:emp-{_short_seed(p['person_id'])}")
+        # Fall back: look up by person_id directly.
+        if employee_pk is None:
+            employee_pk = await ctx.pool.fetchval(
+                "SELECT e.id FROM app_quickbooks.employees e "
+                "JOIN org.people p ON p.id = e.person_id "
+                "WHERE e.company_pk = $1 AND p.handle = ANY (ARRAY[$2, $3])",
+                company_pk, p["person_id"].removeprefix("person:"), p["person_id"],
+            )
+    expense_pk = await _qb_account_pk(ctx, company_pk, p.get("expense_account", "5000"))
+    payment_pk = await _qb_account_pk(ctx, company_pk, p.get("payment_account", "1000"))
+    pk = uuid4()
+    try:
+        await ctx.pool.execute(
+            "INSERT INTO app_quickbooks.purchases "
+            "(id, company_pk, purchase_id, txn_date, amount_cents, vendor_pk, "
+            " employee_pk, expense_account_pk, payment_account_pk, category, "
+            " memo, payload, created_at) "
+            "VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13)",
+            pk, company_pk, p["id"],
+            datetime.fromisoformat(p["txn_date"]).date(),
+            int(p["amount_usd"]) * 100,
+            vendor_pk, employee_pk, expense_pk, payment_pk,
+            p.get("category", "other"),
+            p.get("memo", ""),
+            json.dumps({k: v for k, v in p.items()
+                        if k not in ("id", "txn_date", "amount_usd", "vendor",
+                                     "vendor_id", "expense_account", "payment_account",
+                                     "category", "memo", "person_id")}),
+            when,
+        )
+        # Running balance: debit expense, credit bank.
+        amount_cents = int(p["amount_usd"]) * 100
+        if expense_pk:
+            await ctx.pool.execute(
+                "UPDATE app_quickbooks.accounts SET current_balance_cents = "
+                "current_balance_cents + $1 WHERE id = $2", amount_cents, expense_pk)
+        if payment_pk:
+            await ctx.pool.execute(
+                "UPDATE app_quickbooks.accounts SET current_balance_cents = "
+                "current_balance_cents - $1 WHERE id = $2", amount_cents, payment_pk)
+    except asyncpg.exceptions.UniqueViolationError:
+        pass
+
+
+def _short_seed(s: str) -> str:
+    import hashlib
+    return hashlib.sha256(s.encode()).hexdigest()[:12]
 
 
 # =============================================================================

@@ -73,6 +73,10 @@ KINDS: dict[str, set[str]] = {
     "drive": {
         "file.create", "file.update", "file.trash", "comment", "revision",
     },
+    "quickbooks": {
+        "company.create", "account.create", "vendor.create",
+        "employee.create", "deposit", "purchase",
+    },
 }
 
 

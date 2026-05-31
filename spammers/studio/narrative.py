@@ -231,6 +231,28 @@ async def _db_signals(pool: asyncpg.Pool, run_id: UUID) -> dict[str, int]:
                     WHERE i.run_id = $1)""", run_id)
     out["jira"] = int(val or 0)
 
+    # ---- quickbooks: deposits + purchases (accounts/vendors/employees are
+    # one-off seeding, so they don't dominate the live "what Fyralis sees right
+    # now" picture — but we still include them so the tile's count is honest)
+    val = await pool.fetchval(
+        """SELECT (SELECT count(*) FROM app_quickbooks.companies WHERE run_id = $1)
+                + (SELECT count(*) FROM app_quickbooks.accounts a
+                     JOIN app_quickbooks.companies c ON c.id = a.company_pk
+                    WHERE c.run_id = $1)
+                + (SELECT count(*) FROM app_quickbooks.vendors v
+                     JOIN app_quickbooks.companies c ON c.id = v.company_pk
+                    WHERE c.run_id = $1)
+                + (SELECT count(*) FROM app_quickbooks.employees e
+                     JOIN app_quickbooks.companies c ON c.id = e.company_pk
+                    WHERE c.run_id = $1)
+                + (SELECT count(*) FROM app_quickbooks.deposits d
+                     JOIN app_quickbooks.companies c ON c.id = d.company_pk
+                    WHERE c.run_id = $1)
+                + (SELECT count(*) FROM app_quickbooks.purchases p
+                     JOIN app_quickbooks.companies c ON c.id = p.company_pk
+                    WHERE c.run_id = $1)""", run_id)
+    out["quickbooks"] = int(val or 0)
+
     return out
 
 

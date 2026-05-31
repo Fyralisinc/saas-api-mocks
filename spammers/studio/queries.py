@@ -138,9 +138,34 @@ async def provider_status(pool: asyncpg.Pool, run_id: UUID) -> dict:
             "SELECT count(*) FROM app_jira.comments c JOIN app_jira.issues i ON i.id=c.issue_pk "
             "WHERE i.installation_pk=$1", jinst["id"])
 
+    # QuickBooks
+    qcomp = await pool.fetchrow(
+        "SELECT id FROM app_quickbooks.companies WHERE run_id=$1", run_id)
+    quickbooks = {"employees": 0, "deposits": 0, "purchases": 0,
+                  "bank_balance_cents": 0, "total_raised_cents": 0,
+                  "total_spent_cents": 0}
+    if qcomp:
+        quickbooks["employees"] = await pool.fetchval(
+            "SELECT count(*) FROM app_quickbooks.employees WHERE company_pk=$1", qcomp["id"])
+        quickbooks["deposits"] = await pool.fetchval(
+            "SELECT count(*) FROM app_quickbooks.deposits WHERE company_pk=$1", qcomp["id"])
+        quickbooks["purchases"] = await pool.fetchval(
+            "SELECT count(*) FROM app_quickbooks.purchases WHERE company_pk=$1", qcomp["id"])
+        # Bank balance is the Operating Bank account (number 1000) — the
+        # running balance reflects all deposits in + purchases out so far.
+        quickbooks["bank_balance_cents"] = int(await pool.fetchval(
+            "SELECT COALESCE(current_balance_cents, 0) FROM app_quickbooks.accounts "
+            "WHERE company_pk=$1 AND account_number='1000'", qcomp["id"]) or 0)
+        quickbooks["total_raised_cents"] = int(await pool.fetchval(
+            "SELECT COALESCE(sum(amount_cents), 0) FROM app_quickbooks.deposits "
+            "WHERE company_pk=$1", qcomp["id"]) or 0)
+        quickbooks["total_spent_cents"] = int(await pool.fetchval(
+            "SELECT COALESCE(sum(amount_cents), 0) FROM app_quickbooks.purchases "
+            "WHERE company_pk=$1", qcomp["id"]) or 0)
+
     return {"people": people, "teams": teams, "slack": slack, "discord": discord,
             "github": github, "calendar": calendar, "notion": notion, "gmail": gmail,
-            "drive": drive, "jira": jira}
+            "drive": drive, "jira": jira, "quickbooks": quickbooks}
 
 
 # --------------------------------------------------------------------------- people / channels / repos

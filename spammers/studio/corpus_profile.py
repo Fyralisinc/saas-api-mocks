@@ -100,6 +100,17 @@ def _build_profile(events_jsonl: Path) -> dict:
     external_events = (office.get("external_events") or [])
     conference_travel = (office.get("conference_travel") or {})
 
+    # Known round ids drive the thread → round mapping below. Read once so
+    # the events.jsonl walk can match every thread key to the longest known
+    # round id prefix (the fundraising emitter uses keys like
+    # `round:seed-pitch-investor:ribbit`, which has to fold back into
+    # `round:seed` not get split into 11 sub-rounds).
+    finance = _yaml(corpus_root / "facts" / "finance.yaml") or {}
+    known_round_ids = sorted(
+        ((r.get("id") or "") for r in (finance.get("funding_rounds") or [])),
+        key=lambda s: -len(s),     # longest first so prefix-match picks the most specific
+    )
+
     company = (facts or {}).get("company", {})
     products = (facts or {}).get("products", [])
     repos = (facts or {}).get("repos", [])
@@ -138,6 +149,15 @@ def _build_profile(events_jsonl: Path) -> dict:
     ingest:  dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
     repo_activity: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
     actor_activity: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    # Per-month finance: cash in (deposits), cash out (purchases), broken down
+    # by category. Running bank balance is computed after the walk.
+    cash_in:  dict[str, int] = defaultdict(int)
+    cash_out: dict[str, int] = defaultdict(int)
+    cash_out_by_cat: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    # Fundraising thread index — group every gmail fundraise_* / grant_* event
+    # by (round_id, thread_key) so Page 2 can render a thread browser.
+    fundraising_threads: dict[str, dict[str, dict]] = defaultdict(dict)
+    # round_id -> { messages: int, threads: int, participants: set(addr) }
 
     first_ts: str | None = None
     last_ts: str | None = None
@@ -172,6 +192,35 @@ def _build_profile(events_jsonl: Path) -> dict:
                 actor = payload.get("actor") or payload.get("author") or e.get("actor")
                 if isinstance(actor, str) and actor.startswith("person:"):
                     actor_activity[ym][actor] += 1
+                # ---- finance roll-up
+                if provider == "quickbooks" and kind == "deposit":
+                    cash_in[ym] += int(payload.get("amount_usd", 0))
+                elif provider == "quickbooks" and kind == "purchase":
+                    amt = int(payload.get("amount_usd", 0))
+                    cash_out[ym] += amt
+                    cat = payload.get("category", "other")
+                    cash_out_by_cat[ym][cat] += amt
+                # ---- fundraising threads
+                if provider == "gmail" and kind == "message":
+                    cat = payload.get("category", "") or ""
+                    if cat.startswith("fundraise_") or cat.startswith("grant_"):
+                        thread = payload.get("thread") or ""
+                        round_id = _round_id_from_thread(thread, known_round_ids)
+                        if round_id:
+                            bucket = fundraising_threads.setdefault(round_id, {})
+                            tb = bucket.setdefault(thread, {
+                                "thread": thread, "round_id": round_id,
+                                "category": cat, "subject": payload.get("subject", ""),
+                                "messages": [], "first_ts": t,
+                            })
+                            tb["messages"].append({
+                                "t": t, "from": payload.get("from", ""),
+                                "to": payload.get("to") or [],
+                                "subject": payload.get("subject", ""),
+                                "snippet": (payload.get("body", "") or "")[:240],
+                                "category": cat,
+                                "actor": e.get("actor"),
+                            })
 
     # totals across the whole corpus
     totals_corpus: dict[str, int] = defaultdict(int)
@@ -186,6 +235,11 @@ def _build_profile(events_jsonl: Path) -> dict:
     # ---- month list — span the full corpus window so the UI can render
     #      "future / not yet replayed" months consistently.
     months = _month_range(first_ts, last_ts) if first_ts and last_ts else []
+    # Running bank balance walks forward through the month list so each
+    # month carries the end-of-month position. Anchored at 0 — the corpus's
+    # founders-capital tranche on 2022-01-15 is itself a deposit that lifts
+    # the balance the first month.
+    running_balance = 0
     monthly = []
     for ym in months:
         phase = _phase_for(ym)
@@ -204,6 +258,17 @@ def _build_profile(events_jsonl: Path) -> dict:
                            key=lambda kv: -kv[1])[:3]
         top_actors = sorted(actor_activity.get(ym, {}).items(),
                             key=lambda kv: -kv[1])[:3]
+        # finance
+        m_in  = int(cash_in.get(ym, 0))
+        m_out = int(cash_out.get(ym, 0))
+        running_balance += m_in - m_out
+        cash = {
+            "cash_in_usd":  m_in,
+            "cash_out_usd": m_out,
+            "net_usd":      m_in - m_out,
+            "bank_end_usd": running_balance,
+            "out_by_category": dict(cash_out_by_cat.get(ym, {})),
+        }
         monthly.append({
             "ym": ym,
             "label": _month_label(ym),
@@ -232,12 +297,32 @@ def _build_profile(events_jsonl: Path) -> dict:
                 {"handle": _handle_for_pid(people, pid), "commits": n}
                 for pid, n in top_actors
             ],
+            "cash": cash,
             "narrative": _month_narrative(
                 ym, sig, ing, ms, thread_beats, new_hires, top_repos, top_actors, people,
                 external_events=ext, departures=departures,
                 pto_count=len(pto_this_month), phase_title=phase["title"],
             ),
         })
+
+    # ---- finance summary across the corpus ----
+    finance_totals = {
+        "cash_in_usd":   sum(cash_in.values()),
+        "cash_out_usd":  sum(cash_out.values()),
+        "net_usd":       sum(cash_in.values()) - sum(cash_out.values()),
+        "bank_end_usd":  running_balance,
+        "out_by_category": _agg_category(cash_out_by_cat),
+    }
+
+    # ---- fundraising thread bundle for Page 2 ----
+    # Bundle as a list of rounds with their threads grouped + sorted by time.
+    # Round metadata pulled from facts.yaml's company.cofounders-adjacent
+    # `funding_rounds` if present (or finance.yaml — we just need title + amount
+    # + date for the round header). corpus_profile is intentionally decoupled
+    # from finance.yaml, so we derive a minimal round meta from the thread
+    # content itself.
+    fundraising = _build_fundraising_bundle(
+        fundraising_threads, corpus_root / "facts" / "finance.yaml")
 
     # ---- top-level overview text ----
     repos_total = len(repos)
@@ -281,6 +366,8 @@ def _build_profile(events_jsonl: Path) -> dict:
         "teams": teams,
         "people": people,
         "signal_notes": SIGNAL_NOTES,
+        "fundraising": fundraising,
+        "finance_totals": finance_totals,
         "monthly": {
             "months": monthly,
             "totals_corpus": dict(totals_corpus),
@@ -293,6 +380,74 @@ def _build_profile(events_jsonl: Path) -> dict:
                 for (s, e, t, b) in PHASE_BOUNDS
             ],
         },
+    }
+
+
+def _agg_category(cash_out_by_cat: dict[str, dict[str, int]]) -> dict[str, int]:
+    out: dict[str, int] = {}
+    for ym, by_cat in cash_out_by_cat.items():
+        for cat, n in by_cat.items():
+            out[cat] = out.get(cat, 0) + n
+    return out
+
+
+def _build_fundraising_bundle(
+    fundraising_threads: dict[str, dict[str, dict]],
+    finance_yaml: Path,
+) -> dict:
+    """Take the per-round nested dict of threads and shape it into a list of
+    rounds the UI can render. Each round carries its threads sorted by start
+    time; each thread carries its messages sorted by timestamp."""
+    rounds_meta: dict[str, dict] = {}
+    if finance_yaml.exists():
+        try:
+            d = yaml.safe_load(finance_yaml.read_text()) or {}
+            for r in d.get("funding_rounds", []):
+                rounds_meta[r["id"]] = {
+                    "id": r["id"],
+                    "kind": r.get("kind", "round"),
+                    "date": str(r.get("date", "")),
+                    "amount_usd": int(r.get("amount_usd", 0)),
+                    "lead": r.get("lead", ""),
+                    "participants": r.get("participants", []),
+                    "note": r.get("note", ""),
+                }
+        except yaml.YAMLError:
+            pass
+
+    rounds: list[dict] = []
+    for round_id, threads_by_key in fundraising_threads.items():
+        meta = rounds_meta.get(round_id, {
+            "id": round_id, "kind": "round", "date": "",
+            "amount_usd": 0, "lead": "", "participants": [], "note": "",
+        })
+        thr_list = []
+        for thread_key, info in threads_by_key.items():
+            msgs = sorted(info["messages"], key=lambda m: m["t"])
+            thr_list.append({
+                "thread": thread_key,
+                "subject": info["subject"],
+                "category": info["category"],
+                "messages": msgs,
+                "first_ts": msgs[0]["t"] if msgs else "",
+                "msg_count": len(msgs),
+            })
+        thr_list.sort(key=lambda t: t["first_ts"])
+        # Total message + thread count for the round header.
+        msg_total = sum(t["msg_count"] for t in thr_list)
+        rounds.append({
+            **meta,
+            "thread_count": len(thr_list),
+            "msg_count": msg_total,
+            "threads": thr_list,
+        })
+
+    # Sort rounds chronologically.
+    rounds.sort(key=lambda r: r.get("date") or "")
+    return {
+        "rounds": rounds,
+        "total_threads": sum(r["thread_count"] for r in rounds),
+        "total_messages": sum(r["msg_count"] for r in rounds),
     }
 
 
@@ -405,6 +560,22 @@ def _active_beats(threads: list[dict], ym: str) -> list[dict]:
                     "beat_summary": _clean_summary(b.get("summary") or ""),
                 })
     return out
+
+
+def _round_id_from_thread(thread: str, known_round_ids: list[str]) -> str:
+    """Pull the canonical round id off the start of a gmail thread key.
+
+    Thread keys are shaped like ``round:seed-pitch-investor:ribbit`` or
+    ``round:starknet-grant-proposal``. Match each thread against the known
+    round ids from finance.yaml (longest first) so `round:seed-pitch-...`
+    folds into `round:seed`, not into `round:seed-pitch-investor`.
+    """
+    if not thread:
+        return ""
+    for rid in known_round_ids:
+        if thread == rid or thread.startswith(rid + "-") or thread.startswith(rid + ":"):
+            return rid
+    return ""
 
 
 def _pto_in_month(pto_by_pid: dict[str, list[dict]], ym: str,

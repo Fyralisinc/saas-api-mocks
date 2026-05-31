@@ -101,6 +101,8 @@ async def build(pool: asyncpg.Pool, run_id: UUID, company: Company) -> dict:
 
         "people":  profile["people"],
         "signal_notes": profile["signal_notes"],
+        "fundraising": profile["fundraising"],
+        "finance_totals": profile["finance_totals"],
 
         "monthly": {
             "overview_blurb": _monthly_overview_blurb(

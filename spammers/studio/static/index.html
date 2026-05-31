@@ -374,6 +374,80 @@
   .mn-body .th b{color:var(--head)} .mn-body .th i{color:var(--ink-dim);font-style:italic}
   .mn-body .th p{margin:3px 0;color:var(--ink);font-size:12.5px;line-height:1.55}
 
+  /* per-month cash position chips */
+  .cash-chip{font-size:10.5px;letter-spacing:1px;padding:2px 7px;border:1px solid;border-radius:2px;
+    text-transform:uppercase;margin-left:auto;flex:0 0 auto}
+  .cash-chip.cash-up{color:var(--neon);border-color:var(--neon);background:rgba(0,255,102,.05)}
+  .cash-chip.cash-dn{color:var(--amber);border-color:var(--amber);background:rgba(255,212,121,.05)}
+  .cash-row{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 10px}
+  .cash-pos{display:flex;flex-direction:column;align-items:flex-start;border:1px solid var(--line);
+    background:var(--bg2);padding:7px 11px;border-radius:3px;font-size:13.5px;font-weight:700;
+    color:var(--head);letter-spacing:.4px;min-width:130px}
+  .cash-pos small{color:var(--ink-dim);font-weight:400;letter-spacing:1.2px;font-size:9.5px;
+    margin-top:2px;text-transform:uppercase}
+  .cash-pos.in{border-color:rgba(0,255,102,.45);color:var(--neon)}
+  .cash-pos.out{border-color:rgba(255,212,121,.45);color:var(--amber)}
+  .cash-pos.net-pos{border-color:var(--neon);color:var(--head)}
+  .cash-pos.net-neg{border-color:rgba(255,107,102,.45);color:var(--danger)}
+  .cash-pos.bank{border-color:var(--line-bri);color:var(--head)}
+  .cat-row{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}
+  .cat-chip{background:var(--bg2);border:1px solid var(--line);padding:2px 7px;border-radius:2px;
+    font-size:10.5px;color:var(--ink);letter-spacing:.3px}
+  .cat-chip b{color:var(--head);margin-right:5px}
+
+  /* fundraising browser on Page 2 */
+  .fr-bundle{border:1px solid var(--line);background:var(--panel);box-shadow:var(--shadow);
+    border-radius:4px;padding:16px 20px;margin-bottom:14px;border-left:3px solid var(--amber)}
+  .fr-bundle > h3{margin:0 0 12px;color:var(--amber);letter-spacing:2.5px;font-size:12.5px;
+    text-transform:uppercase;border-bottom:1px solid var(--line);padding-bottom:8px}
+  .fr-bundle .blurb{color:var(--ink);font-size:13px;line-height:1.65;margin:0 0 12px}
+  .fr-round{border:1px solid var(--line);background:var(--panel-2);margin-top:9px;border-radius:3px;overflow:hidden}
+  .fr-round .fr-head{display:flex;justify-content:space-between;align-items:center;gap:14px;
+    padding:11px 16px;cursor:pointer;transition:.12s}
+  .fr-round .fr-head:hover{background:#0d2415}
+  .fr-round.open .fr-head{background:#0d2415;border-bottom:1px solid var(--line)}
+  .fr-round .fr-head .l{display:flex;flex-direction:column;min-width:0;flex:1}
+  .fr-round .fr-head .title{color:var(--head);font-size:13.5px;font-weight:700;letter-spacing:.5px}
+  .fr-round .fr-head .title::before{content:'▸ ';color:var(--amber)}
+  .fr-round.open .fr-head .title::before{content:'▾ '}
+  .fr-round .fr-head .sub{color:var(--ink-dim);font-size:11px;margin-top:3px;letter-spacing:.5px}
+  .fr-round .fr-head .amt{color:var(--neon);font-size:15px;font-weight:700;text-align:right;
+    white-space:nowrap;letter-spacing:.4px}
+  .fr-round .fr-head .amt small{color:var(--ink-dim);font-weight:400;font-size:10px;display:block;
+    letter-spacing:1.2px;text-transform:uppercase;margin-top:2px}
+  .fr-round .fr-body{display:none;padding:12px 16px}
+  .fr-round.open .fr-body{display:block}
+  .fr-round .fr-body h5{margin:8px 0 5px;color:var(--amber);font-size:10.5px;letter-spacing:1.5px;text-transform:uppercase}
+  .fr-round .fr-body h5:first-child{margin-top:0}
+  .fr-round .meta-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+  .fr-round .meta-row span{background:var(--bg2);border:1px solid var(--line);padding:2px 8px;
+    border-radius:2px;font-size:11px;color:var(--ink-dim);letter-spacing:.3px}
+  .fr-round .meta-row span b{color:var(--head);margin-right:5px}
+  .fr-cat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:8px;margin-bottom:10px}
+  .fr-cat{border:1px solid var(--line);background:var(--bg2);padding:8px 11px;border-radius:3px}
+  .fr-cat .cat-name{color:var(--head);font-size:11.5px;font-weight:700;letter-spacing:.5px;margin-bottom:3px}
+  .fr-cat .cat-count{color:var(--ink-dim);font-size:10.5px;letter-spacing:.5px}
+  .fr-thr-list{display:flex;flex-direction:column;gap:6px;max-height:380px;overflow-y:auto;
+    padding-right:6px}
+  .fr-thr{border:1px solid var(--line);background:var(--bg2);border-radius:3px;cursor:pointer;
+    padding:7px 10px;transition:.12s}
+  .fr-thr:hover{border-color:var(--line-bri);background:#0d2415}
+  .fr-thr.open{border-color:var(--amber)}
+  .fr-thr .thr-head{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+  .fr-thr .thr-subject{color:var(--head);font-size:12.5px;font-weight:700;letter-spacing:.3px}
+  .fr-thr .thr-cat{color:var(--ink-dim);font-size:9.5px;letter-spacing:1.2px;text-transform:uppercase}
+  .fr-thr .thr-meta{color:var(--ink-dim);font-size:10.5px;margin-top:2px}
+  .fr-thr .thr-body{display:none;margin-top:8px;border-top:1px dashed rgba(255,212,121,.3);padding-top:6px;cursor:default}
+  .fr-thr.open .thr-body{display:block}
+  .fr-msg{margin:7px 0;padding:7px 9px;background:var(--panel);border-left:2px solid var(--ink-dim);
+    border-radius:2px;font-size:11.5px;line-height:1.55}
+  .fr-msg.outbound{border-left-color:var(--neon)}
+  .fr-msg.inbound{border-left-color:var(--amber)}
+  .fr-msg .from{color:var(--head);font-weight:700;font-size:11px}
+  .fr-msg .to{color:var(--ink-dim);font-size:10.5px}
+  .fr-msg .when{color:var(--ink-dim);font-size:10px;letter-spacing:.5px}
+  .fr-msg .snip{color:var(--ink);margin-top:4px;white-space:pre-wrap;font-size:11.5px;line-height:1.5}
+
   /* credentials panel */
   .credstoggle{margin-bottom:0;font-weight:600;font-size:13px}
   .creds{border:1px solid var(--line);background:var(--panel);box-shadow:var(--shadow);
@@ -817,6 +891,7 @@ function renderDossier(d, co, providerStatus){
   `;
   $('#dossier-people').innerHTML = `
     <div class="label" style="margin:0 0 10px">// people · 36 contributors · behavioural patterns</div>
+    ${fundraisingBundleBlock(d.fundraising)}
     ${peoplePageContent(d.people, d.overview.teams)}
   `;
   $('#dossier-monthly').innerHTML = `
@@ -971,6 +1046,118 @@ function fmtMoney(cents){
   if(Math.abs(dollars) >= 1_000_000) return (dollars/1_000_000).toFixed(2)+'M';
   if(Math.abs(dollars) >= 1_000)     return (dollars/1_000).toFixed(1)+'k';
   return dollars.toFixed(0);
+}
+
+//---------- Page 2: fundraising thread browser -----------------------------
+// Per-round bundles, each click-expandable. Inside a round, threads are
+// grouped by stage (pitch, term-sheet, dd, internal, wire, welcome, board,
+// angel, proposal, announce) so the saga reads in order. Clicking a thread
+// expands its messages inline. Heavy rounds (200+ board updates) get a
+// scrolling list cap so the page doesn't balloon.
+
+const FR_CAT_ORDER = [
+  'fundraise_pitch', 'fundraise_pitch_reply',
+  'fundraise_term_sheet', 'fundraise_term_sheet_reply',
+  'fundraise_diligence', 'fundraise_diligence_reply',
+  'fundraise_internal',
+  'fundraise_wire', 'fundraise_wire_reply',
+  'fundraise_welcome',
+  'fundraise_board_update',
+  'fundraise_angel', 'fundraise_angel_reply',
+  'grant_proposal', 'grant_award', 'grant_announce',
+];
+const FR_CAT_LABEL = {
+  'fundraise_pitch': 'Pitch', 'fundraise_pitch_reply': 'Pitch reply',
+  'fundraise_term_sheet': 'Term sheet', 'fundraise_term_sheet_reply': 'Term sheet reply',
+  'fundraise_diligence': 'Diligence', 'fundraise_diligence_reply': 'Diligence reply',
+  'fundraise_internal': 'Internal cofounder thread',
+  'fundraise_wire': 'Wire confirmation', 'fundraise_wire_reply': 'Wire confirm reply',
+  'fundraise_welcome': 'Post-close welcome',
+  'fundraise_board_update': 'Monthly board update',
+  'fundraise_angel': 'Angel outreach', 'fundraise_angel_reply': 'Angel reply',
+  'grant_proposal': 'Grant proposal', 'grant_award': 'Grant award',
+  'grant_announce': 'Grant announce',
+};
+
+function fundraisingBundleBlock(fr){
+  if(!fr || !fr.rounds || !fr.rounds.length) return '';
+  const intro = `${fr.rounds.length} rounds · ${num(fr.total_threads)} threads · ${num(fr.total_messages)} messages routed across the cofounder mailboxes. The CEO Simanta carries the investor narrative; Pramod fields technical diligence; Abishkar handles wire confirmations; Chandan is cc'd on internal cofounder threads.`;
+  return `
+    <div class="fr-bundle">
+      <h3>FUNDRAISING THREADS <span style="color:var(--ink-dim);font-size:11px;letter-spacing:1px">// gmail saga across all rounds</span></h3>
+      <p class="blurb">${esc(intro)}</p>
+      ${fr.rounds.map(fundraisingRound).join('')}
+    </div>`;
+}
+
+function fundraisingRound(r){
+  const amt = r.amount_usd ? '$'+fmtMoney(r.amount_usd*100) : '—';
+  // group threads by category, preserving the saga order
+  const byCat = {};
+  for(const t of (r.threads||[])){
+    (byCat[t.category] = byCat[t.category]||[]).push(t);
+  }
+  const catKeys = FR_CAT_ORDER.filter(k => byCat[k] && byCat[k].length);
+  // any unknown leftover categories at the end
+  for(const k of Object.keys(byCat)) if(!FR_CAT_ORDER.includes(k)) catKeys.push(k);
+
+  const catGrid = catKeys.map(k => {
+    const list = byCat[k] || [];
+    return `<div class="fr-cat">
+      <div class="cat-name">${esc(FR_CAT_LABEL[k] || k)}</div>
+      <div class="cat-count">${list.length} thread${list.length===1?'':'s'} · ${list.reduce((s,t)=>s+t.msg_count,0)} message${list.reduce((s,t)=>s+t.msg_count,0)===1?'':'s'}</div>
+    </div>`;
+  }).join('');
+
+  // representative thread per category (first chronological), plus full
+  // saga list under a single scrolling pane
+  const allThreads = (r.threads||[]).slice().sort((a,b) => (a.first_ts||'').localeCompare(b.first_ts||''));
+  const threadList = allThreads.slice(0, 50).map(threadCard).join('');
+  const more = allThreads.length > 50
+    ? `<div class="dim" style="font-size:11px;text-align:center;padding:6px">…and ${allThreads.length - 50} more threads (capped for performance)</div>`
+    : '';
+
+  const lead = r.lead ? `<span><b>Lead:</b> ${esc(r.lead)}</span>` : '';
+  const parts = r.participants && r.participants.length
+    ? `<span><b>Participants:</b> ${esc(r.participants.slice(0,5).join(', '))}${r.participants.length>5?` +${r.participants.length-5}`:''}</span>`
+    : '';
+
+  return `
+    <div class="fr-round" data-rid="${esc(r.id)}">
+      <div class="fr-head">
+        <div class="l">
+          <span class="title">${esc(r.id.replace(/^round:/, '').replace(/-/g,' '))}</span>
+          <span class="sub">${esc(r.date || '—')} · ${esc(r.kind)} · ${r.thread_count} threads · ${r.msg_count} messages</span>
+        </div>
+        <div class="amt">${amt}<small>raised</small></div>
+      </div>
+      <div class="fr-body">
+        ${(lead||parts) ? `<div class="meta-row">${lead}${parts}</div>` : ''}
+        ${r.note ? `<p class="blurb" style="margin:0 0 10px;font-size:12px">${esc(r.note)}</p>` : ''}
+        <h5>Saga breakdown</h5>
+        <div class="fr-cat-grid">${catGrid}</div>
+        <h5>Threads (chronological)</h5>
+        <div class="fr-thr-list">${threadList}${more}</div>
+      </div>
+    </div>`;
+}
+
+function threadCard(t){
+  const msgs = (t.messages||[]).map(m => {
+    const isOut = (m.from||'').endsWith('@alpenlabs.io');
+    return `<div class="fr-msg ${isOut?'outbound':'inbound'}">
+      <div><span class="from">${esc(m.from||'')}</span> → <span class="to">${esc((m.to||[]).join(', '))}</span> <span class="when">· ${esc((m.t||'').slice(0,16).replace('T',' '))}</span></div>
+      <div class="snip">${esc(m.snippet||'')}</div>
+    </div>`;
+  }).join('');
+  return `<div class="fr-thr" data-thread="${esc(t.thread)}">
+    <div class="thr-head">
+      <span class="thr-subject">${esc(t.subject||'(no subject)')}</span>
+      <span class="thr-cat">${esc(FR_CAT_LABEL[t.category] || t.category)}</span>
+    </div>
+    <div class="thr-meta">${t.msg_count} msg${t.msg_count===1?'':'s'} · started ${esc((t.first_ts||'').slice(0,10))}</div>
+    <div class="thr-body">${msgs}</div>
+  </div>`;
 }
 
 //---------- Page 2: detailed people list (no top-12 cap) --------------------
@@ -1135,12 +1322,24 @@ function monthAccordion(m, isCurrent){
   const badgeLbl = m.in_backfill ? 'BACKFILLED' : 'FUTURE';
   const futureCls = m.is_future ? ' future' : '';
   const openCls = isCurrent ? ' open' : '';
+  const cash = m.cash || {};
+  // Cash chip: net of cash_in / cash_out (the structural picture of the
+  // month). Green when net positive (deposit landed), amber when burning,
+  // muted dim when zero. Bank-end balance shown below.
+  let cashChip = '';
+  if(cash.cash_in_usd || cash.cash_out_usd){
+    const net = cash.net_usd||0;
+    const dir = net >= 0 ? 'cash-up' : 'cash-dn';
+    const sign = net >= 0 ? '+' : '-';
+    cashChip = `<span class="cash-chip ${dir}" title="net cash flow this month">${sign}$${fmtMoney(Math.abs(net)*100)}</span>`;
+  }
   return `
     <div class="mn-acc${futureCls}${openCls}" data-ym="${esc(m.ym)}">
       <div class="mn-head">
         <div class="l">
           <span class="ym">${esc(m.label)}</span>
           <span class="badge-mn ${badgeCls}">${badgeLbl}</span>
+          ${cashChip}
         </div>
         <div class="r">${num(m.unique_total)} unique <small>· ${num(m.ingest_total)} ingest</small></div>
       </div>
@@ -1172,10 +1371,33 @@ function monthBody(m){
       <p>${esc(t.summary||'')}</p>
     </div>`).join('');
 
+  // ---- cash position block ------------------------------------------
+  const cash = m.cash || {};
+  const hasCash = !!(cash.cash_in_usd || cash.cash_out_usd || cash.bank_end_usd);
+  let cashBlock = '';
+  if(hasCash){
+    const catRows = Object.entries(cash.out_by_category || {})
+      .filter(([,n]) => n > 0)
+      .sort((a,b) => b[1]-a[1])
+      .map(([cat, n]) => `<span class="cat-chip"><b>${esc(cat)}</b>$${fmtMoney(n*100)}</span>`)
+      .join('');
+    const inLine  = cash.cash_in_usd  ? `<span class="cash-pos in">+ $${fmtMoney(cash.cash_in_usd*100)}<small>cash in</small></span>` : '';
+    const outLine = cash.cash_out_usd ? `<span class="cash-pos out">− $${fmtMoney(cash.cash_out_usd*100)}<small>cash out</small></span>` : '';
+    const netCls  = (cash.net_usd||0) >= 0 ? 'net-pos' : 'net-neg';
+    const netSign = (cash.net_usd||0) >= 0 ? '+' : '−';
+    const netLine = `<span class="cash-pos ${netCls}">${netSign} $${fmtMoney(Math.abs(cash.net_usd||0)*100)}<small>net</small></span>`;
+    const bankLine = `<span class="cash-pos bank">$${fmtMoney((cash.bank_end_usd||0)*100)}<small>bank EOM</small></span>`;
+    cashBlock = `
+      <h5>Cash position</h5>
+      <div class="cash-row">${inLine}${outLine}${netLine}${bankLine}</div>
+      ${catRows ? `<div class="cat-row">${catRows}</div>` : ''}`;
+  }
+
   return `
     <h5>Signal volume by provider</h5>
     <div class="prov-row">${provRow}</div>
 
+    ${cashBlock}
     ${m.milestones&&m.milestones.length?`<h5>Milestones</h5><ul>${ms}</ul>`:''}
     ${m.external_events&&m.external_events.length?`<h5>External events</h5><ul>${ext}</ul>`:''}
     ${m.departures&&m.departures.length?`<h5>Departures</h5><ul>${dep}</ul>`:''}
@@ -1205,6 +1427,11 @@ function wireDossier(){
   // wire month heads — clicking the head toggles the body. stopPropagation
   // so the click doesn't bubble up and re-toggle the parent phase.
   document.querySelectorAll('.mn-acc .mn-head').forEach(h =>
+    h.onclick = (e) => { e.stopPropagation(); h.parentElement.classList.toggle('open'); });
+  // fundraising browser (Page 2)
+  document.querySelectorAll('.fr-round .fr-head').forEach(h =>
+    h.onclick = () => h.parentElement.classList.toggle('open'));
+  document.querySelectorAll('.fr-thr .thr-head').forEach(h =>
     h.onclick = (e) => { e.stopPropagation(); h.parentElement.classList.toggle('open'); });
 }
 

@@ -480,21 +480,32 @@ async def _slack_channel_create(ctx: ReplayContext, event: Event) -> None:
     when = _parse_ts(event["t"])
     ws_pk = await _ensure_slack_workspace(ctx, when)
     pk = uuid4()
+    is_im = bool(p.get("is_im"))
+    is_mpim = bool(p.get("is_mpim"))
+    # DMs/MPIMs are private by definition; channels honor the explicit flag.
+    is_private = bool(p.get("is_private")) or is_im or is_mpim
+    # Slack-style ID prefixes: D for IM, G for MPIM, C for channel.
+    if is_im:
+        slack_id = "D" + slack_channel_id()[1:]
+    elif is_mpim:
+        slack_id = "G" + slack_channel_id()[1:]
+    else:
+        slack_id = slack_channel_id()
     try:
         await ctx.pool.execute(
             "INSERT INTO app_slack.channels (id, workspace_id, channel_id, name, "
-            "is_private, created_at) VALUES ($1,$2,$3,$4,$5,$6)",
-            pk, ws_pk, slack_channel_id(), p["name"][:80],
-            p.get("is_private", False), when,
+            "is_private, is_im, is_mpim, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)",
+            pk, ws_pk, slack_id, p["name"][:80],
+            is_private, is_im, is_mpim, when,
         )
         await ctx.idmap.put(p["id"], "slack_channel", pk)
     except asyncpg.exceptions.UniqueViolationError:
         # Channel name collisions across threads — append disambiguator
         await ctx.pool.execute(
             "INSERT INTO app_slack.channels (id, workspace_id, channel_id, name, "
-            "is_private, created_at) VALUES ($1,$2,$3,$4,$5,$6)",
-            pk, ws_pk, slack_channel_id(), f"{p['name'][:75]}-{rand_hex(2)}",
-            p.get("is_private", False), when,
+            "is_private, is_im, is_mpim, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)",
+            pk, ws_pk, slack_id, f"{p['name'][:75]}-{rand_hex(2)}",
+            is_private, is_im, is_mpim, when,
         )
         await ctx.idmap.put(p["id"], "slack_channel", pk)
 

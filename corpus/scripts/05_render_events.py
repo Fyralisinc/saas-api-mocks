@@ -419,13 +419,27 @@ EMOJI_NEUTRAL = ["eyes", "thinking_face", "wave", "raised_hand", "saluting_face"
 
 
 def _is_dm_heavy(thread_id: str) -> bool:
-    """A minority of threads — ~10% — have most of the discussion in private
-    DMs. Sensitive HR / legal / pre-announce stuff, basically. The vast
-    majority of engineering threads happen in channels (Slack-default-open
-    ethos). Fyralis should still detect the DM-shadow pattern on the few
-    that have it as a 'low-channel-density' thread that still reaches its
-    milestones."""
-    return _hash_int(thread_id, "dm-heavy", n=10) < 1
+    """A minority of threads — ~15% — have most of the discussion in a
+    private MPIM among the cast. Sensitive HR / legal / pre-announce stuff,
+    plus the occasional team that just prefers backchanneling. The channel
+    keeps the milestone moments (kickoff, ship, postmortem, all-hands) so
+    the thread still reaches its checkpoints visibly. Fyralis should detect
+    these as 'low channel-density' threads that still meet their milestones —
+    the shadow MPIM carries the working chatter."""
+    return _hash_int(thread_id, "dm-heavy", n=100) < 15
+
+
+# Stable id helpers for DMs and MPIMs. Slack itself names IMs by their
+# participants (no human label); we keep a deterministic label so the
+# renderer + replay agree on identity across runs.
+def _dm_id(a: str, b: str) -> str:
+    lo, hi = sorted([a, b])
+    return f"dm:{lo.split(':', 1)[-1]}~{hi.split(':', 1)[-1]}"
+
+
+def _mpim_id(label: str) -> str:
+    slug = re.sub(r"[^a-z0-9-]+", "-", label.lower()).strip("-")
+    return f"mpim:{slug[:60]}"
 
 
 def _build_manager_map(facts: dict) -> None:
@@ -644,6 +658,22 @@ def thread_events(thread: dict, facts: dict) -> Iterator[dict]:
            "payload": {"id": channel_id, "name": channel_id.split(":", 1)[1],
                        "is_private": False}}
 
+    # Shadow MPIM for the small subset of threads that prefer backchannel
+    # work — kickoff/ship/postmortem still surface on the public channel; the
+    # MPIM among the cast carries the day-to-day chatter.
+    cast = thread.get("cast") or []
+    dm_heavy = _is_dm_heavy(thread["id"]) and len(cast) >= 2
+    shadow_mpim_id: str | None = None
+    if dm_heavy:
+        shadow_mpim_id = _mpim_id(f"thr-{thread['id']}")
+        yield {"t": _iso(_midday(thread["window"]["start"], hour=11)),
+               "provider": "slack", "kind": "channel.create",
+               "actor": thread.get("driver"),
+               "payload": {"id": shadow_mpim_id,
+                           "name": shadow_mpim_id,
+                           "is_mpim": True, "is_private": True,
+                           "participants": cast[:8]}}
+
     # One Jira epic per thread.
     epic_key = f"STR-{_hash_int(thread['id'], n=8999) + 1000}"
     yield {"t": _iso(_midday(thread["window"]["start"], hour=9)),
@@ -653,8 +683,6 @@ def thread_events(thread: dict, facts: dict) -> Iterator[dict]:
                        "type": "Epic", "summary": thread["title"],
                        "reporter": thread.get("driver"),
                        "assignee": thread.get("driver")}}
-
-    cast = thread.get("cast") or []
 
     # Each beat: scatter ~6-15 slack msgs across its window, plus a jira story
     # and (where relevant) a notion page linking to the artifact.
@@ -805,17 +833,16 @@ def thread_events(thread: dict, facts: dict) -> Iterator[dict]:
         fallback = BEAT_SLACK.get(kind, BEAT_SLACK["impl"])
         msg_count = min(15, max(5, days * 2))
 
-        # DM-shadow: ~10% of threads have most of the work-discussion in
-        # private DMs; only kickoff/ship/postmortem moments surface in the
-        # channel. Fyralis should detect these as "low channel-density"
-        # threads that still reach their milestones. The reduction is ~half
-        # of normal — the channel doesn't go silent, it just gets terser.
-        dm_heavy = _is_dm_heavy(thread["id"])
-        if dm_heavy and kind not in ("kickoff", "ship", "postmortem", "all_hands_recap"):
-            msg_count = max(3, msg_count // 2)
-        # Remember the first top-level message per beat — used as thread_ts
-        # anchor for any threaded replies inside this beat window.
-        anchor_ts: str | None = None
+        # DM-shadow: see thread bootstrap above. For dm-heavy threads on
+        # non-milestone beats, most messages route to the shadow MPIM instead
+        # of the public channel. Channel stays terser but still resolves at
+        # the milestone moments.
+        is_milestone_beat = kind in ("kickoff", "ship", "postmortem", "all_hands_recap")
+        dm_routed_beat = bool(shadow_mpim_id) and not is_milestone_beat
+        # Remember the first top-level message per beat per channel — thread
+        # anchors are channel-local in Slack, so when a beat splits across
+        # channel + shadow MPIM each side needs its own anchor.
+        anchor_ts_by_channel: dict[str, str] = {}
         for m in range(msg_count):
             actor = participants[m % len(participants)] if participants else None
             offset = (days * 86400 * (m + 1)) // (msg_count + 1)
@@ -866,32 +893,31 @@ def thread_events(thread: dict, facts: dict) -> Iterator[dict]:
                 if ch_pool:
                     text = _pick(ch_pool, actor, thread["id"], bid, m, "chat")
 
-            # Slack threading: first message of the beat is the anchor; some
-            # subsequent messages reply to the anchor instead of going to the
-            # top of the channel. RFCs/audits/postmortems get deeper threads.
-            ts_str = slack_ts(when) if "slack_ts" in globals() else None
-            top_level = (anchor_ts is None) or (
-                _det01(actor, thread["id"], bid, m, "tl") > {
-                    "design": 0.45, "audit": 0.40, "postmortem": 0.40,
-                    "retro": 0.55,
-                }.get(kind, 0.70)
-            ) and not top_level if False else None  # always set fresh below
-            top_level = anchor_ts is None or (
+            # Pick the destination first (anchors are channel-local).
+            target_channel = channel_id
+            if _det01(actor, thread["id"], bid, m, "wrong-ch") < 0.02:
+                target_channel = RANDOM_CHANNEL
+            elif dm_routed_beat and _det01(actor, thread["id"], bid, m, "dm-route") < 0.70:
+                # Shadow MPIM picks up the bulk of working chat; channel stays
+                # quiet between milestones.
+                target_channel = shadow_mpim_id
+
+            # Slack threading: first message of the beat in each channel is
+            # the anchor; some subsequent messages reply to that anchor.
+            # RFCs/audits/postmortems get deeper threads.
+            prior_anchor = anchor_ts_by_channel.get(target_channel)
+            top_level = prior_anchor is None or (
                 _det01(actor, thread["id"], bid, m, "tl") > {
                     "design": 0.40, "audit": 0.35, "postmortem": 0.35,
                     "retro": 0.50,
                 }.get(kind, 0.65)
             )
-            # Wrong-channel posts: ~2% of work content accidentally lands in #random.
-            target_channel = channel_id
-            if _det01(actor, thread["id"], bid, m, "wrong-ch") < 0.02:
-                target_channel = RANDOM_CHANNEL
             payload: dict = {"channel": target_channel, "text": text,
                              "thread_anchor": bid}
             if top_level:
-                anchor_ts = _iso(when)
+                anchor_ts_by_channel[target_channel] = _iso(when)
             else:
-                payload["thread_ts"] = anchor_ts
+                payload["thread_ts"] = prior_anchor
 
             # Emoji reactions on top-level messages — sentiment + engagement
             # signal. RFC/design beats skew higher reaction rates.
@@ -1215,6 +1241,326 @@ def one_on_one_events(facts: dict, start: str, end: str) -> Iterator[dict]:
                 },
             }
         cur += timedelta(days=1)
+
+
+# -----------------------------------------------------------------------------
+# DMs & MPIMs — private side of Slack
+# -----------------------------------------------------------------------------
+#
+# Real companies leak ~30-40% of their internal communication into DMs and
+# MPIMs. Three patterns matter for the model layer:
+#
+#   1. Cofounder MPIM — strategy, fundraising prep, hiring decisions.
+#      Daily-ish on weekdays; bursts around funding round close dates.
+#   2. Manager↔report DMs — fast async pings between formal 1:1s. Quick
+#      "got a sec?" / "moving the demo" / "blocker on X" exchanges.
+#   3. Friend-pair DMs — social chatter (lunch plans, gossip, life). The
+#      "is this team a team or a roster" signal.
+#
+# Per-thread shadow MPIMs are emitted from thread_events() (see _is_dm_heavy).
+
+COFOUNDERS = [
+    "person:simanta-gautam",
+    "person:chhetri22",
+    "person:pramodkandel",
+    "person:chandansharmasubedi",
+]
+
+COFOUNDER_MPIM_LINES = [
+    "term sheet from {participant} reads workable — flag the liquidation pref",
+    "diligence call moved to thursday 3pm — heads up",
+    "going to push to close by end of quarter, signal in the doc",
+    "investor intro pipeline: 6 warm, 2 hot — i'll fwd",
+    "q4 burn closer to plan than i expected, can recheck",
+    "hiring loop for the verifier role is at 3 onsites this week",
+    "audit fee came in higher than planned, absorbing from contingency",
+    "saw the post-mortem — let's pull a board update with the action items",
+    "let's prep a one-pager for the strategic round before friday",
+    "credit markets thesis is landing, adding to the deck",
+    "pramod — got the gtm slide before tomorrow?",
+    "we need a clean answer on testnet stability for the next call",
+    "wsj piece dropping next week, comms plan needed",
+    "chandan — pls own the partner asks for this round",
+    "abishkar — payroll question came up from {participant}, can you handle?",
+    "moving the offsite by 2 weeks — confirm before announcing",
+    "let's not over-promise to investors, keep the roadmap tight",
+    "extending the offer to {participant} today",
+    "wire from the lead came in — accounting flagged it",
+    "anchor LP confirmed allocation — sending the closing docs",
+    "board update draft is in the doc, eyes pls",
+    "two recruiter pings forwarded to {participant} — pick the good ones",
+    "we should sync before the 1:1 with the lead investor",
+    "all-hands theme this month: testnet milestone",
+    "pls keep this off email — internal only for now",
+]
+
+MANAGER_PING_LINES = [
+    "got a sec to look at {participant}'s PR? bit gnarly",
+    "quick async — capacity check for next sprint",
+    "blocker on {participant}'s ticket — can you weigh in?",
+    "skipping standup tomorrow, ok?",
+    "fyi i'm picking up the {participant} review thread",
+    "mind if i shift the 1:1 to wednesday?",
+    "ran into {participant} on the priority — want to align before we ship",
+    "quick q on the q3 plan — slot?",
+    "btw — got the offer letter back from legal",
+    "the audit fix is in review, looking ok",
+    "moving the demo to next thursday — works for you?",
+    "heads up — i'm slow today, dental",
+    "follow-up from our 1:1: i drafted the doc, link soon",
+    "wanted to flag — the {participant} story is at risk of slipping",
+    "do you have bw to pair on the migration?",
+    "ack — will pick this up after standup",
+    "kind ask — can you nudge {participant} on the review",
+    "noticed the spec changed mid-sprint, need to re-plan?",
+]
+
+REPORT_PING_LINES = [
+    "stuck on the {participant} review — can you nudge them?",
+    "quick reality check on the design choice — got 5 mins?",
+    "heads up: shipping today, will pull you in for the deploy",
+    "blocked on something — got time later?",
+    "noticed the ticket priorities shifted — should i re-baseline?",
+    "the PR review feedback caught a deeper issue, may take an extra day",
+    "want me to handle the postmortem write-up?",
+    "btw — got a tap from a recruiter, nothing serious but wanted to mention",
+    "any chance we can move standup to 10am? early calls are killing me",
+    "context dump for the 1:1: see doc",
+    "found a pattern in the alerts that worries me — link in our channel",
+    "thanks for the cover yesterday — owe you a coffee",
+    "the doc you sent helped a ton, thanks",
+    "small ask: can you take the standup notes this week?",
+    "the {participant} feedback was sharp — wanted to debrief",
+    "ramping back up after pto, will pick up the {participant} thread first",
+]
+
+FRIEND_DM_LINES = [
+    "lunch?",
+    "the new ramen place is open btw",
+    "did you catch the keynote",
+    "moving to a coffee shop, want to join?",
+    "wfh today — got a coffee delivery",
+    "saw the cat pic in #random — cute",
+    "tomorrow morning run? i'm in the office around 11",
+    "watching the bitcoin price right now lol",
+    "ok i'm officially done with this codebase for the day",
+    "saw a job ad — not for me, just thought it was funny",
+    "this week is rough",
+    "fri offline plans?",
+    "would be great if {participant} wasn't ooo this week tho",
+    "found a bug in the doc you wrote, dm'ing later",
+    "kiddo got sick, working from home for a bit",
+    "my kid drew a strata logo, sending pic",
+    "fancy a beer after the all-hands",
+    "saw your commit — nice cleanup",
+    "what's our move on the holiday week",
+    "the offsite booking link is back up btw",
+    "quick gossip — guess who's hiring",
+    "you doing the gym thing this week?",
+    "got an extra ticket to the meetup",
+    "stand-up at this hour is brutal",
+    "did you read the rfc?",
+    "lol that thread in #random",
+    "weekend?",
+    "covering for {participant} today since they're out",
+]
+
+
+def _pick_friend_pairs(facts: dict) -> list[tuple[str, str]]:
+    """Pick ~12 deterministic friend pairs: same-team, adjacent starters.
+
+    These are the recurring DM pairs. Each pair gets ~2 social messages/week.
+    Same team + similar tenure tracks who-actually-talks-to-whom in the wild.
+    """
+    by_team: dict[str, list[dict]] = {}
+    for p in facts["people"]:
+        if p.get("team") in (None, "needs:review"):
+            continue
+        by_team.setdefault(p["team"], []).append(p)
+    pairs: list[tuple[str, str, int]] = []
+    for team_id, members in by_team.items():
+        if len(members) < 2:
+            continue
+        ms = sorted(members, key=lambda x: x.get("started_at") or "9999-12-31")
+        for i in range(len(ms) - 1):
+            a, b = ms[i], ms[i + 1]
+            score = _hash_int(a["id"], b["id"], "friend", n=10_000)
+            pairs.append((a["id"], b["id"], score))
+    pairs.sort(key=lambda x: x[2])
+    return [(a, b) for a, b, _ in pairs[:12]]
+
+
+def _started_dt(person: dict, fallback: str) -> datetime:
+    raw = person.get("started_at") or fallback
+    try:
+        return datetime.fromisoformat(raw).replace(tzinfo=timezone.utc)
+    except Exception:
+        return datetime.fromisoformat(fallback).replace(tzinfo=timezone.utc)
+
+
+def dm_events(facts: dict, start: str, end: str) -> Iterator[dict]:
+    """Direct messages + group DMs. Three streams:
+
+      1. Cofounder MPIM (#mpim:cofounders) — strategy & fundraising backchannel
+      2. Manager↔report DMs — quick async pings between 1:1s
+      3. Friend-pair DMs — social chatter between same-team adjacent starters
+    """
+    d0 = datetime.fromisoformat(start).replace(tzinfo=timezone.utc)
+    d1 = datetime.fromisoformat(end).replace(tzinfo=timezone.utc)
+    person_by_id = {p["id"]: p for p in facts["people"]}
+    founded = facts["company"]["founded"]
+
+    # ----- 1. Cofounder MPIM ------------------------------------------------
+    cf_mpim_id = _mpim_id("cofounders")
+    yield {
+        "t": _iso(_midday(d0.date(), hour=9)),
+        "provider": "slack", "kind": "channel.create",
+        "actor": "person:simanta-gautam",
+        "payload": {"id": cf_mpim_id, "name": "mpim-cofounders",
+                    "is_mpim": True, "is_private": True,
+                    "participants": COFOUNDERS},
+    }
+    active_cofounders = [c for c in COFOUNDERS if c in person_by_id]
+    if active_cofounders:
+        cur = d0
+        while cur < d1:
+            if cur.weekday() < 5:  # weekdays only
+                # 2-3 messages per active weekday.
+                n_msgs = 2 + _hash_int(cur.toordinal(), "cf_n", n=2)
+                for slot in range(n_msgs):
+                    actor = active_cofounders[
+                        _hash_int(cur.toordinal(), "cf_who", str(slot),
+                                  n=len(active_cofounders))]
+                    if (_is_on_pto(actor, cur)
+                            or _is_departed(actor, cur, facts)):
+                        continue
+                    hr = 9 + _hash_int(actor, cur.toordinal(), slot, "cf_h", n=10)
+                    when = cur.replace(
+                        hour=hr,
+                        minute=_hash_int(actor, slot, "cf_m", n=60))
+                    when = _skew_to_peak(when, actor)
+                    line = COFOUNDER_MPIM_LINES[
+                        _hash_int(cur.toordinal(), slot, "cf_l",
+                                  n=len(COFOUNDER_MPIM_LINES))]
+                    other_cf = active_cofounders[
+                        (active_cofounders.index(actor) + 1)
+                        % len(active_cofounders)]
+                    text = line.format(participant=_resolve_handle(other_cf, facts))
+                    yield {
+                        "t": _iso(when), "provider": "slack", "kind": "message",
+                        "actor": actor,
+                        "payload": {"channel": cf_mpim_id, "text": text,
+                                    "category": "dm:cofounder"},
+                    }
+            cur += timedelta(days=1)
+
+    # ----- 2. Manager↔report DMs --------------------------------------------
+    for report, manager in _MANAGER_OF.items():
+        rp = person_by_id.get(report)
+        mp = person_by_id.get(manager)
+        if not rp or not mp:
+            continue
+        dm_id = _dm_id(manager, report)
+        dm_start = max(d0, _started_dt(rp, founded), _started_dt(mp, founded))
+        yield {
+            "t": _iso(_midday(dm_start.date(), hour=10)),
+            "provider": "slack", "kind": "channel.create",
+            "actor": manager,
+            "payload": {"id": dm_id, "name": dm_id, "is_im": True,
+                        "is_private": True,
+                        "participants": [manager, report]},
+        }
+        # ~3 DMs/week (Mon/Wed/Fri), with skip & direction roll.
+        cur = dm_start
+        while cur < d1:
+            if cur.weekday() in (0, 2, 4):
+                if _det01(manager, report, cur.toordinal(), "skip") < 0.30:
+                    cur += timedelta(days=1)
+                    continue
+                m_to_r = _det01(manager, report, cur.toordinal(), "dir") < 0.6
+                actor = manager if m_to_r else report
+                other = report if m_to_r else manager
+                pool = MANAGER_PING_LINES if m_to_r else REPORT_PING_LINES
+                if (_is_on_pto(actor, cur)
+                        or _is_departed(actor, cur, facts)):
+                    cur += timedelta(days=1)
+                    continue
+                line = pool[_hash_int(manager, report, cur.toordinal(),
+                                      "mp_l", n=len(pool))]
+                text = line.format(participant=_resolve_handle(other, facts))
+                hr = 10 + _hash_int(manager, report, cur.toordinal(),
+                                    "mp_h", n=7)
+                when = cur.replace(hour=hr, minute=_hash_int(
+                    manager, report, cur.toordinal(), "mp_m", n=60))
+                when = _skew_to_peak(when, actor)
+                yield {
+                    "t": _iso(when), "provider": "slack", "kind": "message",
+                    "actor": actor,
+                    "payload": {"channel": dm_id, "text": text,
+                                "category": "dm:manager_ping"},
+                }
+            cur += timedelta(days=1)
+
+    # ----- 3. Friend-pair DMs -----------------------------------------------
+    for a, b in _pick_friend_pairs(facts):
+        ap = person_by_id.get(a)
+        bp = person_by_id.get(b)
+        if not ap or not bp:
+            continue
+        dm_id = _dm_id(a, b)
+        dm_start = max(d0, _started_dt(ap, founded), _started_dt(bp, founded))
+        yield {
+            "t": _iso(_midday(dm_start.date(), hour=11)),
+            "provider": "slack", "kind": "channel.create",
+            "actor": a,
+            "payload": {"id": dm_id, "name": dm_id, "is_im": True,
+                        "is_private": True, "participants": [a, b]},
+        }
+        # 2 social pings per week (Tues/Thurs), plus a coin-flip reply.
+        cur = dm_start
+        while cur < d1:
+            if cur.weekday() in (1, 3):
+                if _det01(a, b, cur.toordinal(), "fr_skip") < 0.40:
+                    cur += timedelta(days=1)
+                    continue
+                first = a if _det01(a, b, cur.toordinal(), "fr_who") < 0.5 else b
+                other = b if first == a else a
+                if (_is_on_pto(first, cur)
+                        or _is_departed(first, cur, facts)):
+                    cur += timedelta(days=1)
+                    continue
+                line = FRIEND_DM_LINES[_hash_int(
+                    a, b, cur.toordinal(), "fr_l", n=len(FRIEND_DM_LINES))]
+                text = line.format(participant=_resolve_handle(other, facts))
+                hr = 11 + _hash_int(a, b, cur.toordinal(), "fr_h", n=6)
+                when = cur.replace(hour=hr, minute=_hash_int(
+                    a, b, cur.toordinal(), "fr_m", n=60))
+                when = _skew_to_peak(when, first)
+                yield {
+                    "t": _iso(when), "provider": "slack", "kind": "message",
+                    "actor": first,
+                    "payload": {"channel": dm_id, "text": text,
+                                "category": "dm:friend"},
+                }
+                # 40% chance of a near-immediate reply from the other party.
+                if (_det01(a, b, cur.toordinal(), "fr_reply") < 0.40
+                        and not _is_on_pto(other, cur)
+                        and not _is_departed(other, cur, facts)):
+                    reply_when = when + timedelta(
+                        minutes=3 + _hash_int(a, b, cur.toordinal(),
+                                              "fr_rm", n=25))
+                    reply_line = FRIEND_DM_LINES[_hash_int(
+                        a, b, cur.toordinal(), "fr_rl",
+                        n=len(FRIEND_DM_LINES))]
+                    yield {
+                        "t": _iso(reply_when), "provider": "slack",
+                        "kind": "message", "actor": other,
+                        "payload": {"channel": dm_id,
+                                    "text": reply_line.format(
+                                        participant=_resolve_handle(first, facts)),
+                                    "category": "dm:friend"},
+                    }
+            cur += timedelta(days=1)
 
 
 # -----------------------------------------------------------------------------
@@ -2410,6 +2756,9 @@ def main() -> None:
     ap.add_argument("--include-fundraising", action="store_true",
                     help="include per-round fundraising gmail threads (pitch, term sheet, "
                          "diligence, closing, board updates)")
+    ap.add_argument("--include-dms", action="store_true",
+                    help="include DM + MPIM streams (cofounder backchannel, "
+                         "manager↔report pings, friend-pair social chatter)")
     ap.add_argument("--include-all", action="store_true",
                     help="shortcut: turn on every --include-*")
     ap.add_argument("--end", default="2026-05-29",
@@ -2471,6 +2820,8 @@ def main() -> None:
             (Path(__file__).parent.parent / "facts" / "finance.yaml").read_text())
         events.extend(fundraising_gmail_events(
             facts, finance, facts["company"]["founded"], args.end))
+    if args.include_dms or args.include_all:
+        events.extend(dm_events(facts, facts["company"]["founded"], args.end))
 
     # Stable sort by timestamp.
     events.sort(key=lambda e: e["t"])

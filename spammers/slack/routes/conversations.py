@@ -23,7 +23,8 @@ async def _find_channel(workspace_pk: UUID, channel_id: str) -> Optional[dict]:
     st = state()
     row = await st.pool.fetchrow(
         """
-        SELECT id, channel_id, name, is_private, is_archived, is_general, topic, purpose,
+        SELECT id, channel_id, name, is_private, is_archived, is_general,
+               is_im, is_mpim, topic, purpose,
                creator_user_id, created_at
           FROM app_slack.channels
          WHERE workspace_id = $1
@@ -35,15 +36,18 @@ async def _find_channel(workspace_pk: UUID, channel_id: str) -> Optional[dict]:
 
 
 def _channel_dto(row: dict, team_id: str, num_members: int = 0) -> dict:
+    is_im = bool(row.get("is_im"))
+    is_mpim = bool(row.get("is_mpim"))
     return {
         "id": row["channel_id"],
         "name": row["name"],
-        "is_channel": not row["is_private"],
-        "is_private": row["is_private"],
+        "is_channel": not (row["is_private"] or is_im or is_mpim),
+        "is_group": row["is_private"] and not (is_im or is_mpim),
+        "is_private": row["is_private"] or is_im or is_mpim,
         "is_archived": row["is_archived"],
         "is_general": row["is_general"],
-        "is_im": False,
-        "is_mpim": False,
+        "is_im": is_im,
+        "is_mpim": is_mpim,
         "is_member": True,
         "is_org_shared": False,
         "is_shared": False,
@@ -95,12 +99,22 @@ async def conv_list(request: Request):
     args: list = [ws["id"]]
     if exclude_archived:
         where.append("is_archived = FALSE")
-    if "public_channel" not in type_set and "private_channel" in type_set:
-        where.append("is_private = TRUE")
-    elif "private_channel" not in type_set and "public_channel" in type_set:
-        where.append("is_private = FALSE")
+    # Slack's types= filter picks the subset of {public_channel, private_channel,
+    # im, mpim}. is_im/is_mpim are exclusive of public/private named channels.
+    flag_clauses: list[str] = []
+    if "public_channel" in type_set:
+        flag_clauses.append("(is_private = FALSE AND is_im = FALSE AND is_mpim = FALSE)")
+    if "private_channel" in type_set:
+        flag_clauses.append("(is_private = TRUE AND is_im = FALSE AND is_mpim = FALSE)")
+    if "im" in type_set:
+        flag_clauses.append("(is_im = TRUE)")
+    if "mpim" in type_set:
+        flag_clauses.append("(is_mpim = TRUE)")
+    if flag_clauses:
+        where.append("(" + " OR ".join(flag_clauses) + ")")
     sql = f"""
-        SELECT id, channel_id, name, is_private, is_archived, is_general, topic, purpose,
+        SELECT id, channel_id, name, is_private, is_archived, is_general,
+               is_im, is_mpim, topic, purpose,
                creator_user_id, created_at
           FROM app_slack.channels
          WHERE {' AND '.join(where)}

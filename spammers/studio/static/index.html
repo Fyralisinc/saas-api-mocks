@@ -134,17 +134,111 @@
   /* console */
   .topbar{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:14px;
     border-bottom:1px solid var(--line);padding-bottom:14px;margin-bottom:20px}
-  .dossier{border:1px solid var(--line);background:var(--panel);box-shadow:var(--shadow);padding:18px 20px;margin-bottom:22px}
-  .dossier .smry{font-size:15px;line-height:1.75;color:var(--ink)}
-  .dossier .smry b{color:var(--head)}
-  .dcols{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px;margin-top:18px;
-    border-top:1px solid var(--line);padding-top:16px}
-  .dcols h4{margin:0 0 8px;color:var(--neon);letter-spacing:1.5px;font-size:12px;text-transform:uppercase}
-  .dcols ul{margin:0;padding-left:18px;font-size:13.5px;line-height:1.7;color:var(--ink)}
-  .dcols li::marker{color:var(--neon)}
-  .dcols li.ob{color:var(--amber)}
+
+  /* dossier — replaces the old summary + columns block */
+  .dossier{margin-bottom:22px}
   .pill{display:inline-block;border:1px solid var(--line);background:var(--panel-2);padding:3px 9px;
     margin:3px 5px 3px 0;font-size:12px;color:var(--ink);border-radius:3px}
+
+  /* hero strip — logo, name, stage */
+  .doss-hero{display:flex;gap:20px;align-items:center;border:1px solid var(--line);background:var(--panel);
+    box-shadow:var(--shadow);border-left:3px solid var(--neon);border-radius:6px;padding:18px 22px;margin-bottom:14px}
+  .doss-hero .logo{width:64px;height:64px;flex:0 0 auto;color:var(--neon);
+    filter:drop-shadow(0 0 8px rgba(0,255,102,.55))}
+  .doss-hero .logo svg{width:100%;height:100%}
+  .doss-hero h2{margin:0;color:var(--head);font-size:24px;letter-spacing:1.2px;line-height:1.1}
+  .doss-hero .sub{margin:6px 0 0;color:var(--ink-dim);font-size:12px;letter-spacing:1.5px;text-transform:uppercase}
+  .doss-hero .alias{color:var(--neon);font-size:11.5px;letter-spacing:1.5px;margin-left:10px}
+
+  /* state strip */
+  .state-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;
+    border:1px solid var(--line);background:var(--panel);box-shadow:var(--shadow);padding:14px 18px;
+    margin-bottom:14px;border-radius:4px}
+  .state-cell{display:flex;flex-direction:column;gap:3px}
+  .state-cell .k{color:var(--ink-dim);font-size:10.5px;letter-spacing:1.5px;text-transform:uppercase}
+  .state-cell .v{color:var(--head);font-size:18px;font-weight:700;letter-spacing:.5px;line-height:1.1}
+  .state-cell .v small{color:var(--ink-dim);font-weight:400;font-size:11.5px;letter-spacing:.5px}
+  .progress{height:6px;background:var(--panel-2);border:1px solid var(--line);border-radius:3px;overflow:hidden;margin-top:6px}
+  .progress > div{height:100%;background:var(--neon);box-shadow:0 0 8px var(--neon);transition:.5s width}
+
+  /* dossier sections */
+  .doss-sec{border:1px solid var(--line);background:var(--panel);box-shadow:var(--shadow);
+    padding:16px 20px;margin-bottom:14px;border-radius:4px}
+  .doss-sec > h3{margin:0 0 12px;color:var(--neon);letter-spacing:2.5px;font-size:12.5px;
+    text-transform:uppercase;border-bottom:1px solid var(--line);padding-bottom:8px;display:flex;align-items:center;gap:8px}
+  .doss-sec > h3 .count{color:var(--ink-dim);font-weight:400;letter-spacing:1px;font-size:11px}
+  .doss-sec .blurb{color:var(--ink);font-size:14px;line-height:1.7;margin:0 0 14px}
+  .doss-sec .blurb b{color:var(--head)}
+
+  /* overview grid */
+  .ov-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+  .ov-card{border:1px solid var(--line);background:var(--panel-2);padding:11px 13px;border-radius:3px;min-width:0}
+  .ov-card h4{margin:0 0 7px;color:var(--head);font-size:11.5px;letter-spacing:2px;text-transform:uppercase}
+  .ov-card ul{margin:0;padding:0;list-style:none;font-size:12.5px;line-height:1.55;color:var(--ink)}
+  .ov-card li{padding:3px 0;border-top:1px dashed rgba(0,255,120,.10)}
+  .ov-card li:first-child{border-top:0}
+  .ov-card li b{color:var(--head)}
+  .ov-card li .dim{color:var(--ink-dim);font-size:11.5px;margin-left:4px}
+
+  /* people grid */
+  .ppl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(305px,1fr));gap:12px;margin-bottom:8px}
+  .ppl-card{border:1px solid var(--line);background:var(--panel-2);padding:11px 13px;border-radius:3px;display:flex;
+    flex-direction:column;gap:7px;min-width:0}
+  .ppl-h{display:flex;align-items:center;gap:9px;min-width:0}
+  .ppl-av{width:30px;height:30px;flex:0 0 auto;border-radius:50%;background:var(--panel);
+    border:1px solid var(--line-bri);color:var(--head);display:flex;align-items:center;justify-content:center;
+    font-size:11.5px;font-weight:700;letter-spacing:.5px}
+  .ppl-h .name{color:var(--head);font-size:13.5px;font-weight:700;letter-spacing:.3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ppl-h .handle{color:var(--neon);font-size:11px;letter-spacing:.5px}
+  .ppl-meta{color:var(--ink-dim);font-size:11px;letter-spacing:.5px;line-height:1.4}
+  .ppl-meta b{color:var(--ink)}
+  .ppl-bhv{color:var(--ink);font-size:12px;line-height:1.5}
+  .ppl-pats{display:flex;flex-wrap:wrap;gap:5px;margin-top:2px}
+  .pat{background:var(--bg2);border:1px solid var(--line);color:var(--ink);padding:2px 7px;font-size:10.5px;
+    border-radius:3px;letter-spacing:.5px}
+  .pat.hot{color:var(--amber);border-color:rgba(255,212,121,.3)}
+  .ppl-more{text-align:center;color:var(--neon);cursor:pointer;font-size:12px;letter-spacing:1.5px;
+    padding:8px;border:1px dashed var(--line);border-radius:3px;background:transparent}
+  .ppl-more:hover{background:rgba(0,255,102,.08)}
+
+  /* monthly */
+  .mn-legend{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+  .mn-phase{font-size:10.5px;letter-spacing:1px;padding:3px 9px;border:1px solid var(--line);
+    background:var(--panel-2);color:var(--ink-dim);border-radius:3px}
+  .mn-notes{margin:10px 0 12px;padding:10px 14px;background:var(--panel-2);border:1px dashed var(--line);
+    border-radius:3px;font-size:11.5px;color:var(--ink-dim);line-height:1.6;display:none}
+  .mn-notes.show{display:block}
+  .mn-notes b{color:var(--head)}
+  .mn-notes-tg{color:var(--neon);cursor:pointer;font-size:11.5px;letter-spacing:1px;margin-bottom:10px;display:inline-block}
+  .mn-phase-h{color:var(--amber);font-size:11px;letter-spacing:2px;margin:14px 0 7px;text-transform:uppercase;
+    border-top:1px dashed rgba(255,212,121,.25);padding-top:8px}
+  .mn-phase-h:first-child{border-top:0;padding-top:0;margin-top:4px}
+  .mn-phase-h .blurb{color:var(--ink-dim);letter-spacing:.5px;text-transform:none;font-size:11px;margin-left:6px}
+  .mn-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:10px}
+  .mn-card{border:1px solid var(--line);background:var(--panel-2);padding:11px 13px;border-radius:3px;
+    cursor:pointer;display:flex;flex-direction:column;gap:6px;transition:.12s}
+  .mn-card:hover{border-color:var(--line-bri);background:#0d2415}
+  .mn-card.future{opacity:.45}
+  .mn-card.future:hover{opacity:.7}
+  .mn-card.open{border-color:var(--neon);box-shadow:0 0 0 1px var(--neon)}
+  .mn-row{display:flex;justify-content:space-between;align-items:baseline;gap:8px;min-width:0}
+  .mn-month{color:var(--head);font-size:13px;font-weight:700;letter-spacing:.8px}
+  .mn-state{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--ink-dim)}
+  .mn-state.bf{color:var(--neon)}
+  .mn-state.ft{color:var(--amber)}
+  .mn-tot{color:var(--neon);font-size:11.5px;letter-spacing:.5px}
+  .mn-tot small{color:var(--ink-dim);margin-left:5px}
+  .mn-prov{display:flex;flex-wrap:wrap;gap:4px;font-size:10.5px;color:var(--ink-dim);letter-spacing:.3px}
+  .mn-prov span{background:var(--bg2);border:1px solid var(--line);padding:2px 6px;border-radius:2px}
+  .mn-prov span b{color:var(--head);margin-right:3px}
+  .mn-detail{display:none;border-top:1px dashed rgba(0,255,120,.18);padding-top:9px;margin-top:4px;
+    font-size:12px;line-height:1.55;color:var(--ink)}
+  .mn-card.open .mn-detail{display:block}
+  .mn-detail h5{margin:6px 0 4px;color:var(--neon);font-size:10.5px;letter-spacing:1.5px;text-transform:uppercase}
+  .mn-detail .ms{color:var(--head)} .mn-detail .nh{color:var(--ink)} .mn-detail .nh i{color:var(--ink-dim)}
+  .mn-detail .th{color:var(--ink);font-size:11.5px;margin-top:4px}
+  .mn-detail .th i{color:var(--ink-dim)}
+  .mn-detail .nar{color:var(--ink);margin-top:6px}
 
   /* credentials panel */
   .credstoggle{margin-bottom:0;font-weight:600;font-size:13px}
@@ -251,10 +345,9 @@
       </div>
     </div>
 
-    <div class="dossier">
-      <div class="label" style="margin:0 0 10px">// company dossier — derived from seeded data</div>
-      <div id="summary" class="smry"></div>
-      <div id="dcols" class="dcols"></div>
+    <div class="dossier" id="dossier">
+      <div class="label" style="margin:0 0 10px">// company dossier — derived from corpus</div>
+      <!-- filled by renderDossier(d, co) -->
     </div>
 
     <button id="credsToggle" class="ghost credstoggle">▸ Connection credentials — point Fyralis here</button>
@@ -531,26 +624,240 @@ async function loadState(){
   collapseCreds();
   CACHE.people=s.people;CACHE.channels=s.channels;CACHE.repos=s.repos;CACHE.notion_databases=s.notion_databases||[];CACHE.jira_projects=s.jira_projects||[];
   const co=s.company,d=s.dossier;
-  $('#coName').textContent=co.name;
-  $('#coSub').textContent=`${co.stage}  ·  ${co.headcount}  ·  ${co.span}  ·  as of ${d.as_of.slice(0,10)}`;
-  $('#summary').innerHTML=esc(d.summary);
-  $('#dcols').innerHTML=`
-    ${col('Trying to achieve',[d.goal].concat((d.projects.in_progress||[]).map(p=>`${p.title} — ${p.owner_name||p.owner||'?'}`)))}
-    ${col('Achieved',(d.achieved.shipped_projects.length?d.achieved.shipped_projects:['—']).concat(
-        [`${d.achieved.merged_prs} PRs merged`,`${d.achieved.closed_issues} issues closed`]))}
-    ${col('Still to do',(d.remaining.in_progress_projects.concat(d.remaining.planned_projects).slice(0,6))
-        .concat([`${d.remaining.open_prs} PRs open`]))}
-    ${col('Obstacles',(d.obstacles.items.length?d.obstacles.items:['none recorded']),true)}
-    ${teamsCol(d.teams)}`;
+  $('#coName').textContent=d.name||co.name;
+  $('#coSub').textContent=`${d.stage||co.stage}  ·  ${d.overview.headcount} people  ·  ${d.state.months_elapsed}/${d.state.months_total} months  ·  as of ${(d.as_of||'').slice(0,10)}`;
+  renderDossier(d, co);
   renderPanels(s.status);
 }
 
-function col(title,items,ob){
-  return `<div><h4>${title}</h4><ul>${items.map(i=>`<li class="${ob?'ob':''}">${esc(i)}</li>`).join('')}</ul></div>`;
+//=========================== rich dossier renderer ============================
+// Everything here is sourced from spammers.studio.narrative.build() — the
+// shape is documented there. Fyralis's model layer is evaluated against the
+// content this panel shows.
+
+const PROV_ORDER=['slack','discord','github','gmail','calendar','notion','drive','jira'];
+const PROV_SHORT={slack:'sl',discord:'di',github:'gh',gmail:'gm',calendar:'ca',notion:'no',drive:'dr',jira:'ji'};
+const TEAM_FULL={protocol:'Protocol Engineering',research:'Research',bridge:'Bridge',
+                 infra:'Infrastructure',ops:'Ops',devrel:'Developer Relations',coo:'COO Office'};
+
+let _showAllPeople=false;
+
+function renderDossier(d, co){
+  const el=$('#dossier'); if(!el) return;
+  el.innerHTML = `
+    <div class="label" style="margin:0 0 10px">// company dossier — derived from corpus</div>
+    ${heroBlock(d, co)}
+    ${stateStrip(d.state)}
+    ${overviewBlock(d.overview)}
+    ${peopleBlock(d.people, d.overview.teams)}
+    ${monthlyBlock(d.monthly, d.signal_notes, d.state)}
+  `;
+  wireDossier();
 }
-function teamsCol(teams){
-  return `<div><h4>Teams</h4><div>${teams.map(t=>`<span class="pill">${esc(t.name)} · ${t.headcount}</span>`).join('')}</div></div>`;
+
+function heroBlock(d, co){
+  return `
+    <div class="doss-hero">
+      <div class="logo">${coIcon(d.logo_id||co.key)}</div>
+      <div>
+        <h2>${esc(d.name)} <span class="alias">// ${esc(d.real_name)}</span></h2>
+        <p class="sub">${esc(d.stage)} · founded ${esc((d.overview.founded||'').slice(0,7))} · ${esc(d.overview.github_org||'')}</p>
+      </div>
+    </div>`;
 }
+
+function stateStrip(st){
+  const fmtTs = ts => ts ? ts.replace('T',' ').slice(0,16)+' UTC' : '—';
+  return `
+    <div class="state-strip">
+      <div class="state-cell">
+        <span class="k">virtual clock</span>
+        <span class="v">${esc(fmtTs(st.now_virtual))}</span>
+        <div class="progress"><div style="width:${st.pct_progress}%"></div></div>
+        <span class="k" style="margin-top:4px">${st.months_elapsed} / ${st.months_total} months · ${st.pct_progress}%</span>
+      </div>
+      <div class="state-cell">
+        <span class="k">corpus signals</span>
+        <span class="v">${num(st.signals_backfilled)} <small>/ ${num(st.signals_corpus)}</small></span>
+        <span class="k" style="margin-top:4px">${num(st.signals_remaining)} still to replay</span>
+      </div>
+      <div class="state-cell">
+        <span class="k">ingestion (live)</span>
+        <span class="v">${num(st.db_signals_total)} <small>rows in mocks</small></span>
+        <span class="k" style="margin-top:4px">${PROV_ORDER.map(p=>`${PROV_SHORT[p]}:${num(st.db_signals_now[p]||0)}`).join(' · ')}</span>
+      </div>
+      <div class="state-cell">
+        <span class="k">corpus window</span>
+        <span class="v">${esc((st.started_virtual||'').slice(0,10))}</span>
+        <span class="k" style="margin-top:4px">→ ${esc((st.end_virtual||'').slice(0,10))}</span>
+      </div>
+    </div>`;
+}
+
+function overviewBlock(ov){
+  const products = (ov.products||[]).map(p=>`<li><b>${esc(p.name)}</b><br><span class="dim">${esc(p.description||'')}</span></li>`).join('');
+  const repos = (ov.repos.top||[]).map(r=>`<li><b>${esc(r.name)}</b> <span class="dim">★${r.stars} · ${esc(r.language||'?')}</span><br><span class="dim">${esc((r.description||'').slice(0,90))}</span></li>`).join('');
+  const ms = (ov.milestones||[]).filter(m=>m.date).sort((a,b)=>a.date<b.date?-1:1)
+    .map(m=>`<li><b>${esc(m.date)}</b> ${esc(m.title||'')}<br><span class="dim">${esc(m.kind||'')}</span></li>`).join('');
+  const teams = (ov.teams||[]).map(t=>{
+    const full = TEAM_FULL[t.name.toLowerCase()] || t.name;
+    return `<li><b>${esc(full)}</b> <span class="dim">${t.headcount} · lead ${esc(t.lead||'—')}</span></li>`;
+  }).join('');
+  return `
+    <div class="doss-sec">
+      <h3>OVERVIEW <span class="count">// who they are, what they ship</span></h3>
+      <p class="blurb">${esc(ov.blurb)}</p>
+      <p class="blurb" style="font-style:italic"><b>Mission:</b> ${esc(ov.mission)}</p>
+      <div class="ov-grid">
+        <div class="ov-card"><h4>Products (${(ov.products||[]).length})</h4><ul>${products}</ul></div>
+        <div class="ov-card"><h4>Top repos (${ov.repos.total} total)</h4><ul>${repos}</ul></div>
+        <div class="ov-card"><h4>Milestones</h4><ul>${ms||'<li>—</li>'}</ul></div>
+        <div class="ov-card"><h4>Teams (${(ov.teams||[]).length})</h4><ul>${teams}</ul></div>
+      </div>
+    </div>`;
+}
+
+function peopleBlock(people, teams){
+  const teamPills = (teams||[]).map(t=>`<span class="pill">${esc(t.name)} · ${t.headcount}</span>`).join('');
+  const view = _showAllPeople ? people : people.slice(0, 12);
+  const more = (!_showAllPeople && people.length > 12)
+    ? `<button class="ppl-more" id="ppl-more">▾ Show all ${people.length} people</button>` : '';
+  return `
+    <div class="doss-sec">
+      <h3>PEOPLE <span class="count">// ${people.length} contributors · behavioural patterns Fyralis can identify</span></h3>
+      <p class="blurb">${teamPills}</p>
+      <div class="ppl-grid">
+        ${view.map(personCard).join('')}
+      </div>
+      ${more}
+    </div>`;
+}
+
+function personCard(p){
+  const init = (p.full_name||p.handle).split(/\s+/).map(s=>s[0]||'').slice(0,2).join('').toUpperCase();
+  const team = (p.team||'').replace(/^team:/,'');
+  const pat = p.patterns||{};
+  const peakHot = (pat.peak_hour||14) >= 21 || (pat.peak_hour||14) < 7;
+  const wendHot = (pat.weekend_factor||0) > 0.5;
+  const lvlBadge = (p.level||'').toUpperCase();
+  return `
+    <div class="ppl-card">
+      <div class="ppl-h">
+        <div class="ppl-av">${esc(init)}</div>
+        <div style="min-width:0;flex:1">
+          <div class="name">${esc(p.full_name||p.handle)}</div>
+          <div class="handle">@${esc(p.handle)} · ${esc(p.role)}${lvlBadge?' · '+esc(lvlBadge):''}</div>
+        </div>
+      </div>
+      <div class="ppl-meta"><b>${esc(team)}</b>${p.location?` · ${esc(p.location)}`:''}${p.started_at?` · joined ${esc(String(p.started_at).slice(0,7))}`:''} · <b>${num(p.commits)}</b> commits</div>
+      <div class="ppl-bhv">${esc(p.behavior_summary)}</div>
+      <div class="ppl-pats">
+        <span class="pat ${peakHot?'hot':''}" title="Hour of day they're most active in Slack + Discord (their local timezone).">peak ${fmtHr(pat.peak_hour)} local</span>
+        <span class="pat ${wendHot?'hot':''}" title="Weekend message volume as a fraction of weekday baseline. <30% = rarely works weekends; >70% = regular weekend worker.">wknd act ${Math.round((pat.weekend_factor||0)*100)}%</span>
+        <span class="pat" title="Fraction of recurring standup calendar invites they accept (app_calendar.events).">standup RSVP ${pat.standup_attendance_pct||0}%</span>
+        <span class="pat" title="Probability a PR review is non-rubber-stamp (detailed body + inline comments).">PR review depth ${pat.review_thoroughness_pct||0}%</span>
+        <span class="pat" title="Median delay from being requested as reviewer to submitting the review.">PR review resp ~${Math.round(pat.review_response_hours||0)}h</span>
+        <span class="pat ${(pat.ship_lag_hours||0)>24?'hot':''}" title="Hours late vs the planned end date on the Jira issue. Positive = closes ticket after the planned date.">Jira slip ${(pat.ship_lag_hours||0)>=0?'+':''}${Math.round(pat.ship_lag_hours||0)}h vs plan</span>
+      </div>
+      ${p.top_repos&&p.top_repos.length?`<div class="ppl-meta" style="font-size:10.5px"><b>repos:</b> ${esc(p.top_repos.slice(0,4).join(', '))}</div>`:''}
+    </div>`;
+}
+
+function fmtHr(h){
+  h = Math.round(h||14); h = ((h%24)+24)%24;
+  if(h===0) return '12am'; if(h===12) return '12pm';
+  return h<12 ? `${h}am` : `${h-12}pm`;
+}
+
+function monthlyBlock(mn, signalNotes, st){
+  const months = mn.months||[];
+  // Group consecutive months by phase title (phases never overlap).
+  const groups=[];
+  let cur=null;
+  for(const m of months){
+    if(!cur || cur.title!==m.phase){
+      cur = {title: m.phase, blurb: m.phase_blurb, months: []};
+      groups.push(cur);
+    }
+    cur.months.push(m);
+  }
+  const phaseLegend = (mn.phase_legend||[]).map(p=>
+    `<span class="mn-phase"><b>${esc(p.title)}</b> — ${esc(p.start)} → ${esc(p.end)}</span>`).join('');
+  const totalsRow = PROV_ORDER.map(p=>{
+    const n = mn.totals_corpus[p]||0;
+    const ing = mn.ingest_corpus[p]||n;
+    return `<li><b>${esc(p)}</b> <span class="dim">${num(n)} unique · ${num(ing)} ingest</span></li>`;
+  }).join('');
+  const notesHtml = PROV_ORDER.map(p=>`<div><b>${esc(p)}</b> — ${esc(signalNotes[p]||'')}</div>`).join('');
+  const groupsHtml = groups.map(g=>`
+    <div class="mn-phase-h">▸ ${esc(g.title)}<span class="blurb"> · ${esc(g.blurb||'')}</span></div>
+    <div class="mn-grid">${g.months.map(monthCard).join('')}</div>
+  `).join('');
+  return `
+    <div class="doss-sec">
+      <h3>MONTHLY BREAKDOWN <span class="count">// ${months.length} months · ${num(st.signals_corpus)} unique signals total</span></h3>
+      <p class="blurb">${esc(mn.overview_blurb)}</p>
+      <div class="mn-legend">${phaseLegend}</div>
+      <span class="mn-notes-tg" id="mn-notes-tg">▸ Signal accounting notes (per-provider unique vs ingest)</span>
+      <div class="mn-notes" id="mn-notes">
+        ${notesHtml}
+        <div style="margin-top:8px;padding-top:8px;border-top:1px dashed rgba(0,255,120,.15)">
+          <b>Corpus totals:</b>
+          <ul style="margin:6px 0 0;padding-left:18px">${totalsRow}</ul>
+        </div>
+      </div>
+      ${groupsHtml}
+    </div>`;
+}
+
+function monthCard(m){
+  const cls = m.in_backfill ? 'bf' : 'ft';
+  const lbl = m.in_backfill ? 'BACKFILLED' : 'FUTURE';
+  const provChips = PROV_ORDER.filter(p=>(m.signals[p]||0)>0).map(p=>{
+    const u = m.signals[p]||0;
+    const i = m.ingest_signals[p]||u;
+    const ingHint = (i!==u) ? ` (${i})` : '';
+    return `<span><b>${PROV_SHORT[p]}</b>${u}${ingHint}</span>`;
+  }).join('');
+  const ms = (m.milestones||[]).map(x=>`<li class="ms">${esc(x.date)} — ${esc(x.title)}</li>`).join('');
+  const nh = (m.new_hires||[]).map(x=>`<li class="nh">@${esc(x.handle)} <i>${esc(x.role)} · ${esc((x.team||'').replace(/^team:/,''))}</i></li>`).join('');
+  const th = (m.threads_active||[]).map(t=>`<li class="th"><b>${esc(t.title||t.id)}</b> <i>${esc(t.beat_kind||'')}</i><br>${esc(t.summary||'')}</li>`).join('');
+  const future = m.is_future ? ' future' : '';
+  return `
+    <div class="mn-card${future}" data-ym="${esc(m.ym)}">
+      <div class="mn-row">
+        <span class="mn-month">${esc(m.label)}</span>
+        <span class="mn-state ${cls}">${lbl}</span>
+      </div>
+      <div class="mn-row">
+        <span class="mn-tot">${num(m.unique_total)} unique <small>· ${num(m.ingest_total)} ingest</small></span>
+      </div>
+      <div class="mn-prov">${provChips||'<span><b>·</b>silence</span>'}</div>
+      <div class="mn-detail">
+        ${ms?`<h5>Milestones</h5><ul style="margin:0;padding-left:16px">${ms}</ul>`:''}
+        ${nh?`<h5>Hires</h5><ul style="margin:0;padding-left:16px">${nh}</ul>`:''}
+        ${th?`<h5>Active threads</h5><ul style="margin:0;padding-left:16px">${th}</ul>`:''}
+        ${(m.top_repos&&m.top_repos.length)?`<h5>Top repo activity</h5><div>${m.top_repos.map(r=>`<span class="pat">${esc(r.repo)} · ${r.commits}</span>`).join('')}</div>`:''}
+        <div class="nar">${esc(m.narrative)}</div>
+      </div>
+    </div>`;
+}
+
+function wireDossier(){
+  const more = $('#ppl-more');
+  if(more) more.onclick = () => { _showAllPeople = true; loadState(); };
+  const tg = $('#mn-notes-tg');
+  if(tg) tg.onclick = () => {
+    const box = $('#mn-notes'); if(!box) return;
+    const open = box.classList.toggle('show');
+    tg.textContent = (open?'▾':'▸')+' Signal accounting notes (per-provider unique vs ingest)';
+  };
+  document.querySelectorAll('.mn-card').forEach(c => {
+    c.onclick = () => c.classList.toggle('open');
+  });
+}
+
+function num(n){ n = Number(n)||0; return n.toLocaleString('en-US'); }
 
 const PROVIDERS=[
   {id:'slack',label:'SLACK',icon:'#'},

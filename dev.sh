@@ -121,7 +121,7 @@ cmd_test() {
 cmd_prepare() {
     require_setup; load_env
     local corpus="${CORPUS_PATH:-./corpus/build/events.jsonl}"
-    local as_of="${AS_OF:-2025-11-28}"      # default: 18 months back from May 2026
+    local as_of="${AS_OF:-2023-07-01}"      # default: first 18 months of the corpus (2022-01 → 2023-07); forward-replay lands the rest
     if [ ! -f "$corpus" ]; then
         c_red "corpus file not found: $corpus"
         c_red "  generate it with: (cd corpus && make corpus)"

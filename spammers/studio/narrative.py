@@ -1,113 +1,249 @@
-"""Derive a faithful 'company dossier' from the seeded run data.
+"""Build the dossier the Studio renders after `Initialize`.
 
-There is no hand-authored narrative in OrgGen, but the structured data is
-a real goal-directed company: people in roles/teams, named projects with
-lifecycle dates (= goals), and open issues/PRs (= obstacles / work in
-flight). We project that into a description a modeller can check messages
-against. Everything here is grounded in the DB — no invention.
+Combines:
+
+  * Static corpus profile (mission, products, repos, people with behavioural
+    patterns, monthly signal roll-up) — parsed once by `corpus_profile.load`
+    and cached for the life of the process.
+  * Run-local dynamic state (virtual_now, replay cursor, paused flag, what's
+    actually landed in the provider tables so far).
+
+Everything is grounded — no invention. The model layer of Fyralis is tested
+against this dossier, so it must match what is actually replayed.
 """
 from __future__ import annotations
 
+import os
 from uuid import UUID
 
 import asyncpg
 
+from spammers.studio import corpus_profile
 from spammers.studio.companies import Company
 
 
+_DEFAULT_CORPUS = os.environ.get(
+    "ALPEN_CORPUS_PATH",
+    os.path.join(os.getcwd(), "corpus", "build", "events.jsonl"),
+)
+
+
 async def build(pool: asyncpg.Pool, run_id: UUID, company: Company) -> dict:
+    profile = corpus_profile.load_profile(_DEFAULT_CORPUS)
+
     run = await pool.fetchrow(
-        "SELECT virtual_now FROM org.runs WHERE id=$1", run_id)
-    now = run["virtual_now"]
-
-    teams = [dict(r) for r in await pool.fetch(
-        """SELECT t.name, count(p.id) AS headcount
-             FROM org.teams t LEFT JOIN org.people p ON p.team_id=t.id
-            WHERE t.run_id=$1 GROUP BY t.name ORDER BY headcount DESC""", run_id)]
-    headcount = await pool.fetchval("SELECT count(*) FROM org.people WHERE run_id=$1", run_id)
-
-    proj_rows = await pool.fetch(
-        """SELECT pr.title, pr.slug, pr.started_at, pr.ended_at, pr.repos,
-                  pe.handle AS owner, pe.full_name AS owner_name
-             FROM org.projects pr LEFT JOIN org.people pe ON pe.id=pr.owner_id
-            WHERE pr.run_id=$1 ORDER BY pr.started_at""", run_id)
-    shipped, in_progress, planned = [], [], []
-    for r in proj_rows:
-        repos = r["repos"] if isinstance(r["repos"], list) else []
-        item = {"title": r["title"], "slug": r["slug"], "owner": r["owner"],
-                "owner_name": r["owner_name"], "repo": repos[0] if repos else None}
-        if r["ended_at"] and r["ended_at"] < now:
-            item["status"] = "shipped"
-            shipped.append(item)
-        elif r["started_at"] and r["started_at"] > now:
-            item["status"] = "planned"
-            planned.append(item)
-        else:
-            item["status"] = "in_progress"
-            in_progress.append(item)
-
-    # GitHub progress + obstacles
-    repo_ids = []
-    app = await pool.fetchrow("SELECT id FROM app_github.apps WHERE run_id=$1", run_id)
-    if app:
-        inst = await pool.fetchrow("SELECT id FROM app_github.installations WHERE app_pk=$1", app["id"])
-        if inst:
-            repo_ids = [r["id"] for r in await pool.fetch(
-                "SELECT id FROM app_github.repositories WHERE installation_pk=$1", inst["id"])]
-    merged_prs = open_prs = closed_issues = open_issues = 0
-    obstacles: list[str] = []
-    if repo_ids:
-        merged_prs = await pool.fetchval("SELECT count(*) FROM app_github.pull_requests WHERE repo_pk=ANY($1) AND merged=true", repo_ids)
-        open_prs = await pool.fetchval("SELECT count(*) FROM app_github.pull_requests WHERE repo_pk=ANY($1) AND state='open'", repo_ids)
-        closed_issues = await pool.fetchval("SELECT count(*) FROM app_github.issues WHERE repo_pk=ANY($1) AND state='closed'", repo_ids)
-        open_issues = await pool.fetchval("SELECT count(*) FROM app_github.issues WHERE repo_pk=ANY($1) AND state='open'", repo_ids)
-        obstacles = [r["title"] for r in await pool.fetch(
-            "SELECT title FROM app_github.issues WHERE repo_pk=ANY($1) AND state='open' ORDER BY created_at DESC LIMIT 8", repo_ids)]
-
-    building = [p["title"] for p in (in_progress + planned)] or [p["title"] for p in shipped]
-    team_summary = ", ".join(f"{t['name']} ({t['headcount']})" for t in teams)
-    summary = (
-        f"{company.name} is a {company.stage.lower()} — about {headcount} people "
-        f"across {team_summary or 'a small team'}. They're a SaaS company building "
-        f"{_join(building)}. As of the snapshot ({now:%b %Y}), "
-        f"{len(shipped)} initiative(s) have shipped, {len(in_progress)} are in flight, "
-        f"and {open_issues} known issue(s) are open."
+        "SELECT virtual_now, corpus_path, created_at FROM org.runs WHERE id=$1",
+        run_id,
     )
+    now = run["virtual_now"]
+    now_ym = now.strftime("%Y-%m") if now else ""
+
+    # ---- dynamic state derived from the run + corpus window ----------------
+    months = profile["monthly"]["months"]
+    first_ym = months[0]["ym"] if months else ""
+    last_ym  = months[-1]["ym"] if months else ""
+    months_elapsed = sum(1 for m in months if m["ym"] <= now_ym)
+    months_total = len(months)
+    pct_progress = int((months_elapsed / months_total) * 100) if months_total else 0
+
+    signals_backfilled = sum(
+        m["unique_total"] for m in months if m["ym"] <= now_ym
+    )
+    signals_corpus = sum(m["unique_total"] for m in months)
+
+    # ---- "what's actually in the provider tables right now" ----------------
+    db_signals = await _db_signals(pool, run_id)
+
+    # ---- mark which months have been replayed yet --------------------------
+    monthly_view = []
+    for m in months:
+        in_backfill = m["ym"] <= now_ym
+        monthly_view.append({**m, "in_backfill": in_backfill,
+                             "is_future": not in_backfill})
 
     return {
-        "name": company.name,
-        "stage": company.stage,
+        "name": profile["company"]["display_name"],
+        "real_name": profile["company"]["name"],
+        "stage": profile["company"]["stage"],
         "tagline": company.tagline,
-        "as_of": now.isoformat(),
-        "headcount": headcount,
-        "teams": teams,
-        "summary": summary,
-        "goal": f"Build and ship: {_join(building)}.",
-        "projects": {"shipped": shipped, "in_progress": in_progress, "planned": planned},
-        "achieved": {
-            "shipped_projects": [p["title"] for p in shipped],
-            "merged_prs": merged_prs,
-            "closed_issues": closed_issues,
+        "logo_id": company.key,
+        "as_of": now.isoformat() if now else None,
+
+        "state": {
+            "started_virtual": f"{first_ym}-01" if first_ym else None,
+            "now_virtual":     now.isoformat() if now else None,
+            "end_virtual":     profile["monthly"]["last_ts"],
+            "months_total":    months_total,
+            "months_elapsed":  months_elapsed,
+            "months_remaining": max(0, months_total - months_elapsed),
+            "pct_progress":    pct_progress,
+            "signals_corpus":  signals_corpus,
+            "signals_backfilled": signals_backfilled,
+            "signals_remaining":  max(0, signals_corpus - signals_backfilled),
+            "db_signals_now":  db_signals,
+            "db_signals_total": sum(db_signals.values()),
         },
-        "remaining": {
-            "in_progress_projects": [p["title"] for p in in_progress],
-            "planned_projects": [p["title"] for p in planned],
-            "open_prs": open_prs,
+
+        "overview": {
+            "blurb":     profile["company"]["overview_blurb"],
+            "mission":   profile["company"]["mission"],
+            "founded":   profile["company"]["founded"],
+            "homepage":  profile["company"]["homepage"],
+            "blog":      profile["company"]["blog"],
+            "github_org": profile["company"]["github_org"],
+            "headcount": profile["company"]["headcount"],
+            "products":  profile["products"],
+            "repos":     profile["repos"],
+            "milestones": profile["milestones"],
+            "teams":     profile["teams"],
         },
-        "obstacles": {
-            "open_issues": open_issues,
-            "open_prs": open_prs,
-            "items": obstacles,
+
+        "people":  profile["people"],
+        "signal_notes": profile["signal_notes"],
+
+        "monthly": {
+            "overview_blurb": _monthly_overview_blurb(
+                months_elapsed, months_total,
+                signals_backfilled, signals_corpus,
+                profile["monthly"]["totals_corpus"],
+            ),
+            "totals_corpus":      profile["monthly"]["totals_corpus"],
+            "ingest_corpus":      profile["monthly"]["ingest_corpus"],
+            "phase_legend":       profile["monthly"]["phase_legend"],
+            "months":             monthly_view,
         },
     }
 
 
-def _join(items: list[str]) -> str:
-    items = [i for i in items if i]
-    if not items:
-        return "their product"
-    if len(items) == 1:
-        return items[0]
-    if len(items) == 2:
-        return f"{items[0]} and {items[1]}"
-    return ", ".join(items[:-1]) + f", and {items[-1]}"
+# ---------------------------------------------------------------------------
+
+async def _db_signals(pool: asyncpg.Pool, run_id: UUID) -> dict[str, int]:
+    """Per-provider row count visible across the mock APIs for this run.
+
+    This is the "what would Fyralis see if it ingested right now" picture —
+    sum of the user-visible row counts each provider's API would return.
+    Most providers use a single primary table; a few add comments/changelogs.
+    """
+    out: dict[str, int] = {}
+
+    # ---- slack: messages
+    val = await pool.fetchval(
+        """SELECT count(*) FROM app_slack.messages m
+             JOIN app_slack.channels c ON c.id = m.channel_pk
+             JOIN app_slack.workspaces w ON w.id = c.workspace_id
+            WHERE w.run_id = $1""", run_id)
+    out["slack"] = int(val or 0)
+
+    # ---- discord: messages
+    val = await pool.fetchval(
+        """SELECT count(*) FROM app_discord.messages m
+             JOIN app_discord.channels c ON c.id = m.channel_pk
+             JOIN app_discord.guilds g ON g.id = c.guild_pk
+             JOIN app_discord.applications a ON a.id = g.application_pk
+            WHERE a.run_id = $1""", run_id)
+    out["discord"] = int(val or 0)
+
+    # ---- github: commits + PRs + issues + reviews + comments
+    app = await pool.fetchrow(
+        "SELECT id FROM app_github.apps WHERE run_id=$1", run_id)
+    if app:
+        inst = await pool.fetchrow(
+            "SELECT id FROM app_github.installations WHERE app_pk=$1", app["id"])
+        if inst:
+            repo_ids = [r["id"] for r in await pool.fetch(
+                "SELECT id FROM app_github.repositories WHERE installation_pk=$1",
+                inst["id"])]
+            if repo_ids:
+                gh = 0
+                # commits / pull_requests / issues / issue_comments hang off
+                # a repo directly; reviews hang off a pull_request.
+                for tbl in ("commits", "pull_requests", "issues", "issue_comments"):
+                    gh += int(await pool.fetchval(
+                        f"SELECT count(*) FROM app_github.{tbl} WHERE repo_pk = ANY($1)",
+                        repo_ids) or 0)
+                gh += int(await pool.fetchval(
+                    """SELECT count(*) FROM app_github.reviews r
+                         JOIN app_github.pull_requests pr ON pr.id = r.pr_pk
+                        WHERE pr.repo_pk = ANY($1)""", repo_ids) or 0)
+                out["github"] = gh
+            else:
+                out["github"] = 0
+        else:
+            out["github"] = 0
+    else:
+        out["github"] = 0
+
+    # ---- gmail: messages
+    val = await pool.fetchval(
+        """SELECT count(*) FROM app_gmail.messages m
+             JOIN app_gmail.threads t ON t.id = m.thread_pk
+             JOIN app_gmail.mailboxes mb ON mb.id = t.mailbox_pk
+             JOIN app_gmail.customers cu ON cu.id = mb.customer_pk
+            WHERE cu.run_id = $1""", run_id)
+    out["gmail"] = int(val or 0)
+
+    # ---- calendar: events
+    val = await pool.fetchval(
+        """SELECT count(*) FROM app_calendar.events e
+             JOIN app_calendar.calendars c ON c.id = e.calendar_pk
+             JOIN app_calendar.accounts a ON a.id = c.account_pk
+            WHERE a.run_id = $1""", run_id)
+    out["calendar"] = int(val or 0)
+
+    # ---- notion: pages + comments (comments hang off pages)
+    val = await pool.fetchval(
+        """SELECT (SELECT count(*) FROM app_notion.pages p
+                     JOIN app_notion.integrations i ON i.id = p.integration_pk
+                    WHERE i.run_id = $1)
+                + (SELECT count(*) FROM app_notion.comments c
+                     JOIN app_notion.pages p2 ON p2.id = c.page_pk
+                     JOIN app_notion.integrations i2 ON i2.id = p2.integration_pk
+                    WHERE i2.run_id = $1)""", run_id)
+    out["notion"] = int(val or 0)
+
+    # ---- drive: files + comments (comments hang off files)
+    val = await pool.fetchval(
+        """SELECT (SELECT count(*) FROM app_drive.files f
+                     JOIN app_drive.installations i ON i.id = f.installation_pk
+                    WHERE i.run_id = $1)
+                + (SELECT count(*) FROM app_drive.comments c
+                     JOIN app_drive.files f2 ON f2.id = c.file_pk
+                     JOIN app_drive.installations i2 ON i2.id = f2.installation_pk
+                    WHERE i2.run_id = $1)""", run_id)
+    out["drive"] = int(val or 0)
+
+    # ---- jira: issues + comments + changelogs (both hang off issues)
+    val = await pool.fetchval(
+        """SELECT (SELECT count(*) FROM app_jira.issues x
+                     JOIN app_jira.projects p ON p.id = x.project_pk
+                     JOIN app_jira.installations i ON i.id = p.installation_pk
+                    WHERE i.run_id = $1)
+                + (SELECT count(*) FROM app_jira.comments c
+                     JOIN app_jira.issues x ON x.id = c.issue_pk
+                     JOIN app_jira.projects p ON p.id = x.project_pk
+                     JOIN app_jira.installations i ON i.id = p.installation_pk
+                    WHERE i.run_id = $1)
+                + (SELECT count(*) FROM app_jira.changelogs cl
+                     JOIN app_jira.issues x ON x.id = cl.issue_pk
+                     JOIN app_jira.projects p ON p.id = x.project_pk
+                     JOIN app_jira.installations i ON i.id = p.installation_pk
+                    WHERE i.run_id = $1)""", run_id)
+    out["jira"] = int(val or 0)
+
+    return out
+
+
+def _monthly_overview_blurb(elapsed: int, total: int,
+                            sig_back: int, sig_corpus: int,
+                            corpus_totals: dict[str, int]) -> str:
+    biggest = sorted(corpus_totals.items(), key=lambda kv: -kv[1])[:3]
+    biggest_blurb = ", ".join(f"{n:,} {p}" for p, n in biggest)
+    return (
+        f"This dossier covers {total} virtual months "
+        f"({elapsed} elapsed · {total - elapsed} ahead). "
+        f"The full corpus is {sig_corpus:,} unique signals "
+        f"({biggest_blurb} dominate). "
+        f"{sig_back:,} signals have been backfilled into the mocks so far; the "
+        f"remaining {max(0, sig_corpus - sig_back):,} will land month-by-month as "
+        f"the virtual clock advances."
+    )

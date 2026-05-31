@@ -193,13 +193,15 @@ class Controller:
                 await self._run_cli("reset", "--confirm", "yes")
 
                 self.state.phase = "seeding"
-                # Backfill corpus up to 2025-11-28 — matches dev.sh's default.
-                # That leaves ~11 months of corpus for forward-replay to land
-                # after the mocks come up, so counts visibly tick up in the UI
-                # instead of going straight to "all 34k events landed".
+                # Backfill the FIRST 18 months of the corpus (2022-01 → 2023-07)
+                # so the company starts with a small, focused history (~2k
+                # signals — gestation, team formation, whitepaper). The
+                # remaining ~40 months land via forward-replay as the virtual
+                # clock advances, so the model layer sees the launch, funding
+                # round, testnet, Glock release, Mosaic etc. happen live.
                 await self._run_cli(
                     "prepare", "--tenant-id", str(uuid.uuid4()),
-                    "--as-of", "2025-11-28",
+                    "--as-of", "2023-07-01",
                     timeout=600.0,
                 )
 

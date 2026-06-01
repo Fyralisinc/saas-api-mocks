@@ -6,7 +6,7 @@ company:
   name: Alpen Labs
   id: company:alpen-labs
   mission: Bitcoin's Own Financial System — borrow, earn, and spend in dollars directly with Bitcoin.
-  founded: '2022-01-01'
+  founded: '2024-02-01'
   homepage: https://www.alpenlabs.io
   github_org: alpenlabs
   blog: https://www.alpenlabs.io/blog
@@ -898,7 +898,7 @@ people:
   title: Cofounder & COO
   level: senior
   team: team:exec
-  started_at: '2022-01-01'
+  started_at: '2024-02-01'
   last_active: '2026-05-27'
   twitter: null
   blog_url: null
@@ -962,7 +962,7 @@ people:
   title: Cofounder & CTO
   level: senior
   team: team:exec
-  started_at: '2022-01-01'
+  started_at: '2024-02-01'
   last_active: '2026-05-27'
   twitter: null
   blog_url: null
@@ -1057,7 +1057,7 @@ people:
   title: Cofounder & CEO
   level: senior
   team: team:exec
-  started_at: '2022-01-01'
+  started_at: '2024-02-01'
   last_active: '2026-05-27'
   twitter: null
   blog_url: null
@@ -1073,7 +1073,7 @@ people:
   title: Cofounder
   level: senior
   team: team:exec
-  started_at: '2022-01-01'
+  started_at: '2024-02-01'
   last_active: '2026-05-27'
   twitter: null
   blog_url: null

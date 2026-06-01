@@ -39,10 +39,10 @@ accounts:
 # always credits Paid-In Capital and debits Operating Bank.
 funding_rounds:
 - id: round:founders-capital
-  date: '2022-01-15'
+  date: '2024-02-15'
   kind: founders_capital
   amount_usd: 1500000
-  note: 'Cofounders + early angels (inferred). Bridge capital for 2-year stealth pre-seed period.'
+  note: 'Cofounders + early angels. Initial bridge capital — funds the first 3 months before the seed round closes.'
   lead: 'Founders + friends'
   participants:
   - 'Cofounders (Simanta, Pramod, Abishkar, Chandan)'

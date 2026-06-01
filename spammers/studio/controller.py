@@ -194,15 +194,16 @@ class Controller:
                 await self._run_cli("reset", "--confirm", "yes")
 
                 self.state.phase = "seeding"
-                # Backfill the FIRST 18 months of the corpus (2022-01 → 2023-07)
-                # so the company starts with a small, focused history (~2k
-                # signals — gestation, team formation, whitepaper). The
-                # remaining ~40 months land via forward-replay as the virtual
-                # clock advances, so the model layer sees the launch, funding
-                # round, testnet, Glock release, Mosaic etc. happen live.
+                # Backfill the FIRST 18 months of the corpus (2024-02 → 2025-08)
+                # so the company starts with the cofounder-only stretch, seed
+                # round close, team formation, and strategic-round phase
+                # already on-screen. The remaining ~10 months land via
+                # forward-replay as the virtual clock advances, so the model
+                # layer sees the testnet, Glock release, Mosaic, and Bitcoin
+                # Dollar happen live.
                 await self._run_cli(
                     "prepare", "--tenant-id", str(uuid.uuid4()),
-                    "--as-of", "2023-07-01",
+                    "--as-of", "2025-08-01",
                     timeout=600.0,
                 )
 

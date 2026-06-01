@@ -57,9 +57,9 @@ SIGNAL_NOTES = {
 # Phase grouping — months → narrative "phase" the company was in.
 # Boundaries derived from curated milestones in facts.yaml.
 PHASE_BOUNDS = [
-    ("2022-01", "2024-03", "Pre-product foundations",
-     "Whitepaper, founding-team formation, no public product yet."),
-    ("2024-04", "2024-12", "Public launch & technical thesis",
+    ("2024-02", "2024-04", "Pre-product foundations",
+     "Cofounders alone — whitepaper, fundraising prep, first hires not in yet."),
+    ("2024-05", "2024-12", "Public launch & team formation",
      "First blog post, repos open-sourced, early Strata protocol work."),
     ("2025-01", "2025-07", "Strategic round & Strata maturation",
      "Funding closed, Bridge + Bitcoin-BOSD work, Glock verification research."),
@@ -237,7 +237,7 @@ def _build_profile(events_jsonl: Path) -> dict:
     months = _month_range(first_ts, last_ts) if first_ts and last_ts else []
     # Running bank balance walks forward through the month list so each
     # month carries the end-of-month position. Anchored at 0 — the corpus's
-    # founders-capital tranche on 2022-01-15 is itself a deposit that lifts
+    # founders-capital tranche on 2024-02-15 is itself a deposit that lifts
     # the balance the first month.
     running_balance = 0
     monthly = []
@@ -335,7 +335,7 @@ def _build_profile(events_jsonl: Path) -> dict:
             "name": company.get("name", "Alpen Labs"),
             "display_name": "Gharelu-Alpen",
             "mission": company.get("mission", ""),
-            "founded": company.get("founded", "2022-01-01"),
+            "founded": company.get("founded", "2024-02-01"),
             "stage": "Series-A protocol startup",
             "homepage": company.get("homepage"),
             "blog": company.get("blog"),
@@ -821,7 +821,7 @@ def _overview_blurb(company: dict, products: list[dict], headcount: int, repos: 
     product_names = [p.get("name") for p in products if p.get("name")]
     return (
         f"{company.get('name', 'Alpen Labs')} is a Bitcoin-native finance protocol startup "
-        f"founded in {company.get('founded', '2022')[:4]}, building toward "
+        f"founded in {company.get('founded', '2024')[:4]}, building toward "
         f"\"{company.get('mission', '')}\". Their stack centres on a Bitcoin rollup "
         f"({product_names[0] if product_names else 'Strata'}), a SNARK-verification primitive "
         f"({product_names[1] if len(product_names) > 1 else 'Glock'}), a garbled-circuit "

@@ -107,11 +107,17 @@ def bootstrap_events(facts: dict) -> Iterator[dict]:
                            "name": p["full_name"] if p["full_name"] != "needs:review"
                                    else p["github_handle"]}}
 
-    # Repos.
+    # Repos. Clamp creation date to company.founded — a few repos predate
+    # the official founding (they were cofounder scratch work that became
+    # Alpen's), but in the simulation they appear on day one.
+    founded_floor = facts["company"]["founded"]
     for r in facts.get("repos", []):
         if r.get("archived"):
             continue
-        when = _iso(_midday(r["created_at"][:10]))
+        created = r["created_at"][:10]
+        if created < founded_floor:
+            created = founded_floor
+        when = _iso(_midday(created))
         yield {"t": when, "provider": "github", "kind": "repo.create",
                "payload": {"id": r["id"], "name": r["name"],
                            "owner": "alpenlabs",
@@ -129,8 +135,18 @@ def _ghuser_id(login: str | None) -> str | None:
 
 
 def github_mirror_events(facts: dict) -> Iterator[dict]:
-    """Replay each scraped commit/PR/issue/release as a corpus event."""
+    """Replay each scraped commit/PR/issue/release as a corpus event.
+
+    Mirror events that predate company.founded are skipped — they're
+    cofounder commits to repos that became Alpen's, but we don't want them
+    showing up in the simulated company's history.
+    """
     known_handles = {p["github_handle"] for p in facts["people"]}
+    founded_floor = facts["company"]["founded"]  # 'YYYY-MM-DD'
+
+    def _after_founded(t: str | None) -> bool:
+        return bool(t) and t[:10] >= founded_floor
+
     for repo in facts.get("repos", []):
         if repo.get("archived"):
             continue
@@ -147,7 +163,7 @@ def github_mirror_events(facts: dict) -> Iterator[dict]:
                 c = json.loads(line)
                 author = (c.get("author") or {}).get("login")
                 t = (c.get("commit") or {}).get("author", {}).get("date") or c.get("commit", {}).get("committer", {}).get("date")
-                if not t:
+                if not _after_founded(t):
                     continue
                 yield {"t": t, "provider": "github", "kind": "commit",
                        "actor": _ghuser_id(author),
@@ -162,7 +178,7 @@ def github_mirror_events(facts: dict) -> Iterator[dict]:
                 pr = json.loads(line)
                 user = (pr.get("user") or {}).get("login")
                 opened = pr.get("created_at")
-                if not opened:
+                if not _after_founded(opened):
                     continue
                 yield {"t": opened, "provider": "github", "kind": "pr.open",
                        "actor": _ghuser_id(user),
@@ -206,7 +222,7 @@ def github_mirror_events(facts: dict) -> Iterator[dict]:
                     continue
                 user = (it.get("user") or {}).get("login")
                 opened = it.get("created_at")
-                if not opened:
+                if not _after_founded(opened):
                     continue
                 yield {"t": opened, "provider": "github", "kind": "issue.open",
                        "actor": _ghuser_id(user),
@@ -225,7 +241,7 @@ def github_mirror_events(facts: dict) -> Iterator[dict]:
             for line in rf.open():
                 rel = json.loads(line)
                 t = rel.get("published_at") or rel.get("created_at")
-                if not t:
+                if not _after_founded(t):
                     continue
                 yield {"t": t, "provider": "github", "kind": "release.publish",
                        "payload": {"repo": repo_id, "tag": rel.get("tag_name"),

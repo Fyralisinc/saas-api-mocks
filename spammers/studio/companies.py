@@ -32,7 +32,7 @@ GHARELU_ALPEN = Company(
     stage="Series-A protocol startup",
     tagline="A homemade high-fidelity simulation of Alpen Labs — "
             "BitVM / Strata, real public GitHub history, ~36 people.",
-    span="~4 years of history",
+    span="~28 months of history",
     headcount="~36 people",
 )
 

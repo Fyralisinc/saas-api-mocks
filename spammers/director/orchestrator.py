@@ -71,6 +71,8 @@ class EmissionLoop:
                AND emitted_at IS NULL
                AND virtual_ts <= $2
                AND type <> 'discord.message'
+               -- a failed delivery is held off until its (real-time) retry is due
+               AND (emit_next_attempt_at IS NULL OR emit_next_attempt_at <= now())
              ORDER BY virtual_ts ASC
              LIMIT $3
             """,

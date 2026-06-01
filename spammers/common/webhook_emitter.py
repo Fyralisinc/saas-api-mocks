@@ -17,7 +17,7 @@ schedule: [1s, 5s, 30s] with a 90s wall budget.
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Awaitable, Callable, Mapping, Optional
 from uuid import UUID
 
@@ -34,6 +34,13 @@ SignFn = Callable[[bytes], Mapping[str, str]]
 
 DEFAULT_SCHEDULE = (1.0, 5.0, 30.0)
 DEFAULT_BUDGET_S = 90.0
+
+# Cross-tick retry of a delivery that keeps failing (after the in-call budget
+# above is exhausted). Real senders retry non-2xx over a long window instead of
+# dropping; we mirror that with a bounded, backed-off reschedule and then
+# dead-letter. Backoff is REAL wall-clock (a webhook retry is not virtual-time).
+DELIVERY_MAX_ATTEMPTS = 5
+RETRY_BACKOFF_S = (30.0, 60.0, 300.0, 600.0)
 
 
 async def deliver(
@@ -92,9 +99,51 @@ async def deliver(
             await client.aclose()
 
 
+def _is_terminal(status: int) -> bool:
+    """A delivery outcome that should NOT be retried.
+
+    2xx = accepted; 404/410 = the endpoint is gone (real senders stop / unsubscribe).
+    Everything else (other 4xx like 401/403/429, all 5xx, and transport failures
+    reported as status<=0) is retryable.
+    """
+    return 200 <= status < 300 or status in (404, 410)
+
+
 async def mark_emitted(pool, event_id: UUID, *, status: int, attempt_at: Optional[datetime] = None) -> None:
+    """Record a delivery outcome against ``timeline.events``.
+
+    - **Terminal** (2xx delivered, or 404/410 gone): stamp ``emitted_at`` — done.
+    - **Retryable** (other non-2xx, or transport failure): leave ``emitted_at``
+      NULL and schedule ``emit_next_attempt_at`` with backoff so the EmissionLoop
+      re-delivers later — matching real senders, which retry non-2xx over a long
+      window rather than dropping. After ``DELIVERY_MAX_ATTEMPTS`` we dead-letter
+      (stamp + log) so a permanently-broken endpoint can't retry forever.
+    """
     at = attempt_at or datetime.now(timezone.utc)
-    await pool.execute(
-        "UPDATE timeline.events SET emitted_at = $2 WHERE id = $1",
-        event_id, at,
+    if _is_terminal(status):
+        await pool.execute(
+            "UPDATE timeline.events SET emitted_at = $2, emit_next_attempt_at = NULL WHERE id = $1",
+            event_id, at,
+        )
+        return
+
+    row = await pool.fetchrow(
+        "UPDATE timeline.events SET emit_attempts = emit_attempts + 1 WHERE id = $1 RETURNING emit_attempts",
+        event_id,
     )
+    attempts = row["emit_attempts"] if row else DELIVERY_MAX_ATTEMPTS
+    if attempts >= DELIVERY_MAX_ATTEMPTS:
+        await pool.execute(
+            "UPDATE timeline.events SET emitted_at = $2, emit_next_attempt_at = NULL WHERE id = $1",
+            event_id, at,
+        )
+        log.warning("webhook_dead_letter", event_id=str(event_id), status=status, attempts=attempts)
+        return
+
+    backoff = RETRY_BACKOFF_S[min(attempts - 1, len(RETRY_BACKOFF_S) - 1)]
+    await pool.execute(
+        "UPDATE timeline.events SET emit_next_attempt_at = $2 WHERE id = $1",
+        event_id, at + timedelta(seconds=backoff),
+    )
+    log.info("webhook_retry_scheduled", event_id=str(event_id), status=status,
+             attempt=attempts, next_in_s=backoff)

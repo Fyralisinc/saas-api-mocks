@@ -1,6 +1,8 @@
 {
   "token": "verification-token-mock",
   "team_id": "T0FIDELITY",
+  "context_team_id": "T0FIDELITY",
+  "context_enterprise_id": null,
   "api_app_id": "A0APP00001",
   "event": {
     "type": "message",
@@ -9,11 +11,14 @@
     "text": "golden",
     "ts": "1768000000.000000",
     "event_ts": "1768000000.000000",
+    "channel_type": "channel",
+    "client_msg_id": "00000000-0000-0000-0000-000000000000",
     "team": "T0FIDELITY"
   },
   "type": "event_callback",
   "event_id": "Ev0000000000",
   "event_time": 1768000000,
+  "event_context": "EC0000000000",
   "authorizations": [
     {
       "enterprise_id": null,

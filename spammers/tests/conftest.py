@@ -16,6 +16,7 @@ default with the db name swapped to ``spammers_test``.
 """
 from __future__ import annotations
 
+import json
 import os
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
@@ -46,6 +47,13 @@ CH_GENERAL = "C0GENERAL0"
 CH_RANDOM = "C0RANDOM01"
 CH_PRIVATE = "C0PRIVATE0"
 CH_ARCHIVED = "C0ARCHIVE0"
+CH_LOCKED = "C0LOCKED00"     # public channel the bot has NOT joined (bot_is_member=FALSE)
+CH_DM_AB = "D0ALICEBOB"      # 1:1 DM between alice & bob
+CH_MPIM_ABC = "G0ABCGROUP"   # group DM among alice, bob, carol
+
+# Per-user xoxp token (alice consented to DM ingestion).
+ALICE_USER_TOKEN = "xoxp-0000000000-2222222222-alicedmtoken000000000000"
+ALICE_USER_SCOPES = ["im:read", "im:history", "mpim:read", "mpim:history", "users:read"]
 
 # #general message timeline (epoch base, microsecond precision in ts).
 _BASE = 1768000000
@@ -56,6 +64,12 @@ TS_R1 = f"{_BASE + 310}.000100"          # reply, bob
 TS_R2 = f"{_BASE + 320}.000100"          # reply, carol
 GENERAL_ROOT_TS = [TS_M1, TS_M2, TS_PARENT]      # what history should return
 GENERAL_ROOT_TS_DESC = [TS_PARENT, TS_M2, TS_M1]  # newest-first order
+
+# DM message timeline (im + mpim).
+TS_DM1 = f"{_BASE + 400}.000100"   # alice -> bob (im)
+TS_DM2 = f"{_BASE + 410}.000100"   # bob -> alice (im)
+TS_MP1 = f"{_BASE + 500}.000100"   # alice (mpim)
+TS_MP2 = f"{_BASE + 510}.000100"   # carol (mpim)
 
 VIRTUAL_NOW = datetime.fromtimestamp(_BASE + 1_000_000, tz=timezone.utc)
 
@@ -124,8 +138,8 @@ async def _seed(pool) -> UUID:
         """
         INSERT INTO app_slack.workspaces
             (id, run_id, team_id, team_name, team_domain, signing_secret,
-             client_id, client_secret, bot_token, bot_user_id, app_id)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+             client_id, client_secret, bot_token, bot_user_id, app_id, app_distribution)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'non_marketplace')
         """,
         ws_pk, run_id, TEAM_ID, TEAM_NAME, TEAM_DOMAIN, SIGNING_SECRET,
         CLIENT_ID, CLIENT_SECRET, BOT_TOKEN, BOT_USER_ID, APP_ID,
@@ -143,52 +157,87 @@ async def _seed(pool) -> UUID:
             upk, ws_pk, person_pks[handle], slack_id, '{"title": "Engineer"}',
         )
 
+    # (cid, name, is_private, is_archived, is_general, is_im, is_mpim, bot_is_member)
     channels = [
-        (CH_GENERAL, "general", False, False, True),
-        (CH_RANDOM, "random", False, False, False),
-        (CH_PRIVATE, "secret-plans", True, False, False),
-        (CH_ARCHIVED, "old-stuff", False, True, False),
+        (CH_GENERAL, "general", False, False, True, False, False, True),
+        (CH_RANDOM, "random", False, False, False, False, False, True),
+        (CH_PRIVATE, "secret-plans", True, False, False, False, False, True),
+        (CH_ARCHIVED, "old-stuff", False, True, False, False, False, True),
+        (CH_LOCKED, "locked-room", False, False, False, False, False, False),
+        (CH_DM_AB, "dm-alice-bob", True, False, False, True, False, True),
+        (CH_MPIM_ABC, "mpim-abc", True, False, False, False, True, True),
     ]
     chan_pks: dict[str, UUID] = {}
-    for cid, name, is_private, is_archived, is_general in channels:
+    for cid, name, is_private, is_archived, is_general, is_im, is_mpim, bot_member in channels:
         cpk = uuid4()
         chan_pks[cid] = cpk
         await pool.execute(
             """
             INSERT INTO app_slack.channels
                 (id, workspace_id, channel_id, name, is_private, is_archived,
-                 is_general, topic, purpose, creator_user_id, created_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                 is_general, is_im, is_mpim, bot_is_member,
+                 topic, purpose, creator_user_id, created_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
             """,
             cpk, ws_pk, cid, name, is_private, is_archived, is_general,
+            is_im, is_mpim, bot_member,
             f"{name} topic", f"{name} purpose", USER_ALICE, VIRTUAL_NOW,
         )
 
-    # #general membership: alice, bob, carol
-    for slack_id in (USER_ALICE, USER_BOB, USER_CAROL):
-        await pool.execute(
-            "INSERT INTO app_slack.channel_membership (channel_pk, user_pk, joined_at) "
-            "VALUES ($1, $2, $3)",
-            chan_pks[CH_GENERAL], user_pks[slack_id], VIRTUAL_NOW,
-        )
+    # Memberships: #general (all three), the im (alice+bob), the mpim (all three).
+    memberships = {
+        CH_GENERAL: (USER_ALICE, USER_BOB, USER_CAROL),
+        CH_DM_AB: (USER_ALICE, USER_BOB),
+        CH_MPIM_ABC: (USER_ALICE, USER_BOB, USER_CAROL),
+    }
+    for cid, member_ids in memberships.items():
+        for slack_id in member_ids:
+            await pool.execute(
+                "INSERT INTO app_slack.channel_membership (channel_pk, user_pk, joined_at) "
+                "VALUES ($1, $2, $3)",
+                chan_pks[cid], user_pks[slack_id], VIRTUAL_NOW,
+            )
+
+    # alice's xoxp user token (the DM consent row).
+    await pool.execute(
+        """
+        INSERT INTO app_slack.user_tokens (id, workspace_id, slack_user_id, user_token, scopes)
+        VALUES ($1, $2, $3, $4, $5::jsonb)
+        """,
+        uuid4(), ws_pk, USER_ALICE, ALICE_USER_TOKEN, json.dumps(ALICE_USER_SCOPES),
+    )
 
     # #general messages: two roots, a thread parent (reply_count=2), two replies.
+    # The parent carries the reply roll-up fields real Slack returns.
     msgs = [
-        (TS_M1, None, USER_ALICE, "first message", 0),
-        (TS_M2, None, USER_BOB, "second message", 0),
-        (TS_PARENT, None, USER_ALICE, "thread parent", 2),
-        (TS_R1, TS_PARENT, USER_BOB, "reply one", 0),
-        (TS_R2, TS_PARENT, USER_CAROL, "reply two", 0),
+        (TS_M1, None, USER_ALICE, "first message", 0, 0, None, []),
+        (TS_M2, None, USER_BOB, "second message", 0, 0, None, []),
+        (TS_PARENT, None, USER_ALICE, "thread parent", 2, 2, TS_R2, [USER_BOB, USER_CAROL]),
+        (TS_R1, TS_PARENT, USER_BOB, "reply one", 0, 0, None, []),
+        (TS_R2, TS_PARENT, USER_CAROL, "reply two", 0, 0, None, []),
+        # DM (im) messages between alice & bob.
+        (TS_DM1, None, USER_ALICE, "hey bob (dm)", 0, 0, None, []),
+        (TS_DM2, None, USER_BOB, "hey alice (dm)", 0, 0, None, []),
+        # group DM (mpim) messages.
+        (TS_MP1, None, USER_ALICE, "mpim from alice", 0, 0, None, []),
+        (TS_MP2, None, USER_CAROL, "mpim from carol", 0, 0, None, []),
     ]
-    for ts, thread_ts, user_slack, text, reply_count in msgs:
+    msg_channel = {
+        TS_M1: CH_GENERAL, TS_M2: CH_GENERAL, TS_PARENT: CH_GENERAL,
+        TS_R1: CH_GENERAL, TS_R2: CH_GENERAL,
+        TS_DM1: CH_DM_AB, TS_DM2: CH_DM_AB,
+        TS_MP1: CH_MPIM_ABC, TS_MP2: CH_MPIM_ABC,
+    }
+    for ts, thread_ts, user_slack, text, reply_count, ruc, latest, rusers in msgs:
         await pool.execute(
             """
             INSERT INTO app_slack.messages
-                (id, channel_pk, user_pk, ts, thread_ts, text, reply_count)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
+                (id, channel_pk, user_pk, ts, thread_ts, text, reply_count,
+                 reply_users_count, latest_reply, reply_users)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb)
             """,
-            uuid4(), chan_pks[CH_GENERAL], user_pks[user_slack], ts, thread_ts,
-            text, reply_count,
+            uuid4(), chan_pks[msg_channel[ts]], user_pks[user_slack], ts, thread_ts,
+            text, reply_count, ruc, latest, json.dumps(rusers),
         )
 
     return run_id
@@ -235,6 +284,12 @@ async def client(pool, run_id):
 @pytest.fixture
 def auth_header() -> dict[str, str]:
     return {"Authorization": f"Bearer {BOT_TOKEN}"}
+
+
+@pytest.fixture
+def user_auth_header() -> dict[str, str]:
+    """alice's xoxp user token — reads her DMs (im) and group DMs (mpim)."""
+    return {"Authorization": f"Bearer {ALICE_USER_TOKEN}"}
 
 
 @pytest.fixture

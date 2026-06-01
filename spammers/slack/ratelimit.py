@@ -16,9 +16,11 @@ from spammers.slack.responses import SlackJSONResponse as JSONResponse
 from spammers.slack.state import state
 
 
-async def check(method: str, *, identity: str) -> Optional[JSONResponse]:
+async def check(
+    method: str, *, identity: str, app_distribution: str = "marketplace"
+) -> Optional[JSONResponse]:
     """Return None if allowed, else a 429 JSONResponse with Retry-After."""
-    cap, refill = slack_tier_for(method)
+    cap, refill = slack_tier_for(method, app_distribution)
     st = state()
     ok, retry, _bucket = await st.rate_limiter.take(
         key=f"slack:{method}:{identity}",

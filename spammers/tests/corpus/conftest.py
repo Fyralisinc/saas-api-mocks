@@ -29,6 +29,14 @@ async def run_id(pool):
         str(FIXTURES / "tiny.events.jsonl"),
     )
     yield rid
+    # Tear down child-first: app_slack.messages.user_pk and app_slack.users.person_id
+    # reference users/people WITHOUT ON DELETE CASCADE, so a bare run-delete trips
+    # those FKs. Dropping channels first cascades messages away; dropping the
+    # workspace then cascades its users, leaving the run-delete free to cascade
+    # org.people.
+    ws_filter = "workspace_id IN (SELECT id FROM app_slack.workspaces WHERE run_id = $1)"
+    await pool.execute(f"DELETE FROM app_slack.channels WHERE {ws_filter}", rid)
+    await pool.execute("DELETE FROM app_slack.workspaces WHERE run_id = $1", rid)
     await pool.execute("DELETE FROM org.runs WHERE id = $1", rid)
 
 

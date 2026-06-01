@@ -18,8 +18,77 @@ import structlog
 from spammers.common.clock import get_clock
 from spammers.common.ids import (
     drive_file_id, gcal_event_id, gcal_ical_uid, github_sha,
-    gmail_message_id, gmail_thread_id, notion_id,
+    gmail_message_id, gmail_thread_id, notion_id, slack_user_token,
 )
+
+
+_DM_USER_SCOPES = ["im:read", "im:history", "mpim:read", "mpim:history", "users:read"]
+
+
+async def provision_slack_user_tokens(
+    pool: asyncpg.Pool,
+    run_id: UUID,
+    *,
+    handles: Optional[list[str]] = None,
+) -> dict[str, str]:
+    """Mint per-user xoxp tokens for DM ingestion (the consent rows).
+
+    Mirrors the doc's per-user DM control plane: each consenting human gets an
+    xoxp user token scoped to im/mpim. With ``handles=None`` we enrol every user
+    who participates in any 1:1 or group DM (membership or message authorship).
+    Returns ``{slack_user_id: xoxp_token}``. Idempotent per (workspace, user).
+
+    Fyralis normally obtains these via OAuth (authed_user.access_token); this is
+    a convenience for frozen Director runs that want DM coverage without driving
+    a per-user OAuth dance.
+    """
+    if handles:
+        rows = await pool.fetch(
+            """
+            SELECT u.id AS user_pk, u.workspace_id, u.slack_user_id
+              FROM app_slack.users u
+              JOIN app_slack.workspaces w ON w.id = u.workspace_id
+              JOIN org.people p ON p.id = u.person_id
+             WHERE w.run_id = $1 AND p.handle = ANY($2::text[])
+            """,
+            run_id, handles,
+        )
+    else:
+        rows = await pool.fetch(
+            """
+            SELECT DISTINCT u.id AS user_pk, u.workspace_id, u.slack_user_id
+              FROM app_slack.users u
+              JOIN app_slack.workspaces w ON w.id = u.workspace_id
+             WHERE w.run_id = $1
+               AND u.id IN (
+                     SELECT cm.user_pk
+                       FROM app_slack.channel_membership cm
+                       JOIN app_slack.channels c ON c.id = cm.channel_pk
+                      WHERE c.is_im OR c.is_mpim
+                     UNION
+                     SELECT m.user_pk
+                       FROM app_slack.messages m
+                       JOIN app_slack.channels c ON c.id = m.channel_pk
+                      WHERE (c.is_im OR c.is_mpim) AND m.user_pk IS NOT NULL
+                   )
+            """,
+            run_id,
+        )
+    out: dict[str, str] = {}
+    for r in rows:
+        token = slack_user_token()
+        await pool.execute(
+            """
+            INSERT INTO app_slack.user_tokens (id, workspace_id, slack_user_id, user_token, scopes)
+            VALUES ($1, $2, $3, $4, $5::jsonb)
+            ON CONFLICT (workspace_id, slack_user_id) DO UPDATE
+              SET user_token = EXCLUDED.user_token, scopes = EXCLUDED.scopes, revoked_at = NULL
+            """,
+            uuid4(), r["workspace_id"], r["slack_user_id"], token, json.dumps(_DM_USER_SCOPES),
+        )
+        out[r["slack_user_id"]] = token
+    log.info("slack_user_tokens_provisioned", run_id=str(run_id), count=len(out))
+    return out
 
 
 log = structlog.get_logger("spammers.orggen.live")

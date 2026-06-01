@@ -509,6 +509,23 @@ async def _slack_channel_create(ctx: ReplayContext, event: Event) -> None:
         )
         await ctx.idmap.put(p["id"], "slack_channel", pk)
 
+    # Seed channel_membership from the payload's explicit participants. A DM's
+    # membership is intrinsic in real Slack: every participant sees the
+    # conversation under their user token whether or not they ever posted. So we
+    # persist it at creation rather than deriving it from who happened to author
+    # a message (which would hide receive-only participants and mis-resolve an
+    # im's `user` counterpart).
+    for ref in p.get("participants") or []:
+        try:
+            member_pk = await _ensure_slack_user(ctx, ref)
+        except KeyError:
+            continue  # participant not in this run's people — skip, like messages do
+        await ctx.pool.execute(
+            "INSERT INTO app_slack.channel_membership (channel_pk, user_pk, joined_at) "
+            "VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",
+            pk, member_pk, when,
+        )
+
 
 @register("slack", "message")
 async def _slack_message(ctx: ReplayContext, event: Event) -> None:

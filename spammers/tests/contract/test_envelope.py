@@ -28,12 +28,12 @@ async def test_success_is_200_ok_true(client, auth_header):
 
 
 async def test_logical_error_is_http_200(client):
-    # No auth → invalid_auth. Real Slack returns HTTP 200 with ok:false.
+    # No auth → not_authed. Real Slack returns HTTP 200 with ok:false.
     r = await client.post("/api/conversations.history", params={"channel": CH_GENERAL})
     assert r.status_code == 200
     body = r.json()
     assert body["ok"] is False
-    assert body["error"] == "invalid_auth"
+    assert body["error"] == "not_authed"
 
 
 async def test_content_type_includes_charset(client, auth_header):

@@ -102,26 +102,40 @@ class RateLimiter:
 
 # ---------- Provider-specific helpers ----------
 
-# Slack tier table (approximate; matches Slack's published guidance).
-# Tier 1: ~1/min, Tier 2: ~20/min, Tier 3: ~50/min, Tier 4: ~100+/min.
-# We model the sustained refill rate, with bursts allowed up to ``capacity``.
+# Slack tier table. Published guidance:
+#   Tier 1 ~1/min, Tier 2 ~20/min, Tier 3 ~50/min, Tier 4 ~100+/min.
+# Capacity (burst) is set to roughly the per-minute number; refill is the
+# sustained per-second rate. chat.postMessage is "Special" (1 msg/sec/channel);
+# auth.test is "Special" (hundreds/min).
 SLACK_TIER_CONFIG: Dict[str, Tuple[float, float]] = {
-    # method-specific override: chat.postMessage is special — 1/sec per channel.
-    "chat.postMessage": (5.0, 1.0),
+    "chat.postMessage": (1.0, 1.0),               # Special: ~1/sec per channel
+    "chat.update":       (50.0, 50.0 / 60.0),     # Tier 3
+    "chat.delete":       (50.0, 50.0 / 60.0),     # Tier 3
     "users.info":        (100.0, 100.0 / 60.0),   # Tier 4 (~100/min)
-    "users.list":        (10.0, 20.0 / 60.0),     # Tier 2 (~20/min)
+    "users.list":        (20.0, 20.0 / 60.0),     # Tier 2 (~20/min)
     "conversations.info":   (50.0, 50.0 / 60.0),  # Tier 3 (~50/min)
-    "conversations.list":   (10.0, 20.0 / 60.0),  # Tier 2 (~20/min)
-    "conversations.history": (50.0, 50.0 / 60.0),  # Tier 3 (~50/min) — Marketplace/internal app
-    "conversations.replies": (50.0, 50.0 / 60.0),  # Tier 3 (~50/min) — Marketplace/internal app
+    "conversations.list":   (20.0, 20.0 / 60.0),  # Tier 2 (~20/min)
+    "conversations.history": (50.0, 50.0 / 60.0),  # Tier 3 — Marketplace/internal
+    "conversations.replies": (50.0, 50.0 / 60.0),  # Tier 3 — Marketplace/internal
     "conversations.members": (100.0, 100.0 / 60.0),  # Tier 4 (~100/min)
-    "team.info":         (10.0, 50.0 / 60.0),     # Tier 3 (~50/min)
-    "auth.test":         (100.0, 100.0 / 60.0),   # Tier 4 (~100/min)
+    "team.info":         (50.0, 50.0 / 60.0),     # Tier 3 (~50/min)
+    "auth.test":         (300.0, 300.0 / 60.0),   # Special: hundreds/min
 }
 
+# Post-2025-05-29: non-Marketplace apps are capped to 1 req/min on these two
+# methods (and limit<=15 objects/page, enforced in the route).
+_NON_MARKETPLACE_TIER1 = {"conversations.history", "conversations.replies"}
 
-def slack_tier_for(method: str) -> Tuple[float, float]:
-    """Return ``(capacity, refill_per_sec)`` for a Slack Web API method."""
+
+def slack_tier_for(method: str, app_distribution: str = "marketplace") -> Tuple[float, float]:
+    """Return ``(capacity, refill_per_sec)`` for a Slack Web API method.
+
+    ``app_distribution`` ("marketplace" | "non_marketplace") selects the
+    post-2025 1-req/min cap on conversations.history/replies for non-Marketplace
+    apps; everything else is app-class-independent.
+    """
+    if app_distribution != "marketplace" and method in _NON_MARKETPLACE_TIER1:
+        return (1.0, 1.0 / 60.0)
     return SLACK_TIER_CONFIG.get(method, (60.0, 1.0))
 
 

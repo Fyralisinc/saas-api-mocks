@@ -88,12 +88,50 @@ def slack_signing_secret() -> str:
     return _rand(_HEX, 32)
 
 
+def slack_dm_channel_id() -> str:
+    """1:1 DM (im) channel id — real Slack prefixes these with 'D'."""
+    return "D" + _rand(_UPPER_ALNUM, 9)
+
+
+def slack_mpim_channel_id() -> str:
+    """Group-DM (mpim) channel id — legacy Slack prefixes these with 'G'."""
+    return "G" + _rand(_UPPER_ALNUM, 9)
+
+
+def slack_bot_id(bot_user_id: Optional[str] = None) -> str:
+    """Bot id ('B…'), distinct from the bot's user id ('U…').
+
+    When a bot user id is supplied we derive a stable B-id from it (same bot →
+    same bot_id); otherwise we mint a fresh one.
+    """
+    if bot_user_id and bot_user_id.startswith("U"):
+        return "B" + bot_user_id[1:]
+    return "B" + _rand(_UPPER_ALNUM, 9)
+
+
 def slack_ts(when: datetime) -> str:
     """Slack ts: 'seconds.microseconds' with 6-digit micros."""
     if when.tzinfo is None:
         when = when.replace(tzinfo=timezone.utc)
     secs = int(when.timestamp())
     micros = when.microsecond
+    return f"{secs}.{micros:06d}"
+
+
+def bump_slack_ts(ts: str) -> str:
+    """Return the next strictly-greater ts in Slack's 'secs.6-digit' format.
+
+    Slack guarantees a message ts is unique *within a channel* and never reuses
+    a raw wall-clock value — it disambiguates collisions. We mirror that: a
+    caller that hits a per-channel ts collision bumps the fractional micros by
+    one (carrying into seconds), so successive messages strictly increase.
+    """
+    secs_s, _, frac_s = ts.partition(".")
+    secs = int(secs_s)
+    micros = int((frac_s or "0")[:6].ljust(6, "0")) + 1
+    if micros >= 1_000_000:
+        secs += micros // 1_000_000
+        micros %= 1_000_000
     return f"{secs}.{micros:06d}"
 
 

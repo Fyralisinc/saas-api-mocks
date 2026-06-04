@@ -49,6 +49,7 @@ async def resolve_installation(request: Request) -> Optional[dict]:
            AND oi.provider = 'github'
            AND oi.access_token = $2
            AND oi.revoked_at IS NULL
+           AND inst.suspended_at IS NULL
            AND (oi.expires_at IS NULL OR oi.expires_at > now())
          LIMIT 1
         """,

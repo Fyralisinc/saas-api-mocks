@@ -91,6 +91,22 @@ def create_app() -> FastAPI:
     async def health():
         return {"ok": True, "service": "github-mock"}
 
+    @app.post("/_control/secondary_limit")
+    async def arm_secondary(request: Request):
+        """Mock-only control (not a GitHub route): arm the next ``count`` requests
+        for an installation to hit the secondary rate limit (429 + Retry-After)."""
+        from spammers.github.ratelimit import arm_secondary_limit
+        qp = request.query_params
+        try:
+            installation_id = int(qp["installation_id"])
+        except (KeyError, ValueError):
+            return GitHubJSONResponse({"message": "installation_id (int) required"}, status_code=400)
+        count = int(qp.get("count", 1))
+        retry_after = int(qp.get("retry_after", 60))
+        arm_secondary_limit(installation_id, count=count, retry_after=retry_after)
+        return {"armed": True, "installation_id": installation_id,
+                "count": count, "retry_after": retry_after}
+
     return app
 
 

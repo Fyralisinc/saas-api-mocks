@@ -22,6 +22,11 @@ from spammers.github.state import state
 router = APIRouter()
 
 _DOCS = "https://docs.github.com/rest"
+# GitHub points App/installation 404s at the apps docs. A consumer treats a 404
+# whose documentation_url is under /rest/apps/(apps|installations) as a
+# revocation signal (the installation is gone/suspended) — so these MUST use the
+# apps URL, distinct from the generic /rest 404s elsewhere.
+_APPS_DOCS = "https://docs.github.com/rest/apps/apps"
 
 
 def _unauthorized() -> JSONResponse:
@@ -59,7 +64,7 @@ async def get_installation(request: Request, installation_id: int):
         app["id"], installation_id,
     )
     if row is None:
-        return JSONResponse(github_error("Not Found", documentation_url=_DOCS), status_code=404)
+        return JSONResponse(github_error("Not Found", documentation_url=_APPS_DOCS), status_code=404)
     return JSONResponse(installation_dto(dict(row), app["app_id"]))
 
 
@@ -73,8 +78,10 @@ async def create_access_token(request: Request, installation_id: int):
         "SELECT * FROM app_github.installations WHERE app_pk = $1 AND installation_id = $2",
         app["id"], installation_id,
     )
-    if inst is None:
-        return JSONResponse(github_error("Not Found", documentation_url=_DOCS), status_code=404)
+    # A suspended/deleted installation can't mint tokens — GitHub 404s with the
+    # apps documentation_url, which the consumer reads as a revocation signal.
+    if inst is None or inst["suspended_at"] is not None:
+        return JSONResponse(github_error("Not Found", documentation_url=_APPS_DOCS), status_code=404)
 
     token = github_installation_token()
     expires_at = datetime.now(timezone.utc) + timedelta(hours=1)

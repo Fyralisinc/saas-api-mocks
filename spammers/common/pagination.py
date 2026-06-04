@@ -53,19 +53,29 @@ def github_link_header(
 ) -> Optional[str]:
     """Build the ``Link:`` value GitHub returns on paginated responses.
 
+    GitHub only emits the relations that make sense for the current position
+    (https://docs.github.com/rest/using-the-rest-api/using-pagination-in-the-rest-api):
+      - first page  → ``next``, ``last`` (no ``prev``/``first``)
+      - middle page → ``prev``, ``next``, ``last``, ``first``
+      - last page   → ``prev``, ``first`` (no ``next``/``last``)
+    so ``first``/``prev`` only appear past page 1, and ``next``/``last`` only
+    appear before the final page. Order matches GitHub's own (prev, next, last,
+    first).
+
     e.g. ``<https://api.github.com/installation/repositories?per_page=30&page=2>; rel="next",
            <https://api.github.com/installation/repositories?per_page=30&page=5>; rel="last"``
     """
     if total_pages <= 1:
         return None
     rels: list[str] = []
-    if page < total_pages:
-        rels.append(f'<{base_url}{path}?per_page={per_page}&page={page + 1}>; rel="next"')
     if page > 1:
         rels.append(f'<{base_url}{path}?per_page={per_page}&page={page - 1}>; rel="prev"')
-    rels.append(f'<{base_url}{path}?per_page={per_page}&page={total_pages}>; rel="last"')
-    rels.append(f'<{base_url}{path}?per_page={per_page}&page=1>; rel="first"')
-    return ", ".join(rels)
+    if page < total_pages:
+        rels.append(f'<{base_url}{path}?per_page={per_page}&page={page + 1}>; rel="next"')
+        rels.append(f'<{base_url}{path}?per_page={per_page}&page={total_pages}>; rel="last"')
+    if page > 1:
+        rels.append(f'<{base_url}{path}?per_page={per_page}&page=1>; rel="first"')
+    return ", ".join(rels) or None
 
 
 # ---------- Gmail nextPageToken ----------

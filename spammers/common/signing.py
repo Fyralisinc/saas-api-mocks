@@ -80,6 +80,17 @@ def github_verify(secret: Union[str, bytes], header: str, body: Union[str, bytes
     return hmac.compare_digest(expected, header or "")
 
 
+def github_sign_sha1(secret: Union[str, bytes], body: Union[str, bytes]) -> str:
+    """Return the value for the legacy ``X-Hub-Signature`` header.
+
+    Real GitHub still sends the SHA-1 signature alongside ``X-Hub-Signature-256``
+    on every delivery when a webhook secret is configured:
+    ``sha1=`` + hex(HMAC-SHA1(secret, body)).
+    """
+    mac = hmac.new(_to_bytes(secret), _to_bytes(body), hashlib.sha1).hexdigest()  # noqa: S324
+    return f"sha1={mac}"
+
+
 def generate_rsa_keypair(key_size: int = 2048) -> tuple[str, str]:
     """Return ``(private_pem, public_pem)`` for a GitHub App.
 

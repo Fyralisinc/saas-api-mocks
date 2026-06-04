@@ -16,7 +16,6 @@ from spammers.common.errors import github_error
 from spammers.common.pagination import github_link_header
 from spammers.github.auth import resolve_installation
 from spammers.github.dto import (
-    _jsonb,
     _login_id,
     branch_dto,
     check_run_dto,
@@ -25,6 +24,7 @@ from spammers.github.dto import (
     issue_comment_dto,
     issue_dto,
     label_dto,
+    label_names,
     pr_as_issue_dto,
     pull_request_dto,
     review_dto,
@@ -37,6 +37,24 @@ router = APIRouter()
 
 _API_BASE = "https://api.github.com"
 _DOCS = "https://docs.github.com/rest"
+
+# GitHub's documented `sort` values for issues/pulls map to row timestamps. We
+# model `created`/`updated`; unmodeled values (comments/popularity/long-running)
+# fall back to created, like a freshly-created repo with no such signal.
+_SORT_COL = {"created": "created_at", "updated": "updated_at"}
+
+
+def _order(sort: str, direction: str) -> tuple[str, str]:
+    """Resolve (column, SQL direction) from GitHub's sort/direction params.
+
+    Real GitHub honours ``sort``/``direction`` on the issues and pulls lists
+    (defaults: ``sort=created&direction=desc``); a consumer that scans with
+    ``sort=updated&direction=asc`` (as Fyralis does) depends on that ordering for
+    its cursor + reconciler baseline, so the mock must not silently re-sort.
+    """
+    col = _SORT_COL.get(sort, "created_at")
+    sql_dir = "ASC" if str(direction).lower() == "asc" else "DESC"
+    return col, sql_dir
 
 
 async def _ctx(request: Request, owner: str, repo: str):
@@ -78,6 +96,7 @@ def _paginate(rows: list, per_page: int, page: int, path: str, headers: dict) ->
 async def list_pulls(
     request: Request, owner: str, repo: str,
     state_: str = Query("open", alias="state"),
+    sort: str = Query("created"), direction: str = Query("desc"),
     per_page: int = Query(30), page: int = Query(1),
 ):
     repo_row, headers, err = await _ctx(request, owner, repo)
@@ -89,8 +108,10 @@ async def list_pulls(
     if state_ in ("open", "closed"):
         where += " AND state = $2"
         args.append(state_)
+    col, sql_dir = _order(sort, direction)
     rows = await state().pool.fetch(
-        f"SELECT * FROM app_github.pull_requests WHERE {where} ORDER BY number DESC", *args
+        f"SELECT * FROM app_github.pull_requests WHERE {where} "
+        f"ORDER BY {col} {sql_dir}, number {sql_dir}", *args
     )
     dtos = [pull_request_dto(dict(r), full, repo_row) for r in rows]
     page_rows, out = _paginate(dtos, per_page, page, f"/repos/{full}/pulls", headers)
@@ -139,11 +160,13 @@ async def list_reviews(
 async def list_issues(
     request: Request, owner: str, repo: str,
     state_: str = Query("open", alias="state"),
+    sort: str = Query("created"), direction: str = Query("desc"),
     per_page: int = Query(30), page: int = Query(1),
 ):
     # On real GitHub, pull requests ARE issues and appear in this list too
-    # (each PR carries a ``pull_request`` key). We merge issues + PRs, ordered
-    # by number descending, like GitHub's default sort.
+    # (each PR carries a ``pull_request`` key). We merge issues + PRs and honour
+    # the requested sort/direction (default created/desc) — a forward-scanning
+    # consumer (sort=updated&direction=asc) relies on that order for its cursor.
     repo_row, headers, err = await _ctx(request, owner, repo)
     if err:
         return err
@@ -168,7 +191,11 @@ async def list_issues(
 
     combined = [(r["number"], issue_dto(dict(r), full, comments=r["comment_count"])) for r in issue_rows]
     combined += [(r["number"], pr_as_issue_dto(dict(r), full)) for r in pr_rows]
-    combined.sort(key=lambda t: t[0], reverse=True)
+    # Sort on the DTO's ISO timestamp (lexically chronological), number as a
+    # stable tiebreak; both in the requested direction.
+    field = "updated_at" if sort == "updated" else "created_at"
+    reverse = str(direction).lower() != "asc"
+    combined.sort(key=lambda t: (t[1].get(field) or "", t[0]), reverse=reverse)
     dtos = [d for _, d in combined]
 
     page_rows, out = _paginate(dtos, per_page, page, f"/repos/{full}/issues", headers)
@@ -266,7 +293,8 @@ async def get_commit(request: Request, owner: str, repo: str, sha: str):
     )
     if row is None:
         return JSONResponse(github_error("Not Found", documentation_url=_DOCS), status_code=404, headers=headers)
-    return JSONResponse(commit_dto(dict(row), repo_row["full_name"]), headers=headers)
+    # The single-commit GET includes the per-file diff (the list endpoint omits it).
+    return JSONResponse(commit_dto(dict(row), repo_row["full_name"], include_files=True), headers=headers)
 
 
 @router.get("/repos/{owner}/{repo}/commits/{ref}/check-runs")
@@ -333,7 +361,7 @@ async def list_labels(
         """,
         repo_row["id"],
     )
-    names = sorted({n for r in rows for n in _jsonb(r["labels"])})
+    names = sorted({n for r in rows for n in label_names(r["labels"])})
     labels = [label_dto(n, full) for n in names]
     page_rows, out = _paginate(labels, per_page, page, f"/repos/{full}/labels", headers)
     return JSONResponse(page_rows, headers=out)

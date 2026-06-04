@@ -193,6 +193,16 @@ def github_delivery_id() -> str:
     return f"{_rand(_HEX, 8)}-{_rand(_HEX, 4)}-{_rand(_HEX, 4)}-{_rand(_HEX, 4)}-{_rand(_HEX, 12)}"
 
 
+def github_hook_id(app_id: int) -> int:
+    """Stable per-App webhook hook id (X-GitHub-Hook-ID).
+
+    Real GitHub assigns one hook id when the App's webhook is created and reuses
+    it across every delivery, so we derive a deterministic 9-digit-ish int from
+    the app id rather than minting a fresh one per event.
+    """
+    return 400_000_000 + (int(app_id) % 100_000_000)
+
+
 def github_sha() -> str:
     return _rand(_HEX, 40)
 

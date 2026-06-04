@@ -42,6 +42,29 @@ def _headers(w: dict) -> dict[str, str]:
     }
 
 
+_SECONDARY_DOCS = (
+    "https://docs.github.com/rest/overview/rate-limits-for-the-rest-api"
+    "#about-secondary-rate-limits"
+)
+
+
+def arm_secondary_limit(installation_id: int, *, count: int = 1, retry_after: int = 60) -> None:
+    """Arm the next ``count`` requests for this installation to hit the secondary
+    (abuse) rate limit — a 429 with ``Retry-After`` — exactly like GitHub does
+    under bursty traffic. Lets a consumer's Retry-After backoff be exercised."""
+    state().secondary[installation_id] = {"remaining": int(count), "retry_after": int(retry_after)}
+
+
+def _take_secondary(installation_id: int) -> Optional[int]:
+    s = state().secondary.get(installation_id)
+    if not s or s["remaining"] <= 0:
+        return None
+    s["remaining"] -= 1
+    if s["remaining"] <= 0:
+        state().secondary.pop(installation_id, None)
+    return s["retry_after"]
+
+
 async def check(request: Request, installation_id: int) -> Tuple[dict[str, str], Optional[GitHubJSONResponse]]:
     """Consume one unit. Returns ``(headers, error_response_or_None)``.
 
@@ -50,6 +73,20 @@ async def check(request: Request, installation_id: int) -> Tuple[dict[str, str],
     """
     request.state.gh_rl_installation = installation_id
     w = _window(installation_id)
+
+    # Secondary (abuse) limit: a 429 + Retry-After that does NOT exhaust the
+    # primary quota — GitHub returns this under bursty traffic (common during
+    # PR-review / check-run fan-out). Checked before consuming a primary unit.
+    retry_after = _take_secondary(installation_id)
+    if retry_after is not None:
+        headers = {**_headers(w), "Retry-After": str(retry_after)}
+        body = github_error(
+            "You have exceeded a secondary rate limit. Please wait a few minutes "
+            "before you try again.",
+            documentation_url=_SECONDARY_DOCS,
+        )
+        return headers, GitHubJSONResponse(body, status_code=429, headers=headers)
+
     w["used"] += 1
     headers = _headers(w)
     if w["used"] > LIMIT:

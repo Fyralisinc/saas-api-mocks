@@ -20,6 +20,10 @@ class GitHubMockState:
     # Fixed hourly rate-limit windows, keyed by installation id:
     # {installation_id: {"reset": epoch_seconds, "used": int}}
     windows: dict = field(default_factory=dict)
+    # Armed secondary (abuse) rate limits, keyed by installation id:
+    # {installation_id: {"remaining": int, "retry_after": int}} — each consumes
+    # one armed unit and returns a 429 + Retry-After, like GitHub's abuse limit.
+    secondary: dict = field(default_factory=dict)
 
 
 _STATE: Optional[GitHubMockState] = None

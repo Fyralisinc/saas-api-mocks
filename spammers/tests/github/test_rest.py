@@ -26,6 +26,7 @@ async def test_installation_repositories(gh_client, install_token):
 
 
 async def test_repositories_pagination_link_header(gh_client, install_token):
+    # First page (of 3): GitHub emits only next + last, never prev/first.
     r = await gh_client.get(
         "/installation/repositories", params={"per_page": 1, "page": 1},
         headers=_auth(install_token),
@@ -34,6 +35,28 @@ async def test_repositories_pagination_link_header(gh_client, install_token):
     assert len(r.json()["repositories"]) == 1
     link = r.headers.get("Link")
     assert link and 'rel="next"' in link and 'rel="last"' in link
+    assert 'rel="prev"' not in link and 'rel="first"' not in link
+
+
+async def test_pagination_link_header_middle_and_last_pages(gh_client, install_token):
+    # Middle page (2 of 3): all four relations present.
+    mid = await gh_client.get(
+        "/installation/repositories", params={"per_page": 1, "page": 2},
+        headers=_auth(install_token),
+    )
+    link = mid.headers.get("Link")
+    assert link
+    for rel in ('rel="prev"', 'rel="next"', 'rel="last"', 'rel="first"'):
+        assert rel in link
+
+    # Last page (3 of 3): GitHub emits only prev + first, never next/last.
+    last = await gh_client.get(
+        "/installation/repositories", params={"per_page": 1, "page": 3},
+        headers=_auth(install_token),
+    )
+    link = last.headers.get("Link")
+    assert link and 'rel="prev"' in link and 'rel="first"' in link
+    assert 'rel="next"' not in link and 'rel="last"' not in link
 
 
 async def test_rate_limit_headers_present(gh_client, install_token):

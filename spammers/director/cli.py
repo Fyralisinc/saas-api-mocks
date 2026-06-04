@@ -35,6 +35,7 @@ from spammers.orggen.live import (
     inject_drive_file,
     inject_gmail_message,
     inject_github_event,
+    inject_github_lifecycle,
     inject_jira_issue,
     inject_notion_page,
     inject_slack_message,
@@ -184,9 +185,16 @@ async def _cmd_inject(args: argparse.Namespace) -> int:
         _eprint("error: no run found")
         return 2
     if args.provider == "github":
-        event_id = await inject_github_event(
-            pool, rid, kind=args.kind, repo=args.repo, handle=args.handle, title=args.text,
-        )
+        if args.kind in ("installation", "installation_repositories", "ping"):
+            repos = args.repo.split(",") if (args.repo and args.kind == "installation_repositories") else None
+            event_id = await inject_github_lifecycle(
+                pool, rid, kind=args.kind, action=args.action, repos=repos, handle=args.handle,
+            )
+        else:
+            event_id = await inject_github_event(
+                pool, rid, kind=args.kind, action=args.action, number=args.number,
+                repo=args.repo, handle=args.handle, title=args.text,
+            )
     elif args.provider == "discord":
         if args.kind == "interaction":
             event_id = await inject_discord_interaction(
@@ -357,9 +365,18 @@ def main() -> None:
                        default="slack")
     p_inj.add_argument("--handle", default=None, help="org.people.handle (default: random)")
     p_inj.add_argument("--channel", default="#general", help="slack/discord channel")
-    p_inj.add_argument("--kind", choices=["pull_request", "issues", "message", "interaction", "file", "trash"],
+    p_inj.add_argument("--kind",
+                       choices=["pull_request", "issues", "push", "pull_request_review",
+                                "issue_comment", "check_run", "installation",
+                                "installation_repositories", "ping",
+                                "message", "interaction", "file", "trash"],
                        default="pull_request",
-                       help="github event kind · discord message/interaction · drive file/trash")
+                       help="github event/lifecycle kind · discord message/interaction · drive file/trash")
+    p_inj.add_argument("--action", default=None,
+                       help="github webhook action (opened/closed/merged/reopened/synchronize/"
+                            "edited; installation suspend/unsuspend/deleted; repos added/removed)")
+    p_inj.add_argument("--number", type=int, default=None,
+                       help="github PR/issue number to target (reviews, comments, transitions)")
     p_inj.add_argument("--repo", default=None, help="github repo name (default: first)")
     p_inj.add_argument("--target", default=None,
                        help="notion database / gmail recipient handle / calendar attendee handle")

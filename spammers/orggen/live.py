@@ -94,100 +94,6 @@ async def provision_slack_user_tokens(
 log = structlog.get_logger("spammers.orggen.live")
 
 
-async def inject_github_event(
-    pool: asyncpg.Pool,
-    run_id: UUID,
-    *,
-    kind: str = "pull_request",
-    repo: Optional[str] = None,
-    handle: Optional[str] = None,
-    title: Optional[str] = None,
-    at_virtual: Optional[datetime] = None,
-) -> UUID:
-    """Create a live GitHub entity (``pull_request`` or ``issues``) + a
-    not-historical timeline event the emission loop will webhook.
-
-    The entity is projected immediately (so REST reads see it); the event drives
-    the outbound webhook. Returns the new timeline event id.
-    """
-    if kind not in ("pull_request", "issues"):
-        raise ValueError(f"unsupported kind: {kind}")
-
-    person = await pool.fetchrow(
-        "SELECT id, handle FROM org.people WHERE run_id = $1 AND ($2::text IS NULL OR handle = $2) "
-        "ORDER BY (handle = $2) DESC, random() LIMIT 1",
-        run_id, handle,
-    )
-    if person is None:
-        raise LookupError("no people in this run; did you forget `prepare`?")
-
-    repo_row = await pool.fetchrow(
-        """
-        SELECT r.id, r.owner, r.name, r.full_name
-          FROM app_github.repositories r
-          JOIN app_github.installations inst ON inst.id = r.installation_pk
-          JOIN app_github.apps a ON a.id = inst.app_pk
-         WHERE a.run_id = $1 AND ($2::text IS NULL OR r.name = $2 OR r.full_name = $2)
-         ORDER BY r.name LIMIT 1
-        """,
-        run_id, repo,
-    )
-    if repo_row is None:
-        raise LookupError("no github repositories in this run; did you forget `prepare`?")
-
-    clock = await get_clock(pool, run_id)
-    when = at_virtual or clock.virtual_now
-    if when.tzinfo is None:
-        when = when.replace(tzinfo=timezone.utc)
-
-    number = (await pool.fetchval(
-        """
-        SELECT COALESCE(MAX(n), 0) + 1 FROM (
-            SELECT number AS n FROM app_github.pull_requests WHERE repo_pk = $1
-            UNION ALL
-            SELECT number AS n FROM app_github.issues WHERE repo_pk = $1
-        ) s
-        """,
-        repo_row["id"],
-    ))
-
-    etype = f"github.{kind}"
-    event_id = uuid4()
-    await pool.execute(
-        """
-        INSERT INTO timeline.events (id, run_id, virtual_ts, type, actor_id, payload, is_historical)
-        VALUES ($1, $2, $3, $4, $5, $6::jsonb, FALSE)
-        """,
-        event_id, run_id, when, etype, person["id"],
-        json.dumps({"action": "opened", "repo": repo_row["full_name"], "number": number}),
-    )
-
-    if kind == "pull_request":
-        await pool.execute(
-            """
-            INSERT INTO app_github.pull_requests
-                (id, repo_pk, number, title, body, state, merged, user_login, head_ref,
-                 head_sha, base_sha, created_at, updated_at, timeline_event_id)
-            VALUES ($1,$2,$3,$4,$5,'open',FALSE,$6,$7,$8,$9,$10,$10,$11)
-            """,
-            uuid4(), repo_row["id"], number, title or f"Live PR #{number}", "Injected live.",
-            person["handle"], f"feature/{repo_row['name']}-{number}", github_sha(),
-            github_sha(), when, event_id,
-        )
-    else:
-        await pool.execute(
-            """
-            INSERT INTO app_github.issues
-                (id, repo_pk, number, title, body, state, user_login, created_at, updated_at, timeline_event_id)
-            VALUES ($1,$2,$3,$4,$5,'open',$6,$7,$7,$8)
-            """,
-            uuid4(), repo_row["id"], number, title or f"Live issue #{number}", "Injected live.",
-            person["handle"], when, event_id,
-        )
-
-    return event_id
-
-
 async def inject_slack_message(
     pool: asyncpg.Pool,
     run_id: UUID,
@@ -343,30 +249,26 @@ async def inject_discord_interaction(
     return event_id
 
 
-async def inject_github_event(
-    pool: asyncpg.Pool,
-    run_id: UUID,
-    *,
-    kind: str = "pull_request",
-    repo: Optional[str] = None,
-    handle: Optional[str] = None,
-    title: Optional[str] = None,
-    at_virtual: Optional[datetime] = None,
-) -> UUID:
-    """Create a live GitHub entity (``pull_request`` or ``issues``) and a
-    not-historical timeline event so the emission loop webhooks it.
+# Content event kinds injectable as live GitHub webhooks, with GitHub's default
+# webhook action for each (``push`` carries no action).
+_GH_CONTENT_KINDS = (
+    "pull_request", "issues", "push",
+    "pull_request_review", "issue_comment", "check_run",
+)
+_GH_DEFAULT_ACTION = {
+    "pull_request": "opened",
+    "issues": "opened",
+    "pull_request_review": "submitted",
+    "issue_comment": "created",
+    "check_run": "completed",
+}
+_GH_LIFECYCLE_KINDS = ("installation", "installation_repositories", "ping")
 
-    The entity is projected immediately (the resource exists when opened), so
-    REST reads see it right away; the webhook notifies the consumer. Returns the
-    new event id.
-    """
-    if kind not in ("pull_request", "issues"):
-        raise ValueError(f"unsupported github inject kind: {kind!r}")
 
-    # Resolve the installation's first repo (or the named one) for this run.
-    repo_row = await pool.fetchrow(
+async def _gh_repo_row(pool, run_id: UUID, repo: Optional[str]):
+    row = await pool.fetchrow(
         """
-        SELECT r.id, r.owner, r.name FROM app_github.repositories r
+        SELECT r.id, r.owner, r.name, r.default_branch FROM app_github.repositories r
           JOIN app_github.installations inst ON inst.id = r.installation_pk
           JOIN app_github.apps a ON a.id = inst.app_pk
          WHERE a.run_id = $1 AND ($2::text IS NULL OR r.name = $2 OR (r.owner || '/' || r.name) = $2)
@@ -375,12 +277,12 @@ async def inject_github_event(
         """,
         run_id, repo,
     )
-    if repo_row is None:
+    if row is None:
         raise LookupError(f"no github repo for run {run_id} (repo={repo!r})")
-    repo_pk, owner, name = repo_row["id"], repo_row["owner"], repo_row["name"]
-    full = f"{owner}/{name}"
+    return row
 
-    # Actor: a real person on this run (timeline.events.actor_id is NOT NULL).
+
+async def _gh_person(pool, run_id: UUID, handle: Optional[str]):
     if handle is not None:
         person = await pool.fetchrow(
             "SELECT id, handle FROM org.people WHERE run_id = $1 AND handle = $2", run_id, handle
@@ -391,10 +293,12 @@ async def inject_github_event(
         )
     if person is None:
         raise LookupError(f"no people on run {run_id}; cannot attribute the event")
-    actor_id, login = person["id"], person["handle"]
+    return person["id"], person["handle"]
 
-    # PRs and issues share one number sequence per repo.
-    next_num = await pool.fetchval(
+
+async def _gh_next_number(pool, repo_pk) -> int:
+    # PRs and issues share one number sequence per repo, like real GitHub.
+    return await pool.fetchval(
         """
         SELECT COALESCE(MAX(number), 0) + 1 FROM (
             SELECT number FROM app_github.pull_requests WHERE repo_pk = $1
@@ -405,45 +309,314 @@ async def inject_github_event(
         repo_pk,
     )
 
+
+async def inject_github_event(
+    pool: asyncpg.Pool,
+    run_id: UUID,
+    *,
+    kind: str = "pull_request",
+    action: Optional[str] = None,
+    repo: Optional[str] = None,
+    handle: Optional[str] = None,
+    title: Optional[str] = None,
+    body: Optional[str] = None,
+    number: Optional[int] = None,
+    review_state: str = "approved",
+    check_conclusion: str = "success",
+    at_virtual: Optional[datetime] = None,
+) -> UUID:
+    """Create/transition a live GitHub entity + a not-historical timeline event
+    so the emission loop webhooks it, exactly like real GitHub.
+
+    ``kind`` ∈ {pull_request, issues, push, pull_request_review, issue_comment,
+    check_run}. ``action`` overrides GitHub's default webhook action — for PRs:
+    opened/closed/reopened/synchronize/edited plus the convenience ``merged``
+    (closes the PR with ``merged=true`` and a "closed" action, like GitHub); for
+    issues: opened/closed/reopened/edited. ``number`` targets an existing PR/issue
+    (required for reviews, comments and transitions); when omitted, opened events
+    mint the next shared number. The entity is projected immediately so REST reads
+    see it. Returns the new timeline event id.
+    """
+    if kind not in _GH_CONTENT_KINDS:
+        raise ValueError(f"unsupported github inject kind: {kind!r}")
+
+    repo_row = await _gh_repo_row(pool, run_id, repo)
+    repo_pk, owner, name = repo_row["id"], repo_row["owner"], repo_row["name"]
+    full = f"{owner}/{name}"
+    actor_id, login = await _gh_person(pool, run_id, handle)
+
+    clock = await get_clock(pool, run_id)
+    vnow = at_virtual or clock.virtual_now
+    if vnow.tzinfo is None:
+        vnow = vnow.replace(tzinfo=timezone.utc)
+    # Live objects must get strictly-increasing, DISTINCT timestamps even under a
+    # frozen clock — real GitHub never collides created_at/updated_at, and a
+    # consumer's `updated_at` cursor + reconciler baseline rely on monotonicity.
+    # Bump one second per prior live github event, so each injection (including a
+    # later merge/close) lands strictly after the object's own created_at, and no
+    # two live objects share a timestamp.
+    prior = await pool.fetchval(
+        "SELECT count(*) FROM timeline.events "
+        "WHERE run_id=$1 AND is_historical=FALSE AND type LIKE 'github.%'",
+        run_id,
+    )
+    when = vnow + timedelta(seconds=int(prior) + 1)   # entity (created/updated/…) timestamp
+    emit_ts = vnow                                      # timeline drains at <= virtual_now
+
+    event_id = uuid4()
+    etype = f"github.{kind}"
+
+    async def _emit(payload: dict) -> UUID:
+        await pool.execute(
+            """
+            INSERT INTO timeline.events
+                (id, run_id, virtual_ts, type, actor_id, payload, cross_refs, is_historical)
+            VALUES ($1, $2, $3, $4, $5, $6::jsonb, '{}'::jsonb, FALSE)
+            """,
+            event_id, run_id, emit_ts, etype, actor_id, json.dumps(payload),
+        )
+        return event_id
+
+    # ----------------------------- pull_request -----------------------------
+    if kind == "pull_request":
+        act = action or _GH_DEFAULT_ACTION[kind]
+        if number is None and act in ("opened", "reopened"):
+            number = await _gh_next_number(pool, repo_pk)
+            await _emit({"repo": full, "number": number, "action": act})
+            await pool.execute(
+                """
+                INSERT INTO app_github.pull_requests
+                    (id, repo_pk, number, title, body, state, merged, user_login,
+                     head_ref, head_sha, base_sha, created_at, updated_at, timeline_event_id)
+                VALUES ($1, $2, $3, $4, $5, 'open', FALSE, $6, $7, $8, $9, $10, $10, $11)
+                """,
+                uuid4(), repo_pk, number, title or f"Live PR #{number}", body or "",
+                login, f"feature/live-{number}", github_sha(), github_sha(), when, event_id,
+            )
+            return event_id
+        if number is None:
+            raise ValueError(f"github pull_request action {act!r} needs a `number`")
+        merged = act == "merged"
+        webhook_action = "closed" if merged else act
+        if webhook_action == "closed":
+            await pool.execute(
+                "UPDATE app_github.pull_requests SET state='closed', merged=$3, "
+                "merged_at=CASE WHEN $3 THEN $4 ELSE merged_at END, closed_at=$4, updated_at=$4 "
+                "WHERE repo_pk=$1 AND number=$2",
+                repo_pk, number, merged, when,
+            )
+        elif webhook_action == "reopened":
+            await pool.execute(
+                "UPDATE app_github.pull_requests SET state='open', merged=FALSE, closed_at=NULL, "
+                "updated_at=$3 WHERE repo_pk=$1 AND number=$2", repo_pk, number, when,
+            )
+        elif webhook_action == "synchronize":
+            await pool.execute(
+                "UPDATE app_github.pull_requests SET head_sha=$3, updated_at=$4 "
+                "WHERE repo_pk=$1 AND number=$2", repo_pk, number, github_sha(), when,
+            )
+        else:  # edited / labeled / any other metadata change → bump updated_at
+            await pool.execute(
+                "UPDATE app_github.pull_requests SET updated_at=$3, title=COALESCE($4, title) "
+                "WHERE repo_pk=$1 AND number=$2", repo_pk, number, when, title,
+            )
+        return await _emit({"repo": full, "number": number, "action": webhook_action})
+
+    # -------------------------------- issues --------------------------------
+    if kind == "issues":
+        act = action or _GH_DEFAULT_ACTION[kind]
+        if number is None and act in ("opened", "reopened"):
+            number = await _gh_next_number(pool, repo_pk)
+            await _emit({"repo": full, "number": number, "action": act})
+            await pool.execute(
+                """
+                INSERT INTO app_github.issues
+                    (id, repo_pk, number, title, body, state, user_login,
+                     created_at, updated_at, timeline_event_id)
+                VALUES ($1, $2, $3, $4, $5, 'open', $6, $7, $7, $8)
+                """,
+                uuid4(), repo_pk, number, title or f"Live issue #{number}", body or "",
+                login, when, event_id,
+            )
+            return event_id
+        if number is None:
+            raise ValueError(f"github issues action {act!r} needs a `number`")
+        if act == "closed":
+            await pool.execute(
+                "UPDATE app_github.issues SET state='closed', closed_at=$3, updated_at=$3 "
+                "WHERE repo_pk=$1 AND number=$2", repo_pk, number, when,
+            )
+        elif act == "reopened":
+            await pool.execute(
+                "UPDATE app_github.issues SET state='open', closed_at=NULL, updated_at=$3 "
+                "WHERE repo_pk=$1 AND number=$2", repo_pk, number, when,
+            )
+        else:  # edited / labeled
+            await pool.execute(
+                "UPDATE app_github.issues SET updated_at=$3, title=COALESCE($4, title) "
+                "WHERE repo_pk=$1 AND number=$2", repo_pk, number, when, title,
+            )
+        return await _emit({"repo": full, "number": number, "action": act})
+
+    # --------------------------------- push ---------------------------------
+    if kind == "push":
+        before = await pool.fetchval(
+            "SELECT sha FROM app_github.commits WHERE repo_pk=$1 ORDER BY committed_at DESC LIMIT 1",
+            repo_pk,
+        )
+        before = before or "0" * 40
+        sha = github_sha()
+        ref = f"refs/heads/{repo_row['default_branch']}"
+        await _emit({"repo": full, "ref": ref, "before": before, "after": sha})
+        await pool.execute(
+            """
+            INSERT INTO app_github.commits
+                (id, repo_pk, sha, message, author_login, author_email, committed_at,
+                 parents, additions, deletions)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10)
+            """,
+            uuid4(), repo_pk, sha, title or f"Live commit {sha[:7]}", login,
+            f"{login}@users.noreply.github.com", when,
+            json.dumps([before] if before != "0" * 40 else []), 1, 0,
+        )
+        return event_id
+
+    # --------------------------- pull_request_review ------------------------
+    if kind == "pull_request_review":
+        act = action or _GH_DEFAULT_ACTION[kind]
+        pr = await pool.fetchrow(
+            "SELECT id, number FROM app_github.pull_requests WHERE repo_pk=$1 "
+            "AND ($2::int IS NULL OR number=$2) ORDER BY (number=$2) DESC, number DESC LIMIT 1",
+            repo_pk, number,
+        )
+        if pr is None:
+            raise LookupError("no pull request to review; inject one first")
+        await _emit({"repo": full, "number": pr["number"], "action": act})
+        await pool.execute(
+            "INSERT INTO app_github.reviews (id, pr_pk, user_login, state, body, submitted_at, timeline_event_id) "
+            "VALUES ($1,$2,$3,$4,$5,$6,$7)",
+            uuid4(), pr["id"], login, review_state, body or "", when, event_id,
+        )
+        await pool.execute("UPDATE app_github.pull_requests SET updated_at=$2 WHERE id=$1", pr["id"], when)
+        return event_id
+
+    # ----------------------------- issue_comment ----------------------------
+    if kind == "issue_comment":
+        act = action or _GH_DEFAULT_ACTION[kind]
+        issue_number = number
+        if issue_number is None:
+            issue_number = await pool.fetchval(
+                "SELECT number FROM ("
+                "  SELECT number FROM app_github.issues WHERE repo_pk=$1"
+                "  UNION ALL SELECT number FROM app_github.pull_requests WHERE repo_pk=$1"
+                ") s ORDER BY number DESC LIMIT 1",
+                repo_pk,
+            )
+        if issue_number is None:
+            raise LookupError("no issue/PR to comment on; inject one first")
+        await _emit({"repo": full, "issue_number": issue_number, "action": act})
+        await pool.execute(
+            "INSERT INTO app_github.issue_comments (id, repo_pk, issue_number, user_login, body, created_at, timeline_event_id) "
+            "VALUES ($1,$2,$3,$4,$5,$6,$7)",
+            uuid4(), repo_pk, issue_number, login, body or title or "Live comment.", when, event_id,
+        )
+        return event_id
+
+    # ------------------------------- check_run ------------------------------
+    if kind == "check_run":
+        act = action or _GH_DEFAULT_ACTION[kind]
+        if number is not None:
+            head_sha = await pool.fetchval(
+                "SELECT head_sha FROM app_github.pull_requests WHERE repo_pk=$1 AND number=$2",
+                repo_pk, number,
+            )
+        else:
+            head_sha = await pool.fetchval(
+                "SELECT sha FROM app_github.commits WHERE repo_pk=$1 ORDER BY committed_at DESC LIMIT 1",
+                repo_pk,
+            )
+        if head_sha is None:
+            raise LookupError("no commit/PR head to attach a check run to; inject one first")
+        completed = act == "completed"
+        await _emit({"repo": full, "head_sha": head_sha, "action": act})
+        await pool.execute(
+            "INSERT INTO app_github.check_runs (id, repo_pk, name, head_sha, status, conclusion, started_at, completed_at, timeline_event_id) "
+            "VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)",
+            uuid4(), repo_pk, title or "ci/build", head_sha,
+            "completed" if completed else "in_progress",
+            check_conclusion if completed else None, when, when if completed else None, event_id,
+        )
+        return event_id
+
+    raise ValueError(f"unhandled github inject kind: {kind!r}")  # pragma: no cover
+
+
+async def inject_github_lifecycle(
+    pool: asyncpg.Pool,
+    run_id: UUID,
+    *,
+    kind: str,
+    action: Optional[str] = None,
+    repos: Optional[list[str]] = None,
+    handle: Optional[str] = None,
+    at_virtual: Optional[datetime] = None,
+) -> UUID:
+    """Inject an App-level GitHub webhook: ``installation`` (created/deleted/
+    suspend/unsuspend), ``installation_repositories`` (added/removed), or ``ping``.
+
+    These are NOT observations on the consumer side — they drive install
+    enable/disable and the repo allowlist. ``suspend``/``deleted`` also flip the
+    installation's ``suspended_at`` so the REST API starts returning the
+    documented 404 for that token, exercising the revocation chokepoint too.
+    Returns the new timeline event id.
+    """
+    if kind not in _GH_LIFECYCLE_KINDS:
+        raise ValueError(f"unsupported github lifecycle kind: {kind!r}")
+    actor_id, _login = await _gh_person(pool, run_id, handle)
+
+    inst = await pool.fetchrow(
+        """
+        SELECT inst.id, inst.installation_id FROM app_github.installations inst
+          JOIN app_github.apps a ON a.id = inst.app_pk
+         WHERE a.run_id = $1 ORDER BY inst.installation_id LIMIT 1
+        """,
+        run_id,
+    )
+    if inst is None:
+        raise LookupError(f"no github installation for run {run_id}")
+
     clock = await get_clock(pool, run_id)
     when = at_virtual or clock.virtual_now
     if when.tzinfo is None:
         when = when.replace(tzinfo=timezone.utc)
 
-    etype = f"github.{kind}"
+    if kind == "installation":
+        act = action or "created"
+        if act in ("suspend", "deleted"):
+            await pool.execute(
+                "UPDATE app_github.installations SET suspended_at=$2 WHERE id=$1", inst["id"], when
+            )
+        elif act in ("unsuspend", "created"):
+            await pool.execute(
+                "UPDATE app_github.installations SET suspended_at=NULL WHERE id=$1", inst["id"]
+            )
+        payload = {"action": act}
+    elif kind == "installation_repositories":
+        act = action or "removed"
+        payload = {"action": act, "repos": repos or []}
+    else:  # ping
+        act = None
+        payload = {}
+
     event_id = uuid4()
-    payload = {"repo": full, "number": next_num, "action": "opened"}
     await pool.execute(
         """
         INSERT INTO timeline.events
             (id, run_id, virtual_ts, type, actor_id, payload, cross_refs, is_historical)
         VALUES ($1, $2, $3, $4, $5, $6::jsonb, '{}'::jsonb, FALSE)
         """,
-        event_id, run_id, when, etype, actor_id, json.dumps(payload),
+        event_id, run_id, when, f"github.{kind}", actor_id, json.dumps(payload),
     )
-
-    if kind == "pull_request":
-        await pool.execute(
-            """
-            INSERT INTO app_github.pull_requests
-                (id, repo_pk, number, title, body, state, merged, user_login,
-                 head_ref, head_sha, base_sha, created_at, updated_at, timeline_event_id)
-            VALUES ($1, $2, $3, $4, '', 'open', FALSE, $5, $6, $7, $8, $9, $9, $10)
-            """,
-            uuid4(), repo_pk, next_num, title or f"Live PR #{next_num}",
-            login, f"feature/live-{next_num}", github_sha(), github_sha(), when, event_id,
-        )
-    else:  # issues
-        await pool.execute(
-            """
-            INSERT INTO app_github.issues
-                (id, repo_pk, number, title, body, state, user_login,
-                 created_at, updated_at, timeline_event_id)
-            VALUES ($1, $2, $3, $4, '', 'open', $5, $6, $6, $7)
-            """,
-            uuid4(), repo_pk, next_num, title or f"Live issue #{next_num}", login, when, event_id,
-        )
-
     return event_id
 
 

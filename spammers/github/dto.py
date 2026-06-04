@@ -44,6 +44,19 @@ def _jsonb(value) -> list:
     return value if isinstance(value, list) else json.loads(value)
 
 
+def _label_name(item) -> str:
+    """A stored label is either a bare name (``"bug"``) or a GitHub-style object
+    (``{"name": "bug", …}`` — what the corpus persists). Normalize to the name."""
+    if isinstance(item, dict):
+        return item.get("name", "")
+    return item
+
+
+def label_names(value) -> list[str]:
+    """All label names from a stored JSONB labels column (either shape)."""
+    return [_label_name(n) for n in _jsonb(value)]
+
+
 def user_dto(login: str) -> dict:
     uid = _login_id(login)
     return {
@@ -103,7 +116,8 @@ def installation_dto(inst: dict, app_id: int) -> dict:
         "events": ["push", "pull_request", "issues", "issue_comment", "pull_request_review", "check_run"],
         "created_at": iso(inst.get("created_at")),
         "updated_at": iso(inst.get("created_at")),
-        "suspended_at": None,
+        "suspended_at": iso(inst.get("suspended_at")),
+        "suspended_by": None,
     }
 
 
@@ -213,6 +227,20 @@ _CUSTOM_LABEL_DESCRIPTIONS: dict[str, str] = {
 }
 
 
+def min_repo_dto(repo: dict) -> dict:
+    """The slim repository object GitHub embeds in installation / lifecycle
+    webhook payloads (id, node_id, name, full_name, private)."""
+    full = f"{repo['owner']}/{repo['name']}"
+    rid = repo["repo_id"]
+    return {
+        "id": rid,
+        "node_id": _node_id("Repository", rid),
+        "name": repo["name"],
+        "full_name": full,
+        "private": repo["private"],
+    }
+
+
 def branch_dto(name: str, sha: str, full_name: str, *, protected: bool = False) -> dict:
     return {
         "name": name,
@@ -319,7 +347,7 @@ def pull_request_dto(pr: dict, full_name: str, repo_row: dict | None = None) -> 
         "assignee": None,
         "assignees": [],
         "requested_reviewers": [user_dto(login) for login in _jsonb(pr.get("requested_reviewers"))],
-        "labels": [label_dto(n, full_name) for n in _jsonb(pr.get("labels"))],
+        "labels": [label_dto(n, full_name) for n in label_names(pr.get("labels"))],
         "milestone": None,
         "created_at": iso(pr.get("created_at")),
         "updated_at": iso(pr.get("updated_at")),
@@ -350,7 +378,7 @@ def issue_dto(issue: dict, full_name: str, comments: int = 0, *, pull_request: d
         "html_url": f"https://github.com/{full_name}/issues/{num}",
         "assignee": None,
         "assignees": [user_dto(login) for login in _jsonb(issue.get("assignees"))],
-        "labels": [label_dto(n, full_name) for n in _jsonb(issue.get("labels"))],
+        "labels": [label_dto(n, full_name) for n in label_names(issue.get("labels"))],
         "milestone": None,
         "comments": comments,
         "author_association": "MEMBER",
@@ -389,10 +417,65 @@ def pr_as_issue_dto(pr: dict, full_name: str) -> dict:
     return issue_dto(issue_shaped, full_name, comments=0, pull_request=link)
 
 
-def commit_dto(c: dict, full_name: str) -> dict:
+# Deterministic synthetic file paths for a commit — same (repo, sha) always
+# yields the same set, so the file list is stable across the single-commit GET
+# and the push webhook (what a blast-radius consumer keys on). Plausible source
+# paths/statuses; real GitHub's exact paths aren't reproducible anyway.
+_SYNTH_DIRS = ("src", "lib", "internal", "pkg", "tests", "docs", "api", "cmd")
+_SYNTH_NAMES = ("handler", "client", "service", "models", "utils", "config",
+                "router", "cache", "auth", "db", "queue", "schema", "worker", "store")
+_SYNTH_EXTS = (".py", ".ts", ".go", ".js", ".sql", ".md", ".yaml")
+# Weighted toward "modified" — most real commits touch existing files.
+_SYNTH_STATUS = ("modified", "modified", "modified", "added", "removed")
+
+
+def synth_commit_files(full_name: str, sha: str) -> list[dict]:
+    """A deterministic, plausible list of changed files for a commit (GitHub's
+    commit ``files[]`` shape)."""
+    h = hashlib.sha1(f"{full_name}@{sha}".encode()).hexdigest()
+    count = 1 + (int(h[0], 16) % 4)  # 1..4 files
+    files: list[dict] = []
+    seen: set[str] = set()
+    for i in range(count):
+        seg = h[i * 6:(i + 1) * 6] or h[:6]
+        path = (f"{_SYNTH_DIRS[int(seg[0], 16) % len(_SYNTH_DIRS)]}/"
+                f"{_SYNTH_NAMES[int(seg[1], 16) % len(_SYNTH_NAMES)]}"
+                f"{_SYNTH_EXTS[int(seg[2], 16) % len(_SYNTH_EXTS)]}")
+        if path in seen:
+            d, _, f = path.rpartition("/")
+            path = f"{d}/{i}_{f}"
+        seen.add(path)
+        status = _SYNTH_STATUS[int(seg[3], 16) % len(_SYNTH_STATUS)]
+        adds = 0 if status == "removed" else 1 + int(seg[4], 16) % 60
+        dels = 0 if status == "added" else 1 + int(seg[5], 16) % 30
+        files.append({
+            "sha": hashlib.sha1(f"{sha}:{path}".encode()).hexdigest()[:40],
+            "filename": path,
+            "status": status,
+            "additions": adds,
+            "deletions": dels,
+            "changes": adds + dels,
+            "blob_url": f"https://github.com/{full_name}/blob/{sha}/{path}",
+            "raw_url": f"https://github.com/{full_name}/raw/{sha}/{path}",
+            "contents_url": f"{_API}/repos/{full_name}/contents/{path}?ref={sha}",
+            "patch": f"@@ -0,0 +1,{adds} @@",
+        })
+    return files
+
+
+def push_commit_file_lists(files: list[dict]) -> tuple[list[str], list[str], list[str]]:
+    """Split commit ``files[]`` into the (added, removed, modified) path lists a
+    GitHub ``push`` payload carries on each commit."""
+    added = [f["filename"] for f in files if f["status"] == "added"]
+    removed = [f["filename"] for f in files if f["status"] == "removed"]
+    modified = [f["filename"] for f in files if f["status"] not in ("added", "removed")]
+    return added, removed, modified
+
+
+def commit_dto(c: dict, full_name: str, *, include_files: bool = False) -> dict:
     sha = c["sha"]
     when = iso(c.get("committed_at"))
-    return {
+    dto = {
         "sha": sha,
         "node_id": _node_id("Commit", _num_id(c["id"])),
         "url": f"{_API}/repos/{full_name}/commits/{sha}",
@@ -411,6 +494,10 @@ def commit_dto(c: dict, full_name: str) -> dict:
         "parents": [{"sha": s, "url": f"{_API}/repos/{full_name}/commits/{s}"} for s in _jsonb(c.get("parents"))],
         "stats": {"additions": c["additions"], "deletions": c["deletions"], "total": c["additions"] + c["deletions"]},
     }
+    # Real GitHub returns ``files`` only on the single-commit GET, not the list.
+    if include_files:
+        dto["files"] = synth_commit_files(full_name, sha)
+    return dto
 
 
 def _actor_dto(login: str) -> dict:

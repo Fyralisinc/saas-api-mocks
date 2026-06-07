@@ -39,8 +39,12 @@ def gmail_error(code: int, message: str, *, reason: str | None = None) -> dict[s
 
 
 def notion_error(status: int, code: str, message: str) -> dict[str, Any]:
-    """Notion returns ``{"object":"error","status":…,"code":"…","message":"…"}``."""
-    return {"object": "error", "status": status, "code": code, "message": message}
+    """Notion returns ``{"object":"error","status":…,"code":"…","message":"…",
+    "request_id":"…"}`` — every real error body carries a ``request_id`` (a UUID).
+    """
+    import uuid as _uuid
+    return {"object": "error", "status": status, "code": code, "message": message,
+            "request_id": str(_uuid.uuid4())}
 
 
 def jira_error(messages: list[str] | str, *, errors: dict[str, Any] | None = None) -> dict[str, Any]:

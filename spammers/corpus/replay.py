@@ -812,50 +812,134 @@ async def _gmail_message(ctx: ReplayContext, event: Event) -> None:
             pass
 
 
+def _notion_rt(content: str) -> list:
+    """A single plain-text rich-text run, Notion's documented shape."""
+    return [{"type": "text", "text": {"content": content, "link": None},
+             "annotations": {"bold": False, "italic": False, "strikethrough": False,
+                             "underline": False, "code": False, "color": "default"},
+             "plain_text": content, "href": None}]
+
+
+# Structured page kinds live in real Notion *databases* (so each is a DB row with
+# a workflow `Status` select → the consumer's `state_change` kind); free-form kinds
+# (design_doc, rfc, retro, all_hands_recap, …) stay as loose workspace pages. This
+# gives both backfill shard families — `notion_database` and `notion_page_tree` —
+# real coverage from the corpus. kind → (database title, [status options]).
+_NOTION_DB_KINDS = {
+    "1on1_note":       ("1:1 Notes",  ["Scheduled", "In Progress", "Done"]),
+    "hiring_decision": ("Hiring",     ["Sourced", "Onsite", "Decision", "Closed"]),
+    "postmortem":      ("Incidents",  ["Investigating", "Mitigated", "Resolved"]),
+}
+_SELECT_COLORS = ["gray", "brown", "orange", "yellow", "green", "blue", "purple", "pink", "red"]
+
+
+def _stable_idx(key: str, n: int) -> int:
+    return sum(key.encode("utf-8")) % n if n else 0
+
+
+def _select_color(name: str) -> str:
+    return _SELECT_COLORS[_stable_idx(name, len(_SELECT_COLORS))]
+
+
+async def _ensure_notion_database(ctx: ReplayContext, integ_pk: UUID, kind: str,
+                                  title: str, status_opts: list[str], when: datetime) -> tuple:
+    """Lazily create the per-kind database; returns (db_pk, database_id)."""
+    key = f"notion:db:{kind}"
+    db_pk = await ctx.idmap.get(key)
+    if db_pk is not None:
+        row = await ctx.pool.fetchrow("SELECT database_id FROM app_notion.databases WHERE id=$1", db_pk)
+        return db_pk, row["database_id"]
+    db_pk = uuid4()
+    database_id = notion_id()
+    schema = {
+        "Name": {"id": "title", "name": "Name", "type": "title", "title": {}},
+        "Status": {"id": "stat%3A", "name": "Status", "type": "select", "select": {
+            "options": [{"id": notion_id()[:8], "name": o, "color": _select_color(o)}
+                        for o in status_opts]}},
+    }
+    await ctx.pool.execute(
+        "INSERT INTO app_notion.databases (id, integration_pk, database_id, title, "
+        "parent_type, parent_id, icon, properties_schema, url, created_time, last_edited_time) "
+        "VALUES ($1,$2,$3,$4,'workspace',NULL,NULL,$5::jsonb,$6,$7,$7)",
+        db_pk, integ_pk, database_id, title, json.dumps(schema),
+        f"https://www.notion.so/{database_id.replace('-', '')}", when,
+    )
+    await ctx.idmap.put(key, "notion_database", db_pk)
+    return db_pk, database_id
+
+
 @register("notion", "page.create")
 async def _notion_page_create(ctx: ReplayContext, event: Event) -> None:
     p = event["payload"]
     when = _parse_ts(event["t"])
     integ_pk = await _ensure_notion_integration(ctx, when)
+    bot_user_id = await ctx.pool.fetchval(
+        "SELECT bot_user_id FROM app_notion.integrations WHERE id=$1", integ_pk)
     page_id = notion_id()
+    title = (p.get("title") or "Untitled")[:300]
+    kind = p.get("kind") or ""
+    db_cfg = _NOTION_DB_KINDS.get(kind)
     pk = uuid4()
     try:
-        await ctx.pool.execute(
-            "INSERT INTO app_notion.pages (id, integration_pk, page_id, "
-            "parent_type, title, properties, url, created_time, last_edited_time) "
-            "VALUES ($1,$2,$3,'workspace',$4,$5::jsonb,$6,$7,$7)",
-            pk, integ_pk, page_id, (p.get("title") or "Untitled")[:300],
-            json.dumps({"body_md": p.get("body_md", ""),
-                        "kind": p.get("kind", "doc"),
-                        "is_private": p.get("is_private", False),
-                        "audience": p.get("audience") or [],
-                        "category": p.get("category") or ""}),
-            f"https://www.notion.so/{page_id.replace('-', '')}", when,
-        )
+        if db_cfg:
+            # Database row: typed property map = title + a workflow Status select.
+            db_pk, database_id = await _ensure_notion_database(
+                ctx, integ_pk, kind, db_cfg[0], db_cfg[1], when)
+            status = db_cfg[1][_stable_idx(p["id"], len(db_cfg[1]))]
+            props = {
+                "Name": {"id": "title", "type": "title", "title": _notion_rt(title)},
+                "Status": {"id": "stat%3A", "type": "select",
+                           "select": {"name": status, "color": _select_color(status)}},
+            }
+            await ctx.pool.execute(
+                "INSERT INTO app_notion.pages (id, integration_pk, page_id, parent_type, "
+                "parent_id, database_pk, title, properties, created_by, url, created_time, last_edited_time) "
+                "VALUES ($1,$2,$3,'database_id',$4,$5,$6,$7::jsonb,$8,$9,$10,$10)",
+                pk, integ_pk, page_id, database_id, db_pk, title, json.dumps(props),
+                bot_user_id, f"https://www.notion.so/{page_id.replace('-', '')}", when,
+            )
+            await ctx.pool.execute(
+                "UPDATE app_notion.databases SET last_edited_time = GREATEST(last_edited_time, $2) "
+                "WHERE id = $1", db_pk, when)
+        else:
+            # Loose page: properties = a single title entry; body lives in blocks.
+            props = {"title": {"id": "title", "type": "title", "title": _notion_rt(title)}}
+            await ctx.pool.execute(
+                "INSERT INTO app_notion.pages (id, integration_pk, page_id, "
+                "parent_type, title, properties, created_by, url, created_time, last_edited_time) "
+                "VALUES ($1,$2,$3,'workspace',$4,$5::jsonb,$6,$7,$8,$8)",
+                pk, integ_pk, page_id, title, json.dumps(props), bot_user_id,
+                f"https://www.notion.so/{page_id.replace('-', '')}", when,
+            )
         await ctx.idmap.put(p["id"], "notion_page", pk)
     except asyncpg.exceptions.UniqueViolationError:
-        pass
+        return
+    # Body becomes a single paragraph block so the page has real, hydratable
+    # content (GET /v1/blocks/{id}/children), mirroring how Notion stores text.
+    body = (p.get("body_md") or "").strip()
+    if body:
+        await ctx.pool.execute(
+            "INSERT INTO app_notion.blocks (id, page_pk, block_id, parent_block_id, "
+            "type, content, has_children, position, created_by, created_time, last_edited_time) "
+            "VALUES ($1,$2,$3,NULL,'paragraph',$4::jsonb,FALSE,0,$5,$6,$6)",
+            uuid4(), pk, notion_id(),
+            json.dumps({"rich_text": _notion_rt(body[:1800]), "color": "default"}),
+            bot_user_id, when,
+        )
 
 
 @register("notion", "page.update")
 async def _notion_page_update(ctx: ReplayContext, event: Event) -> None:
-    """Edit history: bumps last_edited_time + appends summary into properties."""
+    """An edit bumps ``last_edited_time`` — the observable effect on the page
+    object. (Notion exposes no edit-history list via the API.)"""
     p = event["payload"]
     page_pk = await ctx.idmap.get(p["id"])
     if page_pk is None:
         return
     when = _parse_ts(event["t"])
-    summary = p.get("summary", "edit")
     await ctx.pool.execute(
-        "UPDATE app_notion.pages "
-        "SET last_edited_time = $2, "
-        "    properties = jsonb_set(properties, '{edit_history}', "
-        "        COALESCE(properties->'edit_history', '[]'::jsonb) "
-        "        || jsonb_build_array(jsonb_build_object("
-        "          'at', to_char($2 at time zone 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"'), "
-        "          'editor', $3::text, 'summary', $4::text))) "
-        "WHERE id = $1",
-        page_pk, when, event.get("actor") or "", summary,
+        "UPDATE app_notion.pages SET last_edited_time = $2 WHERE id = $1",
+        page_pk, when,
     )
 
 

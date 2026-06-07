@@ -15,7 +15,7 @@ router = APIRouter()
 @router.get("/v1/comments")
 async def list_comments(request: Request):
     if not authed(request):
-        return JSONResponse(notion_error(401, "unauthorized", "API token is invalid."), status_code=401)
+        return JSONResponse(notion_error(401, "unauthorized", "The bearer token is not valid."), status_code=401)
     qs = request.query_params
     block_id = qs.get("block_id")
     if not block_id:

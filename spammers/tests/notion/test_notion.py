@@ -13,11 +13,32 @@ from spammers.tests.notion.conftest import BOT_USER_ID, DB1_ID, PAGE_IDS
 pytestmark = pytest.mark.asyncio(loop_scope="session")
 
 
+_VERSION = {"Notion-Version": "2022-06-28"}
+
+
 async def test_unauthed_401(notion_client):
-    r = await notion_client.post("/v1/search", json={})
+    # A versioned but unauthenticated request → 401 unauthorized.
+    r = await notion_client.post("/v1/search", json={}, headers=_VERSION)
     assert r.status_code == 401
     body = r.json()
     assert body["object"] == "error" and body["code"] == "unauthorized"
+    assert "request_id" in body  # real Notion errors always carry a request_id
+
+
+async def test_missing_notion_version_400(notion_client, notion_auth):
+    # Notion-Version is mandatory; absent → 400 missing_version, before auth.
+    headers = {"Authorization": notion_auth["Authorization"]}
+    r = await notion_client.post("/v1/search", json={}, headers=headers)
+    assert r.status_code == 400
+    body = r.json()
+    assert body["object"] == "error" and body["code"] == "missing_version"
+    assert "Notion-Version" in body["message"] and "request_id" in body
+
+
+async def test_oauth_does_not_require_version(notion_client):
+    # OAuth endpoints are exempt from the Notion-Version gate.
+    r = await notion_client.post("/v1/oauth/token", json={})
+    assert r.status_code == 200 and "access_token" in r.json()
 
 
 async def test_search_by_object(notion_client, notion_auth):
@@ -50,6 +71,29 @@ async def test_database_query(notion_client, notion_auth):
     assert page["object"] == "page" and page["parent"]["type"] == "database_id"
     assert page["properties"]["Name"]["type"] == "title"
     assert page["properties"]["Name"]["title"][0]["plain_text"].startswith("Doc")
+
+
+async def test_query_database_honours_sort_probe(notion_client, notion_auth, pool, notion_run):
+    # Fyralis's reconciler probe (latest_database_edit) sends page_size=1 +
+    # descending last_edited_time to read the NEWEST row edit. Make Doc 3 newest.
+    integ_pk = await pool.fetchval(
+        "SELECT id FROM app_notion.integrations WHERE run_id=$1", notion_run)
+    try:
+        await pool.execute(
+            "UPDATE app_notion.pages SET last_edited_time = last_edited_time + interval '10 days' "
+            "WHERE integration_pk=$1 AND title='Doc 3'", integ_pk)
+        r = await notion_client.post(
+            f"/v1/databases/{DB1_ID}/query",
+            json={"page_size": 1,
+                  "sorts": [{"timestamp": "last_edited_time", "direction": "descending"}]},
+            headers=notion_auth)
+        body = r.json()
+        assert len(body["results"]) == 1
+        assert body["results"][0]["properties"]["Name"]["title"][0]["plain_text"] == "Doc 3"
+    finally:
+        await pool.execute(
+            "UPDATE app_notion.pages SET last_edited_time = last_edited_time - interval '10 days' "
+            "WHERE integration_pk=$1 AND title='Doc 3'", integ_pk)
 
 
 async def test_database_query_pagination(notion_client, notion_auth):
@@ -102,12 +146,63 @@ async def test_users(notion_client, notion_auth):
     assert {u["type"] for u in body["results"][1:]} == {"person"}
 
 
+async def test_get_user_by_id(notion_client, notion_auth, pool, notion_run):
+    # Known workspace member → full person user.
+    pid = await pool.fetchval(
+        "SELECT id FROM org.people WHERE run_id=$1 ORDER BY full_name LIMIT 1", notion_run)
+    r = await notion_client.get(f"/v1/users/{pid}", headers=notion_auth)
+    assert r.status_code == 200
+    body = r.json()
+    assert body["object"] == "user" and body["type"] == "person" and body["id"] == str(pid)
+
+    # Unknown (but well-formed) id → 404 object_not_found, not a fabricated 200.
+    r = await notion_client.get("/v1/users/99999999-9999-4999-8999-999999999999", headers=notion_auth)
+    assert r.status_code == 404 and r.json()["code"] == "object_not_found"
+
+    # Malformed (non-UUID) id → 400 validation_error.
+    r = await notion_client.get("/v1/users/not-a-uuid", headers=notion_auth)
+    assert r.status_code == 400 and r.json()["code"] == "validation_error"
+
+
 async def test_unknown_path_returns_notion_envelope(notion_client, notion_auth):
     r = await notion_client.get("/v1/bogus", headers=notion_auth)
     assert r.status_code == 404
     body = r.json()
     assert body["object"] == "error" and body["code"] == "object_not_found"
     assert "detail" not in body  # not FastAPI's default shape
+
+
+async def test_armed_rate_limit_forces_429(notion_client, notion_auth):
+    # Mock-only control: arm exactly 2 forced 429s, then recover.
+    from spammers.notion.ratelimit import _RL
+    _RL._buckets.clear()  # avoid interference from any prior burst
+    r = await notion_client.post("/_control/rate_limit?count=2&retry_after=3")
+    assert r.status_code == 200 and r.json()["armed"] == 2
+    r1 = await notion_client.get("/v1/users/me", headers=notion_auth)
+    assert r1.status_code == 429 and r1.json()["code"] == "rate_limited"
+    assert int(r1.headers["Retry-After"]) == 3
+    r2 = await notion_client.get("/v1/users/me", headers=notion_auth)
+    assert r2.status_code == 429
+    # third request: armed queue drained -> back to normal 200
+    r3 = await notion_client.get("/v1/users/me", headers=notion_auth)
+    assert r3.status_code == 200 and r3.json()["type"] == "bot"
+
+
+async def test_revocation_returns_401(notion_client, notion_auth):
+    # A revoked integration → every authed /v1 call returns 401 unauthorized,
+    # even with the (now-dead) seeded token. Restore returns to normal.
+    r = await notion_client.post("/_control/revoke?revoked=true")
+    assert r.status_code == 200 and r.json()["revoked"] is True
+    try:
+        r1 = await notion_client.get("/v1/users/me", headers=notion_auth)
+        assert r1.status_code == 401 and r1.json()["code"] == "unauthorized"
+        r2 = await notion_client.get(f"/v1/pages/{PAGE_IDS[0]}", headers=notion_auth)
+        assert r2.status_code == 401 and r2.json()["code"] == "unauthorized"
+    finally:
+        rr = await notion_client.post("/_control/revoke?revoked=false")
+        assert rr.json()["revoked"] is False
+    r3 = await notion_client.get("/v1/users/me", headers=notion_auth)
+    assert r3.status_code == 200 and r3.json()["type"] == "bot"
 
 
 async def test_rate_limit_429(notion_client, notion_auth):

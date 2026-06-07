@@ -20,7 +20,7 @@ router = APIRouter()
 @router.get("/v1/blocks/{block_id}/children")
 async def block_children(request: Request, block_id: str):
     if not authed(request):
-        return JSONResponse(notion_error(401, "unauthorized", "API token is invalid."), status_code=401)
+        return JSONResponse(notion_error(401, "unauthorized", "The bearer token is not valid."), status_code=401)
     st = state()
     page = await st.pool.fetchrow(
         "SELECT id, page_id FROM app_notion.pages WHERE integration_pk = $1 AND page_id = $2",

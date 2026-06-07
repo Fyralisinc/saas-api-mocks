@@ -20,7 +20,7 @@ router = APIRouter()
 @router.post("/v1/search")
 async def search(request: Request):
     if not authed(request):
-        return JSONResponse(notion_error(401, "unauthorized", "API token is invalid."), status_code=401)
+        return JSONResponse(notion_error(401, "unauthorized", "The bearer token is not valid."), status_code=401)
     try:
         body = await request.json()
     except Exception:

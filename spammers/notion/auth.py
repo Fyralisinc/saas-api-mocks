@@ -20,8 +20,26 @@ def bearer(request: Request) -> Optional[str]:
     return h
 
 
+# Mock-only: when an integration is removed/revoked in real Notion, every API call
+# with its (now-dead) token returns 401 `unauthorized`. This flag lets a test arm
+# that condition via POST /_control/revoke without rotating the seeded token.
+_REVOKED = False
+
+
+def set_revoked(value: bool) -> None:
+    global _REVOKED
+    _REVOKED = bool(value)
+
+
+def is_revoked() -> bool:
+    return _REVOKED
+
+
 def authed(request: Request) -> bool:
-    """True iff the request carries this run's integration bot token."""
+    """True iff the request carries this run's integration bot token and the
+    integration has not been revoked."""
+    if _REVOKED:
+        return False  # revoked integration → routes return 401 unauthorized
     tok = bearer(request)
     return bool(tok) and tok == state().bot_token
 

@@ -38,6 +38,7 @@ from spammers.orggen.live import (
     inject_github_lifecycle,
     inject_jira_issue,
     inject_notion_page,
+    inject_notion_page_update,
     inject_slack_message,
 )
 
@@ -205,9 +206,17 @@ async def _cmd_inject(args: argparse.Namespace) -> int:
                 pool, rid, handle=args.handle, channel=args.channel, text=args.text,
             )
     elif args.provider == "notion":
-        event_id = await inject_notion_page(
-            pool, rid, handle=args.handle, database=args.target, title=args.text,
-        )
+        # --action selects the live event: omitted/"create"/"page.created" makes a
+        # NEW page; "update"/"content_updated"/"properties_updated" edits an
+        # existing page (dedups, no new observation).
+        act = (args.action or "create").replace("page.", "")
+        if act in ("update", "content_updated", "properties_updated", "edit"):
+            etype = "page.properties_updated" if act == "properties_updated" else "page.content_updated"
+            event_id = await inject_notion_page_update(pool, rid, event_type=etype)
+        else:
+            event_id = await inject_notion_page(
+                pool, rid, handle=args.handle, database=args.target, title=args.text,
+            )
     elif args.provider == "gmail":
         event_id = await inject_gmail_message(
             pool, rid, handle=args.handle, recipient=args.target, text=args.text,

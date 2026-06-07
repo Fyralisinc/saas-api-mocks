@@ -641,6 +641,25 @@ def _notion_rich_text(content: str) -> list:
              "plain_text": content, "href": None}]
 
 
+async def _notion_live_ts(pool: asyncpg.Pool, run_id: UUID, at_virtual: Optional[datetime]):
+    """Return ``(virtual_ts, entity_ts)`` for a live Notion event.
+
+    Like GitHub, live Notion objects must get strictly-increasing, DISTINCT
+    ``created_time``/``last_edited_time`` even under a frozen clock — real Notion
+    never collides them, and the consumer's reconciler high-water + cursor rely on
+    monotonicity. The timeline event drains at ``virtual_ts = virtual_now`` while
+    the entity timestamp is bumped one second per prior live notion event."""
+    clock = await get_clock(pool, run_id)
+    vnow = at_virtual or clock.virtual_now
+    if vnow.tzinfo is None:
+        vnow = vnow.replace(tzinfo=timezone.utc)
+    prior = await pool.fetchval(
+        "SELECT count(*) FROM timeline.events "
+        "WHERE run_id=$1 AND is_historical=FALSE AND type='notion.page'",
+        run_id)
+    return vnow, vnow + timedelta(seconds=int(prior) + 1)
+
+
 async def inject_notion_page(
     pool: asyncpg.Pool,
     run_id: UUID,
@@ -648,12 +667,14 @@ async def inject_notion_page(
     handle: Optional[str] = None,
     database: Optional[str] = None,
     title: Optional[str] = None,
+    event_type: str = "page.created",
     at_virtual: Optional[datetime] = None,
 ) -> UUID:
     """Create a live Notion page in a database + a not-historical ``notion.page``
     event. The page is projected immediately (REST sees it); the event drives the
     signed thin webhook the consumer hydrates via GET /v1/pages/{id}."""
-    integ = await pool.fetchrow("SELECT id FROM app_notion.integrations WHERE run_id=$1", run_id)
+    integ = await pool.fetchrow(
+        "SELECT id, bot_user_id FROM app_notion.integrations WHERE run_id=$1", run_id)
     if integ is None:
         raise LookupError("no notion integration in this run; did you forget `prepare`?")
     db = await pool.fetchrow(
@@ -663,23 +684,20 @@ async def inject_notion_page(
     if db is None:
         raise LookupError("no notion database in this run")
     person = await _live_person(pool, run_id, handle)
-    clock = await get_clock(pool, run_id)
-    when = at_virtual or (clock.virtual_now + timedelta(seconds=1))
-    if when.tzinfo is None:
-        when = when.replace(tzinfo=timezone.utc)
+    vnow, entity_ts = await _notion_live_ts(pool, run_id, at_virtual)
 
     page_id = notion_id()
-    ttl = (title or f"Live page @ {when.isoformat()}")[:120]
+    ttl = (title or f"Live page @ {entity_ts.isoformat()}")[:120]
     event_id = uuid4()
     await pool.execute(
         """INSERT INTO timeline.events
             (id, run_id, virtual_ts, type, actor_id, payload, cross_refs, is_historical)
            VALUES ($1,$2,$3,'notion.page',$4,$5::jsonb,'{}'::jsonb,FALSE)""",
-        event_id, run_id, when, person["id"],
-        json.dumps({"object": "page", "page_id": page_id, "event_type": "page.created", "title": ttl}))
+        event_id, run_id, vnow, person["id"],
+        json.dumps({"object": "page", "page_id": page_id, "event_type": event_type, "title": ttl}))
 
     props = {"Name": {"id": "title", "type": "title", "title": _notion_rich_text(ttl)},
-             "Status": {"id": "statU", "type": "select", "select": {"name": "Draft", "color": "default"}}}
+             "Status": {"id": "stat%3A", "type": "select", "select": {"name": "Draft", "color": "default"}}}
     page_pk = uuid4()
     await pool.execute(
         """INSERT INTO app_notion.pages
@@ -687,7 +705,7 @@ async def inject_notion_page(
              icon, archived, url, created_by, created_time, last_edited_time, timeline_event_id)
            VALUES ($1,$2,$3,'database_id',$4,$5,$6,$7::jsonb,NULL,FALSE,$8,$9,$10,$10,$11)""",
         page_pk, integ["id"], page_id, db["database_id"], db["id"], ttl, json.dumps(props),
-        f"https://www.notion.so/{page_id.replace('-', '')}", notion_id(), when, event_id)
+        f"https://www.notion.so/{page_id.replace('-', '')}", integ["bot_user_id"], entity_ts, event_id)
     await pool.execute(
         """INSERT INTO app_notion.blocks
             (id, page_pk, block_id, parent_block_id, type, content, has_children, position,
@@ -695,7 +713,44 @@ async def inject_notion_page(
            VALUES ($1,$2,$3,NULL,'paragraph',$4::jsonb,FALSE,0,$5,$6,$6,$7)""",
         uuid4(), page_pk, notion_id(),
         json.dumps({"rich_text": _notion_rich_text("Injected live."), "color": "default"}),
-        notion_id(), when, event_id)
+        integ["bot_user_id"], entity_ts, event_id)
+    return event_id
+
+
+async def inject_notion_page_update(
+    pool: asyncpg.Pool,
+    run_id: UUID,
+    *,
+    page_id: Optional[str] = None,
+    event_type: str = "page.content_updated",
+    at_virtual: Optional[datetime] = None,
+) -> UUID:
+    """Emit a live edit of an EXISTING page: bump its ``last_edited_time`` to a
+    fresh distinct timestamp + emit a thin ``notion.page`` event. The consumer
+    fetches the page back, and ``external_id = notion:page:{id}`` dedups it against
+    the backfilled copy — so an update produces no NEW observation (the dedup
+    invariant), but does advance the reconciler high-water."""
+    integ = await pool.fetchrow("SELECT id FROM app_notion.integrations WHERE run_id=$1", run_id)
+    if integ is None:
+        raise LookupError("no notion integration in this run; did you forget `prepare`?")
+    row = await pool.fetchrow(
+        "SELECT id, page_id FROM app_notion.pages WHERE integration_pk=$1 "
+        "AND ($2::text IS NULL OR page_id=$2) ORDER BY (page_id=$2) DESC, last_edited_time ASC LIMIT 1",
+        integ["id"], page_id)
+    if row is None:
+        raise LookupError("no notion page to update in this run")
+    person = await _live_person(pool, run_id, None)
+    vnow, entity_ts = await _notion_live_ts(pool, run_id, at_virtual)
+    event_id = uuid4()
+    await pool.execute(
+        """INSERT INTO timeline.events
+            (id, run_id, virtual_ts, type, actor_id, payload, cross_refs, is_historical)
+           VALUES ($1,$2,$3,'notion.page',$4,$5::jsonb,'{}'::jsonb,FALSE)""",
+        event_id, run_id, vnow, person["id"],
+        json.dumps({"object": "page", "page_id": row["page_id"], "event_type": event_type}))
+    await pool.execute(
+        "UPDATE app_notion.pages SET last_edited_time=$2, timeline_event_id=$3 WHERE id=$1",
+        row["id"], entity_ts, event_id)
     return event_id
 
 

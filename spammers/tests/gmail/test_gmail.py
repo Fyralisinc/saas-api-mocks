@@ -106,7 +106,8 @@ async def test_watch_and_stop(gmail_client, gmail_auth):
     body = r.json()
     assert body["historyId"] == "2" and body["expiration"].isdigit()
     r = await gmail_client.post("/gmail/v1/users/me/stop", headers=gmail_auth)
-    assert r.status_code == 204
+    # Real users.stop returns 200 with an empty JSON object (not 204).
+    assert r.status_code == 200 and r.json() == {}
 
 
 # ---- directory ------------------------------------------------------------
@@ -135,7 +136,8 @@ async def test_jwks_and_push_verifies(gmail_client, gmail_auth):
     assert decoded["email"] == PUSH_SA and decoded["email_verified"] is True
     env = build_envelope(ALICE, 42, "projects/p/subscriptions/s")
     data = json.loads(base64.b64decode(env["message"]["data"]))
-    assert data == {"emailAddress": ALICE, "historyId": 42}
+    # historyId is a quoted string in Gmail's canonical push payload.
+    assert data == {"emailAddress": ALICE, "historyId": "42"}
 
 
 # ---- rate limiting --------------------------------------------------------

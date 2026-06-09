@@ -72,8 +72,12 @@ def sign_oidc(private_pem: str, public_pem: str, *, audience: str, push_sa_email
 
 
 def build_envelope(email: str, history_id: int, subscription: str) -> dict:
-    """The Pub/Sub push body Gmail delivers (data is base64 of {emailAddress, historyId})."""
-    data = json.dumps({"emailAddress": email, "historyId": history_id}).encode()
+    """The Pub/Sub push body Gmail delivers (data is base64 of {emailAddress, historyId}).
+
+    Gmail's canonical push-guide example encodes ``historyId`` as a QUOTED STRING
+    (not a number), so we stringify it to match the wire shape.
+    """
+    data = json.dumps({"emailAddress": email, "historyId": str(history_id)}).encode()
     return {
         "message": {
             "data": base64.b64encode(data).decode(),

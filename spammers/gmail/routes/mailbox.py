@@ -5,7 +5,6 @@ from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 from fastapi import APIRouter, Request
-from fastapi.responses import Response
 
 from spammers.gmail.dto import profile_dto
 from spammers.gmail.responses import GoogleJSONResponse as JSONResponse
@@ -72,4 +71,5 @@ async def stop(request: Request, user_id: str):
     if err:
         return err
     await state().pool.execute("DELETE FROM app_gmail.watches WHERE mailbox_pk = $1", mbox["id"])
-    return Response(status_code=204)
+    # Real users.stop returns HTTP 200 with an empty JSON object, not 204.
+    return JSONResponse({})

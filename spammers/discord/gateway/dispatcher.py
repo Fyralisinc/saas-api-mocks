@@ -191,5 +191,5 @@ def _system_author() -> dict[str, Any]:
     return {
         "id": "0", "username": "system", "discriminator": "0000",
         "global_name": "system", "avatar": None, "bot": True, "system": True,
-        "public_flags": 0, "flags": 0,
+        "public_flags": 0, "flags": 0, "primary_guild": None,
     }

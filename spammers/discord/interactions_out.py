@@ -151,7 +151,7 @@ async def _member_user(pool: asyncpg.Pool, application_pk: UUID, person_id: UUID
     )
     if row is None:
         return {"id": "0", "username": "unknown", "discriminator": "0", "global_name": None,
-                "avatar": None, "bot": False, "public_flags": 0}
+                "avatar": None, "bot": False, "public_flags": 0, "primary_guild": None}
     return {
         "id": row["discord_user_id"],
         "username": row["username"],
@@ -160,4 +160,5 @@ async def _member_user(pool: asyncpg.Pool, application_pk: UUID, person_id: UUID
         "avatar": row["avatar_hash"],
         "bot": False,
         "public_flags": 0,
+        "primary_guild": None,
     }

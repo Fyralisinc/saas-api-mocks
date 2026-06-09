@@ -45,7 +45,7 @@ def _author_obj(row: dict[str, Any]) -> dict[str, Any]:
     return {
         "id": "0", "username": "deleted_user", "discriminator": "0000",
         "global_name": None, "avatar": None, "bot": False, "system": False,
-        "public_flags": 0, "flags": 0,
+        "public_flags": 0, "flags": 0, "primary_guild": None,
     }
 
 

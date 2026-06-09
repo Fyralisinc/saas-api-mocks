@@ -1058,3 +1058,64 @@ async def inject_jira_issue(
     return event_id
 
 
+async def inject_quickbooks_change(
+    pool: asyncpg.Pool,
+    run_id: UUID,
+    *,
+    entity_name: str = "Bill",
+    operation: str = "Create",
+    amount_usd: Optional[int] = None,
+    memo: Optional[str] = None,
+    at_virtual: Optional[datetime] = None,
+) -> UUID:
+    """Append a new QBO transaction (a ``purchase`` -> a new Bill/BillPayment) plus
+    a thin ``quickbooks.change`` timeline event that drives the signed Intuit
+    ``eventNotifications`` webhook. The notification is body-less, so the consumer
+    re-queries the entity by ``Id`` to fetch it (the new purchase row makes the
+    Bill/BillPayment queryable)."""
+    import secrets as _secrets
+    company = await pool.fetchrow(
+        "SELECT id, realm_id FROM app_quickbooks.companies WHERE run_id=$1", run_id)
+    if company is None:
+        raise LookupError("no quickbooks company in this run; did you forget `prepare`?")
+    company_pk = company["id"]
+    vendor = await pool.fetchrow(
+        "SELECT id, vendor_id, display_name FROM app_quickbooks.vendors "
+        "WHERE company_pk=$1 ORDER BY random() LIMIT 1", company_pk)
+    expense = await pool.fetchval(
+        "SELECT id FROM app_quickbooks.accounts WHERE company_pk=$1 AND account_number=$2",
+        company_pk, "5000")
+    payacct = await pool.fetchval(
+        "SELECT id FROM app_quickbooks.accounts WHERE company_pk=$1 AND account_number=$2",
+        company_pk, "1000")
+    actor = await pool.fetchval(
+        "SELECT id FROM org.people WHERE run_id=$1 ORDER BY random() LIMIT 1", run_id)
+    clock = await get_clock(pool, run_id)
+    when = at_virtual or clock.virtual_now
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+
+    purchase_id = f"live-{_secrets.token_hex(6)}"
+    # The notification id is the ENTITY's Id: Bill==purchase_id, BillPayment=='BP-'+id.
+    entity_id = f"BP-{purchase_id}" if entity_name == "BillPayment" else purchase_id
+    amount_cents = int(amount_usd if amount_usd is not None
+                       else _secrets.randbelow(9000) + 1000) * 100
+    event_id = uuid4()
+    await pool.execute(
+        """INSERT INTO timeline.events
+            (id, run_id, virtual_ts, type, actor_id, payload, cross_refs, is_historical)
+           VALUES ($1,$2,$3,'quickbooks.change',$4,$5::jsonb,'{}'::jsonb,FALSE)""",
+        event_id, run_id, when, actor,
+        json.dumps({"entity_name": entity_name, "entity_id": entity_id,
+                    "operation": operation, "realm_id": company["realm_id"]}))
+    await pool.execute(
+        """INSERT INTO app_quickbooks.purchases
+            (id, company_pk, purchase_id, txn_date, amount_cents, vendor_pk,
+             expense_account_pk, payment_account_pk, category, memo, payload, created_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'live',$9,'{}'::jsonb,$10)""",
+        uuid4(), company_pk, purchase_id, when.date(), amount_cents,
+        vendor["id"] if vendor else None, expense, payacct,
+        memo or "Live QBO change", when)
+    return event_id
+
+

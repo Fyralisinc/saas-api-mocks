@@ -80,6 +80,25 @@ def github_verify(secret: Union[str, bytes], header: str, body: Union[str, bytes
     return hmac.compare_digest(expected, header or "")
 
 
+# ---------- Intuit / QuickBooks Online ----------
+
+def intuit_sign(verifier_token: Union[str, bytes], body: Union[str, bytes]) -> str:
+    """Return the value for QBO's ``intuit-signature`` webhook header.
+
+    Real Intuit: **base64**(HMAC-SHA256(verifierToken, rawBody)) — base64, NOT hex,
+    and with no algorithm prefix.
+    """
+    import base64
+    mac = hmac.new(_to_bytes(verifier_token), _to_bytes(body), hashlib.sha256).digest()
+    return base64.b64encode(mac).decode("ascii")
+
+
+def intuit_verify(verifier_token: Union[str, bytes], header: str,
+                  body: Union[str, bytes]) -> bool:
+    expected = intuit_sign(verifier_token, body)
+    return hmac.compare_digest(expected, header or "")
+
+
 def github_sign_sha1(secret: Union[str, bytes], body: Union[str, bytes]) -> str:
     """Return the value for the legacy ``X-Hub-Signature`` header.
 

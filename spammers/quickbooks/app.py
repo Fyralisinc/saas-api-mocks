@@ -1,34 +1,33 @@
-"""QuickBooks Online mock — FastAPI app.
+"""QuickBooks Online (QBO) Accounting API v3 mock — FastAPI app.
 
-Exposes the read endpoints a real connector hits against the QBO REST API v3:
+The real surface a connector hits is the **query** endpoint and CompanyInfo:
 
+    GET /v3/company/{realmId}/query?query=<SQL>&minorversion=75
     GET /v3/company/{realmId}/companyinfo/{realmId}
-    GET /v3/company/{realmId}/account            — list accounts
-    GET /v3/company/{realmId}/vendor             — list vendors
-    GET /v3/company/{realmId}/employee           — list employees
-    GET /v3/company/{realmId}/deposit            — list deposits
-    GET /v3/company/{realmId}/purchase           — list purchases
 
-Pagination uses ``startposition`` + ``maxresults`` (QBO native). Responses are
-shaped as ``{QueryResponse: {<Resource>: [...], startPosition, maxResults}}``
-matching QBO's envelope so a connector can iterate without special-casing.
+Fyralis ingests the four transactional entities Invoice / Bill / BillPayment /
+Payment via the query endpoint; we project the corpus finance data into those
+QBO shapes at read time (see dto.py). Auth is OAuth ``Authorization: Bearer``;
+errors are QBO ``Fault`` envelopes; rate limiting is HTTP 429 ThrottleExceeded.
 
-Writes happen via the corpus replay layer, not these endpoints — there is no
-``POST`` path here. (A real connector for QuickBooks is read-only for ingest.)
-
-OAuth: this mock accepts any ``Authorization: Bearer …`` header. The corpus
-provisions credentials in oauth.installs that match a real QBO connection.
+Mock-only: ``POST /_control/rate_limit?count=N`` arms N forced 429s (not part of
+the real API; mirrors the notion/github controls).
 """
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from typing import Any
+from datetime import datetime, timezone
+from typing import Any, Optional
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from spammers.quickbooks import dto as _dto
 from spammers.quickbooks import state as _state
+from spammers.quickbooks.auth import is_authed
+from spammers.quickbooks.query import parse_query
+
+_FORCED_429 = {"count": 0}
 
 
 @asynccontextmanager
@@ -38,22 +37,117 @@ async def _lifespan(app: FastAPI):
     await _state.shutdown()
 
 
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+
+
+def _fault(status: int, message: str, *, code: str, fault_type: str,
+           detail: str = "") -> JSONResponse:
+    err: dict[str, Any] = {"Message": message, "code": code}
+    if detail:
+        err["Detail"] = detail
+    return JSONResponse(
+        {"Fault": {"Error": [err], "type": fault_type}, "time": _now_iso()},
+        status_code=status,
+    )
+
+
+def _unauthorized() -> JSONResponse:
+    return _fault(401, "AuthenticationFailed", code="3200",
+                  fault_type="AUTHENTICATION", detail="Token expired or invalid")
+
+
+def _envelope(entity: str, items: list[dict], *, start_position: int) -> dict:
+    return {
+        "QueryResponse": {
+            entity: items,
+            "startPosition": start_position,
+            "maxResults": len(items),
+        },
+        "time": _now_iso(),
+    }
+
+
+# ---- source fetchers (project corpus finance rows -> QBO entities) ----------
+
+_PURCHASE_COLS = """p.purchase_id, p.txn_date, p.amount_cents, p.created_at,
+           v.vendor_id, v.display_name AS vendor_name,
+           ea.account_number AS expense_acct_num, ea.name AS expense_acct_name,
+           pa.account_number AS pay_acct_num, pa.name AS pay_acct_name"""
+_PURCHASE_FROM = """FROM app_quickbooks.purchases p
+      LEFT JOIN app_quickbooks.vendors  v  ON v.id  = p.vendor_pk
+      LEFT JOIN app_quickbooks.accounts ea ON ea.id = p.expense_account_pk
+      LEFT JOIN app_quickbooks.accounts pa ON pa.id = p.payment_account_pk
+     WHERE p.company_pk = $1"""
+_PURCHASE_ORDER = "ORDER BY p.created_at, p.purchase_id"
+
+_GRANT_COLS = """d.deposit_id, d.txn_date, d.amount_cents, d.created_at, d.lead,
+           da.account_number AS dep_acct_num, da.name AS dep_acct_name"""
+_GRANT_FROM = """FROM app_quickbooks.deposits d
+      LEFT JOIN app_quickbooks.accounts da ON da.id = d.deposit_to_account_pk
+     WHERE d.company_pk = $1 AND d.round_kind = 'grant'"""
+_GRANT_ORDER = "ORDER BY d.created_at, d.deposit_id"
+
+# entity -> (cols, from, order, updated_col, id_col, id_prefix, DTO)
+_ENTITY_SOURCES = {
+    "Bill":        (_PURCHASE_COLS, _PURCHASE_FROM, _PURCHASE_ORDER, "p.created_at",
+                    "p.purchase_id", "", _dto.bill_dto),
+    "BillPayment": (_PURCHASE_COLS, _PURCHASE_FROM, _PURCHASE_ORDER, "p.created_at",
+                    "p.purchase_id", "BP-", _dto.bill_payment_dto),
+    "Invoice":     (_GRANT_COLS, _GRANT_FROM, _GRANT_ORDER, "d.created_at",
+                    "d.deposit_id", "", _dto.invoice_dto),
+    "Payment":     (_GRANT_COLS, _GRANT_FROM, _GRANT_ORDER, "d.created_at",
+                    "d.deposit_id", "P-", _dto.payment_dto),
+}
+
+
+def _where(entity: str, *, updated_after, id_equals, params: list) -> str:
+    _, _, _, ucol, id_col, prefix, _ = _ENTITY_SOURCES[entity]
+    clauses = []
+    if id_equals is not None:
+        src_id = (id_equals[len(prefix):]
+                  if prefix and id_equals.startswith(prefix) else id_equals)
+        params.append(src_id)
+        clauses.append(f"{id_col} = ${len(params)}")
+    if updated_after is not None:
+        params.append(updated_after)
+        clauses.append(f"{ucol} > ${len(params)}")
+    return (" AND " + " AND ".join(clauses)) if clauses else ""
+
+
+async def _fetch_entity(pool, company_pk, entity: str, *, updated_after, id_equals,
+                        offset, limit):
+    cols, frm, order, *_rest = _ENTITY_SOURCES[entity]
+    dto_fn = _ENTITY_SOURCES[entity][-1]
+    params: list = [company_pk]
+    flt = _where(entity, updated_after=updated_after, id_equals=id_equals, params=params)
+    params.append(limit)
+    params.append(offset)
+    sql = (f"SELECT {cols} {frm}{flt} {order} "
+           f"LIMIT ${len(params)-1} OFFSET ${len(params)}")
+    rows = await pool.fetch(sql, *params)
+    return [dto_fn(dict(r)) for r in rows]
+
+
+async def _count_entity(pool, company_pk, entity: str, *, updated_after) -> int:
+    cols, frm, order, *_ = _ENTITY_SOURCES[entity]
+    params: list = [company_pk]
+    flt = _where(entity, updated_after=updated_after, id_equals=None, params=params)
+    sql = f"SELECT count(*) {frm}{flt}"
+    return int(await pool.fetchval(sql, *params))
+
+
 def create_app() -> FastAPI:
     app = FastAPI(title="QuickBooks Online mock", lifespan=_lifespan)
 
-    @app.exception_handler(StarletteHTTPException)
-    async def _http_exc(request, exc: StarletteHTTPException):
-        # QBO returns errors as Fault objects.
-        return JSONResponse({
-            "Fault": {
-                "Error": [{
-                    "Message": exc.detail if isinstance(exc.detail, str) else "Error",
-                    "code": str(exc.status_code),
-                }],
-                "type": "ValidationFault" if exc.status_code == 400 else "SystemFault",
-            },
-            "time": _now_iso(),
-        }, status_code=exc.status_code)
+    @app.middleware("http")
+    async def _rate_limit(request: Request, call_next):
+        if request.url.path.startswith("/v3/") and _FORCED_429["count"] > 0:
+            _FORCED_429["count"] -= 1
+            return _fault(429, "ThrottleExceeded", code="003001",
+                          fault_type="THROTTLE",
+                          detail="The request limit for this resource has been reached.")
+        return await call_next(request)
 
     @app.get("/_health")
     async def health():
@@ -62,181 +156,55 @@ def create_app() -> FastAPI:
         return {"ok": True, "service": "quickbooks-mock",
                 "run_id": str(s.run_id), "realm_id": realm_id}
 
-    # ---- CompanyInfo --------------------------------------------------------
+    @app.post("/_control/rate_limit")
+    async def arm_rate_limit(count: int = 1):
+        _FORCED_429["count"] = max(0, count)
+        return {"armed": _FORCED_429["count"]}
 
     @app.get("/v3/company/{realm_id}/companyinfo/{realm_id_again}")
-    async def company_info(realm_id: str, realm_id_again: str):
+    async def company_info(request: Request, realm_id: str, realm_id_again: str):
+        if not is_authed(request):
+            return _unauthorized()
         s = _state.state()
         company_pk = await _state.company_pk_for_realm(s.pool, s.run_id, realm_id)
         if company_pk is None:
-            raise HTTPException(404, f"company {realm_id} not found")
+            return _fault(404, "Object Not Found", code="610", fault_type="ValidationFault",
+                          detail=f"company {realm_id} not found")
         row = await s.pool.fetchrow(
             "SELECT realm_id, company_name, legal_name, country, currency, "
-            "fiscal_year_start, created_at "
-            "FROM app_quickbooks.companies WHERE id = $1", company_pk)
-        return _envelope("CompanyInfo", [{
-            "Id":               row["realm_id"],
-            "CompanyName":      row["company_name"],
-            "LegalName":        row["legal_name"],
-            "Country":          row["country"],
-            "DefaultCurrencyRef": {"value": row["currency"]},
-            "FiscalYearStartMonth": row["fiscal_year_start"],
-            "MetaData": {"CreateTime": row["created_at"].isoformat()},
-        }])
-
-    # ---- List endpoints (paginated) ----------------------------------------
-
-    def _paged_list(resource: str, sql: str, *, json_keys: dict | None = None):
-        async def handler(
-            realm_id: str,
-            startposition: int = Query(1, ge=1),
-            maxresults: int = Query(100, ge=1, le=1000),
-        ):
-            s = _state.state()
-            company_pk = await _state.company_pk_for_realm(s.pool, s.run_id, realm_id)
-            if company_pk is None:
-                raise HTTPException(404, f"company {realm_id} not found")
-            rows = await s.pool.fetch(
-                sql, company_pk, maxresults, startposition - 1,
-            )
-            return _envelope(resource, [_row_to_qbo(r, resource, json_keys or {}) for r in rows],
-                             startposition=startposition, maxresults=len(rows))
-        return handler
-
-    # IMPORTANT: each /v3/company/{realm_id}/{resource} listing also has a
-    # canonical query form via the QBO `?query=SELECT * FROM <Resource>` endpoint,
-    # but real connectors generally use the resource-listing URLs against the
-    # community libraries — both shapes here.
-
-    app.get("/v3/company/{realm_id}/account")(
-        _paged_list("Account",
-            """SELECT account_id, account_number, name, type, subtype,
-                      description, currency, current_balance_cents, created_at
-                 FROM app_quickbooks.accounts WHERE company_pk = $1
-                ORDER BY account_number LIMIT $2 OFFSET $3"""))
-
-    app.get("/v3/company/{realm_id}/vendor")(
-        _paged_list("Vendor",
-            """SELECT vendor_id, display_name, active, currency, created_at
-                 FROM app_quickbooks.vendors WHERE company_pk = $1
-                ORDER BY display_name LIMIT $2 OFFSET $3"""))
-
-    app.get("/v3/company/{realm_id}/employee")(
-        _paged_list("Employee",
-            """SELECT employee_id, display_name, email, title, team,
-                      location_bucket, annual_salary_cents, active,
-                      hired_at, released_at, created_at
-                 FROM app_quickbooks.employees WHERE company_pk = $1
-                ORDER BY hired_at LIMIT $2 OFFSET $3"""))
-
-    app.get("/v3/company/{realm_id}/deposit")(
-        _paged_list("Deposit",
-            """SELECT deposit_id, txn_date, amount_cents,
-                      round_id, round_kind, lead, participants, memo, created_at
-                 FROM app_quickbooks.deposits WHERE company_pk = $1
-                ORDER BY txn_date LIMIT $2 OFFSET $3""",
-            json_keys={"participants"}))
-
-    app.get("/v3/company/{realm_id}/purchase")(
-        _paged_list("Purchase",
-            """SELECT purchase_id, txn_date, amount_cents, category,
-                      memo, payload, created_at
-                 FROM app_quickbooks.purchases WHERE company_pk = $1
-                ORDER BY txn_date LIMIT $2 OFFSET $3""",
-            json_keys={"payload"}))
-
-    # ---- Minimal query endpoint (SQL-like SELECT) --------------------------
+            "fiscal_year_start, created_at FROM app_quickbooks.companies WHERE id=$1",
+            company_pk)
+        return JSONResponse({"CompanyInfo": _dto.company_info_dto(dict(row)),
+                             "time": _now_iso()})
 
     @app.get("/v3/company/{realm_id}/query")
-    async def query(realm_id: str,
-                    query: str = Query(..., description="QBO SQL-like SELECT")):
-        # Just enough to honor `SELECT * FROM <Resource>` — the real QBO query
-        # language is much richer; a connector should fall back to resource
-        # endpoints for anything non-trivial.
-        q = (query or "").strip().lower()
-        if not q.startswith("select"):
-            raise HTTPException(400, "only SELECT supported")
-        for resource, endpoint in (
-            ("account", "/v3/company/{}/account"),
-            ("vendor",  "/v3/company/{}/vendor"),
-            ("employee", "/v3/company/{}/employee"),
-            ("deposit", "/v3/company/{}/deposit"),
-            ("purchase", "/v3/company/{}/purchase"),
-        ):
-            if f"from {resource}" in q:
-                # Route into the corresponding list endpoint by calling the
-                # handler directly — simplest way to share pagination logic.
-                from fastapi import Request
-                # Minimal forward: re-call the list handler with default paging.
-                # Real implementations would parse SELECT clauses; we do not.
-                from starlette.requests import Request as _Req
-                # Easiest: re-execute the SQL directly.
-                s = _state.state()
-                company_pk = await _state.company_pk_for_realm(s.pool, s.run_id, realm_id)
-                if company_pk is None:
-                    raise HTTPException(404, f"company {realm_id} not found")
-                limit = 1000
-                table = {
-                    "account":  ("Account",   "SELECT * FROM app_quickbooks.accounts  WHERE company_pk = $1 ORDER BY account_number LIMIT $2"),
-                    "vendor":   ("Vendor",    "SELECT * FROM app_quickbooks.vendors   WHERE company_pk = $1 ORDER BY display_name LIMIT $2"),
-                    "employee": ("Employee",  "SELECT * FROM app_quickbooks.employees WHERE company_pk = $1 ORDER BY hired_at LIMIT $2"),
-                    "deposit":  ("Deposit",   "SELECT * FROM app_quickbooks.deposits  WHERE company_pk = $1 ORDER BY txn_date LIMIT $2"),
-                    "purchase": ("Purchase",  "SELECT * FROM app_quickbooks.purchases WHERE company_pk = $1 ORDER BY txn_date LIMIT $2"),
-                }[resource]
-                qb_resource, sql = table
-                rows = await s.pool.fetch(sql, company_pk, limit)
-                return _envelope(qb_resource, [_row_to_qbo(r, qb_resource, {}) for r in rows])
-        raise HTTPException(400, "unrecognized resource in query")
+    async def query(request: Request, realm_id: str):
+        if not is_authed(request):
+            return _unauthorized()
+        s = _state.state()
+        company_pk = await _state.company_pk_for_realm(s.pool, s.run_id, realm_id)
+        if company_pk is None:
+            return _fault(404, "Object Not Found", code="610", fault_type="ValidationFault",
+                          detail=f"company {realm_id} not found")
+        raw = request.query_params.get("query")
+        if not raw:
+            return _fault(400, "Required param query is missing", code="4000",
+                          fault_type="ValidationFault")
+        q = parse_query(raw)
+        if q.entity is None or q.entity not in _ENTITY_SOURCES:
+            return _fault(400, "QueryParserError", code="4000", fault_type="ValidationFault",
+                          detail=f"unsupported entity in query: {raw[:120]}")
+        if q.is_count:
+            total = await _count_entity(s.pool, company_pk, q.entity,
+                                        updated_after=q.updated_after)
+            return JSONResponse(
+                {"QueryResponse": {"totalCount": total}, "time": _now_iso()})
+        items = await _fetch_entity(
+            s.pool, company_pk, q.entity, updated_after=q.updated_after,
+            id_equals=q.id_equals, offset=q.start_position - 1, limit=q.max_results)
+        return JSONResponse(_envelope(q.entity, items, start_position=q.start_position))
 
     return app
-
-
-# ---- helpers --------------------------------------------------------------
-
-def _envelope(resource: str, items: list[dict],
-              startposition: int = 1, maxresults: int | None = None) -> dict:
-    return {
-        "QueryResponse": {
-            resource: items,
-            "startPosition": startposition,
-            "maxResults": maxresults if maxresults is not None else len(items),
-            "totalCount": len(items),
-        },
-        "time": _now_iso(),
-    }
-
-
-def _row_to_qbo(row, resource: str, json_keys: set) -> dict:
-    """Map a DB row to the QBO API JSON shape. Best-effort field renames."""
-    import json as _json
-    d = {}
-    for k, v in dict(row).items():
-        if k in json_keys and isinstance(v, str):
-            try: v = _json.loads(v)
-            except (ValueError, TypeError): pass
-        # Cents → decimal-2 USD for Amount fields.
-        if k.endswith("_cents") and isinstance(v, int):
-            d[_qbo_name(k.removesuffix("_cents"))] = round(v / 100, 2)
-            continue
-        d[_qbo_name(k)] = v.isoformat() if hasattr(v, "isoformat") else v
-    return d
-
-
-def _qbo_name(k: str) -> str:
-    # snake_case → QBO's PascalCase, plus a few known exceptions.
-    overrides = {
-        "deposit_id": "Id", "purchase_id": "Id", "employee_id": "Id",
-        "vendor_id":  "Id", "account_id":   "Id",
-        "display_name": "DisplayName", "company_name": "CompanyName",
-    }
-    if k in overrides:
-        return overrides[k]
-    return "".join(part.capitalize() for part in k.split("_"))
-
-
-def _now_iso() -> str:
-    from datetime import datetime, timezone
-    return datetime.now(timezone.utc).isoformat()
 
 
 app = create_app()

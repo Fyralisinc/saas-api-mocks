@@ -37,6 +37,7 @@ from spammers.orggen.live import (
     inject_github_event,
     inject_github_lifecycle,
     inject_jira_issue,
+    inject_quickbooks_change,
     inject_notion_page,
     inject_notion_page_update,
     inject_slack_message,
@@ -130,6 +131,7 @@ async def _cmd_emit(args: argparse.Namespace) -> int:
     notion_webhook_url = args.notion_webhook_url or f"{fyralis_base}/webhooks/notion"
     gmail_pubsub_url = args.gmail_pubsub_url or f"{fyralis_base}/webhooks/gmail/pubsub"
     jira_webhook_url = args.jira_webhook_url or f"{fyralis_base}/webhooks/jira"
+    quickbooks_webhook_url = args.quickbooks_webhook_url or f"{fyralis_base}/webhooks/quickbooks"
 
     # set live mode at requested speed
     await set_mode(pool, rid, mode="live", speed_multiplier=args.speed)
@@ -145,7 +147,8 @@ async def _cmd_emit(args: argparse.Namespace) -> int:
                         discord_interactions_url=discord_interactions_url,
                         notion_webhook_url=notion_webhook_url,
                         gmail_pubsub_url=gmail_pubsub_url,
-                        jira_webhook_url=jira_webhook_url)
+                        jira_webhook_url=jira_webhook_url,
+                        quickbooks_webhook_url=quickbooks_webhook_url)
     loop.start()
     _eprint(f"emitting → slack:{slack_events_url} github:{github_events_url} "
             f"discord:{discord_interactions_url} notion:{notion_webhook_url} "
@@ -234,6 +237,10 @@ async def _cmd_inject(args: argparse.Namespace) -> int:
         event_id = await inject_jira_issue(
             pool, rid, handle=args.handle, project=args.target, summary=args.text,
         )
+    elif args.provider == "quickbooks":
+        event_id = await inject_quickbooks_change(
+            pool, rid, entity_name=args.target or "Bill", memo=args.text,
+        )
     else:
         event_id = await inject_slack_message(
             pool, rid,
@@ -311,7 +318,8 @@ async def _cmd_reset(args: argparse.Namespace) -> int:
         await pool.close()
         return 2
     schemas = ["timeline", "app_slack", "app_discord", "app_github", "app_gmail",
-               "app_calendar", "app_notion", "app_drive", "app_jira", "oauth", "org"]
+               "app_calendar", "app_notion", "app_drive", "app_jira", "app_quickbooks",
+               "oauth", "org"]
     for s in schemas:
         await pool.execute(f"DROP SCHEMA IF EXISTS {s} CASCADE")
     _eprint(f"dropped schemas: {schemas}")
@@ -364,13 +372,15 @@ def main() -> None:
                         help="defaults to {fyralis_base}/webhooks/gmail/pubsub")
     p_emit.add_argument("--jira-webhook-url", default=None,
                         help="defaults to {fyralis_base}/webhooks/jira")
+    p_emit.add_argument("--quickbooks-webhook-url", default=None,
+                        help="defaults to {fyralis_base}/webhooks/quickbooks")
     p_emit.set_defaults(func=_cmd_emit)
 
     p_inj = sub.add_parser("inject", help="inject a one-off live event")
     p_inj.add_argument("--run-id", default=None)
     p_inj.add_argument("--provider",
                        choices=["slack", "discord", "github", "notion", "gmail",
-                                "calendar", "drive", "jira"],
+                                "calendar", "drive", "jira", "quickbooks"],
                        default="slack")
     p_inj.add_argument("--handle", default=None, help="org.people.handle (default: random)")
     p_inj.add_argument("--channel", default="#general", help="slack/discord channel")

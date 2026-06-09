@@ -149,7 +149,8 @@ cmd_serve() {
         notion)   default_port=7006 ;;
         drive)    default_port=7007 ;;
         jira)     default_port=7008 ;;
-        *) c_red "unknown provider: $provider (use slack|discord|github|gmail|calendar|notion|drive|jira)"; exit 1 ;;
+        quickbooks) default_port=7009 ;;
+        *) c_red "unknown provider: $provider (use slack|discord|github|gmail|calendar|notion|drive|jira|quickbooks)"; exit 1 ;;
     esac
     local port="${PORT:-$default_port}"
     echo "$provider mock on http://localhost:$port  (health: /_health)"

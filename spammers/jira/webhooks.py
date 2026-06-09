@@ -24,7 +24,7 @@ import structlog
 
 from spammers.common.signing import github_sign  # returns "sha256=<hex>"
 from spammers.common.webhook_emitter import deliver, mark_emitted
-from spammers.jira.dto import jira_ts
+from spammers.jira.dto import issue_dto, user_dto
 
 log = structlog.get_logger("spammers.jira.webhooks")
 
@@ -66,20 +66,22 @@ async def emit_event(
             "SELECT * FROM app_jira.changelogs WHERE issue_pk=$1 AND history_id=$2",
             issue["id"], str(history_id))
 
-    actor = {"accountId": issue["reporter_account_id"]} if issue["reporter_account_id"] else None
-    issue_obj = {
-        "id": str(issue["issue_id"]),
-        "key": issue["issue_key"],
-        "self": f"{base_url}/rest/api/3/issue/{issue['issue_id']}",
-        "fields": {
-            "summary": issue["summary"],
-            "status": {"name": issue["status"]},
-            "updated": jira_ts(issue["updated_at"]),
-            "project": {"id": issue["project_id"], "key": issue["project_key"],
-                        "name": issue["project_name"]},
-        },
-    }
+    # Build the FULL issue resource the real webhook carries (all navigable
+    # fields, ADF description, full user objects) so a webhook-delivered change
+    # is byte-identical to its backfill twin. Comment is non-navigable + excluded
+    # from the webhook issue; changelog rides the envelope top level, not here.
+    users = {r["account_id"]: dict(r) for r in await pool.fetch(
+        "SELECT account_id, email, display_name FROM app_jira.users WHERE installation_pk=$1",
+        inst["id"])}
+    project = await pool.fetchrow(
+        "SELECT * FROM app_jira.projects WHERE id=$1", issue["project_pk"])
+    issue_obj = issue_dto(
+        dict(issue), base_url=base_url, users=users, project=dict(project),
+        comments=[], histories=[], requested_fields={"*navigable"}, include_changelog=False)
+    actor = user_dto(issue["reporter_account_id"], users, base_url)
     envelope = {
+        # Webhook `timestamp` is integer epoch-ms — NOT the REST `.SSS+0000`
+        # string format the embedded issue/comment objects use.
         "timestamp": int(time.time() * 1000),
         "webhookEvent": "jira:issue_updated",
         "issue_event_type_name": "issue_generic",

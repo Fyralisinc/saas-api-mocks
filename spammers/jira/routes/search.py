@@ -23,7 +23,7 @@ from spammers.jira.state import state
 router = APIRouter()
 
 _DEFAULT_MAX = 50
-_HARD_MAX = 100
+_HARD_MAX = 5000  # real /search/jql cap (id/key-only pages); fields reduce it server-side
 
 
 async def _read_json(request: Request) -> dict:
@@ -61,7 +61,9 @@ async def _run_search(
     next_page_token: Optional[str],
 ) -> dict[str, Any]:
     include_changelog = "changelog" in expand_str
-    include_comment = ("comment" in field_set) or ("*all" in field_set) or not field_set
+    # `comment` is a non-navigable field: fetched only when explicitly selected
+    # (or via `*all`). A default/empty selector returns IDs only — no comment.
+    want_comment = ("comment" in field_set) or ("*all" in field_set)
 
     st = state()
     project, issues = await _matching_issues(st, inst, jql_str)
@@ -76,7 +78,7 @@ async def _run_search(
     out_issues: list[dict[str, Any]] = []
     for issue in page:
         comments = histories = []
-        if include_comment:
+        if want_comment:
             comments = [dict(c) for c in await st.pool.fetch(
                 "SELECT * FROM app_jira.comments WHERE issue_pk=$1 ORDER BY position, created_at",
                 issue["id"])]
@@ -87,7 +89,7 @@ async def _run_search(
         out_issues.append(issue_dto(
             issue, base_url=base_url, users=users, project=project,
             comments=comments, histories=histories,
-            include_comment=include_comment, include_changelog=include_changelog,
+            requested_fields=field_set, include_changelog=include_changelog,
         ))
 
     more = offset + max_results < len(issues)

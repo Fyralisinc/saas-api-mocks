@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-from spammers.tests.jira.conftest import ACCOUNT_EMAIL, PROJECT_KEY, basic_header
+from spammers.tests.jira.conftest import ACCOUNT_EMAIL, BASE_URL, PROJECT_KEY, basic_header
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
 
@@ -113,6 +113,69 @@ async def test_search_jql_get(jira_client, jira_auth):
     assert len(resp["issues"]) == 3 and resp["isLast"] is True
     assert resp["issues"][0]["fields"]["comment"]["total"] == 1
     assert len(resp["issues"][0]["changelog"]["histories"]) == 1
+
+
+# ---- field selection (the new /search/jql contract) -----------------------
+
+async def test_search_jql_default_fields_id_only(jira_client, jira_auth):
+    # Real /search/jql default (no `fields`) returns IDs ONLY — `fields` == {} —
+    # unlike the old /search whose default was *navigable.
+    body = {"jql": f'project = "{PROJECT_KEY}" ORDER BY updated ASC', "maxResults": 50}
+    r = await jira_client.post("/rest/api/3/search/jql", json=body, headers=jira_auth)
+    issues = r.json()["issues"]
+    assert len(issues) == 3
+    for i in issues:
+        assert {"id", "key", "self", "fields"} <= set(i)
+        assert i["fields"] == {}
+
+
+async def test_search_jql_field_projection(jira_client, jira_auth):
+    # An explicit `fields` returns ONLY those keys — not the full issue.
+    body = {"jql": f'project = "{PROJECT_KEY}" ORDER BY updated ASC',
+            "fields": ["summary", "status"]}
+    r = await jira_client.post("/rest/api/3/search/jql", json=body, headers=jira_auth)
+    f = r.json()["issues"][0]["fields"]
+    assert set(f) == {"summary", "status"}
+    assert "comment" not in f and "reporter" not in f and "description" not in f
+
+
+async def test_search_jql_navigable_vs_all(jira_client, jira_auth):
+    # *navigable returns the navigable fields but NOT comment; *all includes it.
+    nav = await jira_client.post(
+        "/rest/api/3/search/jql",
+        json={"jql": f'project = "{PROJECT_KEY}" ORDER BY updated ASC',
+              "fields": ["*navigable"]}, headers=jira_auth)
+    f = nav.json()["issues"][0]["fields"]
+    assert "summary" in f and "reporter" in f and "status" in f
+    assert "comment" not in f
+    allf = await jira_client.post(
+        "/rest/api/3/search/jql",
+        json={"jql": f'project = "{PROJECT_KEY}" ORDER BY updated ASC',
+              "fields": ["*all"]}, headers=jira_auth)
+    # ENG-1 (first, updated ASC) carries one comment.
+    assert allf.json()["issues"][0]["fields"]["comment"]["total"] == 1
+
+
+async def test_status_category_full_shape(jira_client, jira_auth):
+    body = {"jql": f'project = "{PROJECT_KEY}" ORDER BY updated ASC', "fields": ["status"]}
+    r = await jira_client.post("/rest/api/3/search/jql", json=body, headers=jira_auth)
+    st = r.json()["issues"][0]["fields"]["status"]  # ENG-1 -> Done
+    assert st["name"] == "Done"
+    assert st["self"].startswith(BASE_URL)
+    cat = st["statusCategory"]
+    assert cat["id"] == 3 and cat["key"] == "done"
+    assert cat["colorName"] == "green"
+    assert cat["self"].endswith("/statuscategory/3")
+
+
+async def test_user_object_self_and_avatars(jira_client, jira_auth):
+    body = {"jql": f'project = "{PROJECT_KEY}" ORDER BY updated ASC', "fields": ["reporter"]}
+    r = await jira_client.post("/rest/api/3/search/jql", json=body, headers=jira_auth)
+    rep = r.json()["issues"][0]["fields"]["reporter"]
+    # Real Jira: User.self is the per-site account URL, never a placeholder host.
+    assert rep["self"] == f"{BASE_URL}/rest/api/3/user?accountId={rep['accountId']}"
+    assert "https://mock" not in rep["self"]
+    assert set(rep["avatarUrls"]) == {"16x16", "24x24", "32x32", "48x48"}
 
 
 async def test_error_envelope_not_fastapi_default(jira_client, jira_auth):

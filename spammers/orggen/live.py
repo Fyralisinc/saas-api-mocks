@@ -1002,9 +1002,23 @@ async def inject_jira_issue(
         inst["id"], reporter["id"])
     acct = ru["account_id"] if ru else None
     clock = await get_clock(pool, run_id)
-    when = at_virtual or (clock.virtual_now + timedelta(seconds=1))
-    if when.tzinfo is None:
-        when = when.replace(tzinfo=timezone.utc)
+    vnow = clock.virtual_now
+    if vnow.tzinfo is None:
+        vnow = vnow.replace(tzinfo=timezone.utc)
+    # Timeline event drains when virtual_ts <= virtual_now (so default = vnow, NOT
+    # vnow+1s which would never drain under a frozen clock). The ISSUE `updated`
+    # must be strictly-increasing + DISTINCT and PAST the backfill high-water so
+    # the reconciler's `updated >= floor` probe and the JQL cursor see it as new;
+    # real Jira never collides `updated` across edits.
+    prior_live = await pool.fetchval(
+        "SELECT count(*) FROM timeline.events "
+        "WHERE run_id=$1 AND type='jira.issue' AND is_historical=FALSE", run_id)
+    when_timeline = at_virtual or vnow
+    if when_timeline.tzinfo is None:
+        when_timeline = when_timeline.replace(tzinfo=timezone.utc)
+    when_entity = at_virtual or (vnow + timedelta(seconds=int(prior_live) + 1))
+    if when_entity.tzinfo is None:
+        when_entity = when_entity.replace(tzinfo=timezone.utc)
 
     import secrets as _secrets
     n = int(await pool.fetchval(
@@ -1022,7 +1036,7 @@ async def inject_jira_issue(
         """INSERT INTO timeline.events
             (id, run_id, virtual_ts, type, actor_id, payload, cross_refs, is_historical)
            VALUES ($1,$2,$3,'jira.issue',$4,$5::jsonb,'{}'::jsonb,FALSE)""",
-        event_id, run_id, when, reporter["id"],
+        event_id, run_id, when_timeline, reporter["id"],
         json.dumps({"issue_id": issue_id, "issue_key": issue_key, "history_id": history_id,
                     "kind": "issue_updated"}))
     await pool.execute(
@@ -1034,13 +1048,13 @@ async def inject_jira_issue(
            VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,'Task','In Progress','indeterminate','Medium',
                    NULL,NULL,$8,$8,$8,'["live"]'::jsonb,'[]'::jsonb,NULL,$9,$9,$10)""",
         issue_pk, inst["id"], proj["id"], issue_id, issue_key, summ, json.dumps(desc),
-        acct, when, event_id)
+        acct, when_entity, event_id)
     items = [{"field": "status", "fieldtype": "jira", "fieldId": "status",
               "from": "1", "fromString": "To Do", "to": "2", "toString": "In Progress"}]
     await pool.execute(
         """INSERT INTO app_jira.changelogs (id, issue_pk, history_id, author_account_id, items, created_at, position)
            VALUES ($1,$2,$3,$4,$5::jsonb,$6,0)""",
-        uuid4(), issue_pk, history_id, acct, json.dumps(items), when)
+        uuid4(), issue_pk, history_id, acct, json.dumps(items), when_entity)
     return event_id
 
 

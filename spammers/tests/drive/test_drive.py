@@ -128,7 +128,10 @@ async def test_export_and_alt_media(drive_client, drive_auth):
 async def test_comments_and_revisions(drive_client, drive_auth):
     # The earliest My Drive file (Design doc, modified offset 0h) carries the seeded comment + revisions.
     doc_id = "1fileMyDoc00000000000000000001"
-    cr = await drive_client.get(f"/drive/v3/files/{doc_id}/comments", headers=drive_auth)
+    # comments.list requires an explicit `fields` selector (real Drive contract).
+    cr = await drive_client.get(
+        f"/drive/v3/files/{doc_id}/comments?fields=comments(id,content,author,resolved)",
+        headers=drive_auth)
     cbody = cr.json()
     assert cbody["kind"] == "drive#commentList" and len(cbody["comments"]) == 1
     assert cbody["comments"][0]["content"] == "Looks good to me."
@@ -136,6 +139,18 @@ async def test_comments_and_revisions(drive_client, drive_auth):
     rr = await drive_client.get(f"/drive/v3/files/{doc_id}/revisions", headers=drive_auth)
     rbody = rr.json()
     assert rbody["kind"] == "drive#revisionList" and len(rbody["revisions"]) == 2
+
+
+async def test_comments_list_requires_fields(drive_client, drive_auth):
+    # Real Drive 400s comments.list when `fields` is omitted (documented quirk of
+    # the comments/replies collections; files/revisions/changes do NOT require it).
+    doc_id = "1fileMyDoc00000000000000000001"
+    r = await drive_client.get(f"/drive/v3/files/{doc_id}/comments", headers=drive_auth)
+    assert r.status_code == 400
+    err = r.json()["error"]
+    assert err["status"] == "INVALID_ARGUMENT"
+    assert err["errors"][0]["reason"] == "required"
+    assert err["errors"][0]["location"] == "fields"
 
 
 async def test_file_404(drive_client, drive_auth):

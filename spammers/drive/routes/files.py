@@ -83,9 +83,11 @@ async def list_files(request: Request):
         *params,
     )
     try:
-        page_size = max(1, min(int(q.get("pageSize", 200)), 1000))
+        # files.list caps pageSize at 100 ("values above 100 are changed to 100"),
+        # NOT 1000 (that is changes.list's cap).
+        page_size = max(1, min(int(q.get("pageSize", 100)), 100))
     except ValueError:
-        page_size = 200
+        page_size = 100
     offset = decode_offset(q.get("pageToken")) or 0
     page = rows[offset:offset + page_size]
     body = {"kind": "drive#fileList", "incompleteSearch": False,
@@ -112,6 +114,14 @@ async def export_file(request: Request, file_id: str):
 async def list_comments(request: Request, file_id: str):
     if require_claims(request) is None:
         return unauthorized()
+    # The comments collection REQUIRES an explicit `fields` selector; real Drive
+    # returns 400 when it is omitted (a documented quirk of comments/replies).
+    if "fields" not in request.query_params:
+        return JSONResponse(
+            google_error(400, "The 'fields' parameter is required for this method.",
+                         reason="required", location="fields", location_type="parameter"),
+            status_code=400,
+        )
     st = state()
     inst = await installation(st)
     row = await _file_row(st, inst["id"], file_id) if inst else None

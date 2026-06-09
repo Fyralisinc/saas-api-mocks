@@ -108,6 +108,22 @@ async def test_incremental_from_old_token_returns_changes(cal_client, cal_auth):
     assert "start" not in cancelled[0] and set(cancelled[0]) <= {"kind", "etag", "id", "status", "recurringEventId"}
 
 
+async def test_synctoken_with_full_sync_param_is_400(cal_client, cal_auth):
+    # Real Calendar 400s when syncToken is combined with timeMin/orderBy/etc.
+    # (the incremental query-param set is restricted). The mock previously ignored
+    # the conflicting params and 200'd — masking a real consumer bug.
+    full = (await cal_client.get(
+        "/calendar/v3/calendars/primary/events?timeMin=2000-01-01T00:00:00Z",
+        headers=cal_auth)).json()
+    sync = full["nextSyncToken"]
+    for extra in ("timeMin=2000-01-01T00:00:00Z", "orderBy=startTime", "updatedMin=2000-01-01T00:00:00Z"):
+        r = await cal_client.get(
+            f"/calendar/v3/calendars/primary/events?syncToken={urllib.parse.quote(sync)}&{extra}",
+            headers=cal_auth)
+        assert r.status_code == 400, extra
+        assert r.json()["error"]["code"] == 400
+
+
 async def test_expired_synctoken_is_410(cal_client, cal_auth):
     for tok in ("EXPIRED", "not-a-real-token"):
         r = await cal_client.get(

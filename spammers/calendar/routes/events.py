@@ -78,6 +78,22 @@ async def list_events(request: Request, calendar_id: str):
         max_results = _DEFAULT_MAX
     max_results = max(1, min(max_results, _HARD_MAX))
 
+    # Real Calendar rejects a syncToken combined with full-sync filters (HTTP 400):
+    # iCalUID/orderBy/privateExtendedProperty/q/sharedExtendedProperty/timeMin/
+    # timeMax/updatedMin are all incompatible with syncToken.
+    if sync_token is not None:
+        conflicting = sorted(
+            p for p in ("timeMin", "timeMax", "updatedMin", "orderBy", "q", "iCalUID")
+            if q.get(p) is not None)
+        if conflicting:
+            return JSONResponse(
+                google_error(400, "Sync token cannot be used with other request "
+                             "parameters: " + ", ".join(conflicting),
+                             reason="badRequest", domain="global",
+                             location="syncToken", location_type="parameter"),
+                status_code=400,
+            )
+
     cal_pk = cal["id"]
     tz = cal["time_zone"] or "UTC"
 

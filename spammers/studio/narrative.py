@@ -329,6 +329,13 @@ async def _db_signals(pool: asyncpg.Pool, run_id: UUID) -> dict[str, int]:
             WHERE c.run_id = $1""", run_id)
     out["gusto"] = int(val or 0)
 
+    # ---- carta: the cap-table stream (one observation per option grant)
+    val = await pool.fetchval(
+        """SELECT count(*) FROM app_carta.option_grants g
+             JOIN app_carta.issuers i ON i.id = g.issuer_pk
+            WHERE i.run_id = $1""", run_id)
+    out["carta"] = int(val or 0)
+
     return out
 
 

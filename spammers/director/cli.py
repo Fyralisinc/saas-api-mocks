@@ -150,6 +150,14 @@ async def _cmd_prepare(args: argparse.Namespace) -> int:
     from spammers.gusto.seed import seed_gusto
     gu = await seed_gusto(pool, rid, at=as_of)
     _eprint(f"gusto seeded: {gu}")
+    # Carta is a net-new Tier-C source: project the run's people into a startup
+    # cap table — stakeholders + share classes + option grants + SAFEs (REAL
+    # api.carta.com /v1alpha1 issuer suite with Google-AIP token pagination +
+    # protobuf-wrapper money/decimals, not the Fyralis QBO/Gusto SQL-query clone —
+    # divergence logged in carta-fidelity-audit; Carta is POLL-ONLY, no webhook).
+    from spammers.carta.seed import seed_carta
+    ca = await seed_carta(pool, rid, at=as_of)
+    _eprint(f"carta seeded: {ca}")
     _eprint(f"backfill summary: total={sum(counts.values())} kinds={len(counts)}")
     for k, v in sorted(counts.items(), key=lambda x: -x[1])[:8]:
         _eprint(f"  {v:>6d}  {k}")
@@ -447,7 +455,7 @@ async def _cmd_reset(args: argparse.Namespace) -> int:
                "app_calendar", "app_notion", "app_drive", "app_jira", "app_quickbooks",
                "app_grafana", "app_mercury", "app_ashby", "app_brex", "app_deel",
                "app_hibob", "app_figma", "app_miro", "app_ramp", "app_gusto",
-               "oauth", "org"]
+               "app_carta", "oauth", "org"]
     for s in schemas:
         await pool.execute(f"DROP SCHEMA IF EXISTS {s} CASCADE")
     _eprint(f"dropped schemas: {schemas}")

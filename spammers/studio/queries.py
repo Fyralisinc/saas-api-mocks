@@ -281,11 +281,25 @@ async def provider_status(pool: asyncpg.Pool, run_id: UUID) -> dict:
         gusto["payrolls"] = int(await pool.fetchval(
             "SELECT count(*) FROM app_gusto.payrolls WHERE company_pk=$1", gco["id"]) or 0)
 
+    # Carta
+    carta = {"stakeholders": 0, "shareClasses": 0, "optionGrants": 0, "convertibleNotes": 0}
+    cis = await pool.fetchrow(
+        "SELECT id FROM app_carta.issuers WHERE run_id=$1", run_id)
+    if cis:
+        carta["stakeholders"] = int(await pool.fetchval(
+            "SELECT count(*) FROM app_carta.stakeholders WHERE issuer_pk=$1", cis["id"]) or 0)
+        carta["shareClasses"] = int(await pool.fetchval(
+            "SELECT count(*) FROM app_carta.share_classes WHERE issuer_pk=$1", cis["id"]) or 0)
+        carta["optionGrants"] = int(await pool.fetchval(
+            "SELECT count(*) FROM app_carta.option_grants WHERE issuer_pk=$1", cis["id"]) or 0)
+        carta["convertibleNotes"] = int(await pool.fetchval(
+            "SELECT count(*) FROM app_carta.convertible_notes WHERE issuer_pk=$1", cis["id"]) or 0)
+
     return {"people": people, "teams": teams, "slack": slack, "discord": discord,
             "github": github, "calendar": calendar, "notion": notion, "gmail": gmail,
             "drive": drive, "jira": jira, "quickbooks": quickbooks, "grafana": grafana,
             "mercury": mercury, "ashby": ashby, "brex": brex, "deel": deel, "hibob": hibob,
-            "figma": figma, "miro": miro, "ramp": ramp, "gusto": gusto}
+            "figma": figma, "miro": miro, "ramp": ramp, "gusto": gusto, "carta": carta}
 
 
 # --------------------------------------------------------------------------- people / channels / repos

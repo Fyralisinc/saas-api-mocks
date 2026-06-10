@@ -99,6 +99,29 @@ def intuit_verify(verifier_token: Union[str, bytes], header: str,
     return hmac.compare_digest(expected, header or "")
 
 
+# ---------- Grafana (Alerting webhook) ----------
+
+def grafana_sign(secret: Union[str, bytes], body: Union[str, bytes],
+                 *, timestamp: Union[str, int, None] = None) -> str:
+    """Return the value for Grafana's ``X-Grafana-Alerting-Signature`` header.
+
+    Real Grafana 12.0+: a **bare lowercase hex** HMAC-SHA256 digest with **no
+    ``sha256=`` prefix** (unlike GitHub/Jira). By default the signed bytes are the
+    raw request body alone; if the contact point is configured with a timestamp
+    header, Grafana instead signs ``"{unix_ts}:" + body`` (off by default).
+    """
+    body_b = _to_bytes(body)
+    signed = (str(timestamp).encode("ascii") + b":" + body_b
+              if timestamp is not None else body_b)
+    return hmac.new(_to_bytes(secret), signed, hashlib.sha256).hexdigest()
+
+
+def grafana_verify(secret: Union[str, bytes], header: str, body: Union[str, bytes],
+                   *, timestamp: Union[str, int, None] = None) -> bool:
+    expected = grafana_sign(secret, body, timestamp=timestamp)
+    return hmac.compare_digest(expected, header or "")
+
+
 def github_sign_sha1(secret: Union[str, bytes], body: Union[str, bytes]) -> str:
     """Return the value for the legacy ``X-Hub-Signature`` header.
 

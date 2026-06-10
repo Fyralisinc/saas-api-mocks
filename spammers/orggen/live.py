@@ -1119,3 +1119,64 @@ async def inject_quickbooks_change(
     return event_id
 
 
+async def inject_grafana_alert(
+    pool: asyncpg.Pool,
+    run_id: UUID,
+    *,
+    alertname: str = "HighErrorRate",
+    status: str = "firing",
+    severity: str = "critical",
+    service: str = "api-gateway",
+    summary: Optional[str] = None,
+    at_virtual: Optional[datetime] = None,
+) -> UUID:
+    """Append a thin ``grafana.alert`` timeline event that drives the signed
+    Grafana **Alerting webhook** (an Alertmanager-superset alert group).
+
+    Grafana's live push channel is the alert webhook (``grafana:alert``), distinct
+    from the pulled annotations channel. The event payload carries the alert's
+    labels/annotations/timestamps; ``grafana/webhooks.py`` expands it into the full
+    alert-group body and signs it ``X-Grafana-Alerting-Signature`` (bare hex)."""
+    import hashlib
+    import secrets as _secrets
+    inst = await pool.fetchrow(
+        "SELECT id, instance_host FROM app_grafana.instances WHERE run_id=$1", run_id)
+    if inst is None:
+        raise LookupError("no grafana instance in this run; did you forget `prepare`?")
+    actor = await pool.fetchval(
+        "SELECT id FROM org.people WHERE run_id=$1 ORDER BY random() LIMIT 1", run_id)
+    clock = await get_clock(pool, run_id)
+    when = at_virtual or clock.virtual_now
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+
+    labels = {"alertname": alertname, "severity": severity,
+              "service": service, "job": service}
+    fingerprint = hashlib.blake2b(
+        json.dumps(labels, sort_keys=True).encode(), digest_size=8).hexdigest()
+    group_key = "{}/{alertname=\"%s\"}:{}" % alertname
+    starts = when.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    payload = {
+        "status": status,
+        "alertname": alertname,
+        "labels": labels,
+        "annotations": {
+            "summary": summary or f"{alertname} on {service}",
+            "description": f"{alertname}: {service} crossed its alert threshold",
+            "runbook_url": f"https://{inst['instance_host']}/runbooks/{alertname.lower()}",
+        },
+        "starts_at": starts,
+        "ends_at": None if status == "firing" else starts,
+        "group_key": group_key,
+        "fingerprint": fingerprint,
+        "generator_url": f"https://{inst['instance_host']}/alerting/grafana/{_secrets.token_hex(6)}/view",
+    }
+    event_id = uuid4()
+    await pool.execute(
+        """INSERT INTO timeline.events
+            (id, run_id, virtual_ts, type, actor_id, payload, cross_refs, is_historical)
+           VALUES ($1,$2,$3,'grafana.alert',$4,$5::jsonb,'{}'::jsonb,FALSE)""",
+        event_id, run_id, when, actor, json.dumps(payload))
+    return event_id
+
+

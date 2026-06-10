@@ -163,9 +163,21 @@ async def provider_status(pool: asyncpg.Pool, run_id: UUID) -> dict:
             "SELECT COALESCE(sum(amount_cents), 0) FROM app_quickbooks.purchases "
             "WHERE company_pk=$1", qcomp["id"]) or 0)
 
+    # Grafana
+    grafana = {"annotations": 0, "alerts": 0}
+    ginst = await pool.fetchrow(
+        "SELECT id FROM app_grafana.instances WHERE run_id=$1", run_id)
+    if ginst:
+        grafana["annotations"] = int(await pool.fetchval(
+            "SELECT count(*) FROM app_grafana.annotations WHERE instance_pk=$1",
+            ginst["id"]) or 0)
+        grafana["alerts"] = int(await pool.fetchval(
+            "SELECT count(*) FROM app_grafana.annotations WHERE instance_pk=$1 "
+            "AND alert_id IS NOT NULL", ginst["id"]) or 0)
+
     return {"people": people, "teams": teams, "slack": slack, "discord": discord,
             "github": github, "calendar": calendar, "notion": notion, "gmail": gmail,
-            "drive": drive, "jira": jira, "quickbooks": quickbooks}
+            "drive": drive, "jira": jira, "quickbooks": quickbooks, "grafana": grafana}
 
 
 # --------------------------------------------------------------------------- people / channels / repos

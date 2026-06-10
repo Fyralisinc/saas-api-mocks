@@ -38,6 +38,7 @@ from spammers.orggen.live import (
     inject_github_lifecycle,
     inject_jira_issue,
     inject_quickbooks_change,
+    inject_grafana_alert,
     inject_notion_page,
     inject_notion_page_update,
     inject_slack_message,
@@ -78,6 +79,11 @@ async def _cmd_prepare(args: argparse.Namespace) -> int:
     )
     _eprint(f"run created: {rid} (as-of {as_of_str})")
     counts = await backfill(pool, rid, corpus_path, until=as_of)
+    # Grafana is a net-new Tier-C source with no corpus events; seed its realistic
+    # annotation stream (derived from the org already replayed) into the run.
+    from spammers.grafana.seed import seed_grafana
+    g = await seed_grafana(pool, rid, at=as_of)
+    _eprint(f"grafana seeded: {g}")
     _eprint(f"backfill summary: total={sum(counts.values())} kinds={len(counts)}")
     for k, v in sorted(counts.items(), key=lambda x: -x[1])[:8]:
         _eprint(f"  {v:>6d}  {k}")
@@ -132,6 +138,7 @@ async def _cmd_emit(args: argparse.Namespace) -> int:
     gmail_pubsub_url = args.gmail_pubsub_url or f"{fyralis_base}/webhooks/gmail/pubsub"
     jira_webhook_url = args.jira_webhook_url or f"{fyralis_base}/webhooks/jira"
     quickbooks_webhook_url = args.quickbooks_webhook_url or f"{fyralis_base}/webhooks/quickbooks"
+    grafana_webhook_url = args.grafana_webhook_url or f"{fyralis_base}/webhooks/grafana"
 
     # set live mode at requested speed
     await set_mode(pool, rid, mode="live", speed_multiplier=args.speed)
@@ -148,7 +155,8 @@ async def _cmd_emit(args: argparse.Namespace) -> int:
                         notion_webhook_url=notion_webhook_url,
                         gmail_pubsub_url=gmail_pubsub_url,
                         jira_webhook_url=jira_webhook_url,
-                        quickbooks_webhook_url=quickbooks_webhook_url)
+                        quickbooks_webhook_url=quickbooks_webhook_url,
+                        grafana_webhook_url=grafana_webhook_url)
     loop.start()
     _eprint(f"emitting → slack:{slack_events_url} github:{github_events_url} "
             f"discord:{discord_interactions_url} notion:{notion_webhook_url} "
@@ -241,6 +249,10 @@ async def _cmd_inject(args: argparse.Namespace) -> int:
         event_id = await inject_quickbooks_change(
             pool, rid, entity_name=args.target or "Bill", memo=args.text,
         )
+    elif args.provider == "grafana":
+        event_id = await inject_grafana_alert(
+            pool, rid, alertname=args.target or "HighErrorRate", summary=args.text,
+        )
     else:
         event_id = await inject_slack_message(
             pool, rid,
@@ -319,7 +331,7 @@ async def _cmd_reset(args: argparse.Namespace) -> int:
         return 2
     schemas = ["timeline", "app_slack", "app_discord", "app_github", "app_gmail",
                "app_calendar", "app_notion", "app_drive", "app_jira", "app_quickbooks",
-               "oauth", "org"]
+               "app_grafana", "oauth", "org"]
     for s in schemas:
         await pool.execute(f"DROP SCHEMA IF EXISTS {s} CASCADE")
     _eprint(f"dropped schemas: {schemas}")
@@ -374,13 +386,15 @@ def main() -> None:
                         help="defaults to {fyralis_base}/webhooks/jira")
     p_emit.add_argument("--quickbooks-webhook-url", default=None,
                         help="defaults to {fyralis_base}/webhooks/quickbooks")
+    p_emit.add_argument("--grafana-webhook-url", default=None,
+                        help="defaults to {fyralis_base}/webhooks/grafana")
     p_emit.set_defaults(func=_cmd_emit)
 
     p_inj = sub.add_parser("inject", help="inject a one-off live event")
     p_inj.add_argument("--run-id", default=None)
     p_inj.add_argument("--provider",
                        choices=["slack", "discord", "github", "notion", "gmail",
-                                "calendar", "drive", "jira", "quickbooks"],
+                                "calendar", "drive", "jira", "quickbooks", "grafana"],
                        default="slack")
     p_inj.add_argument("--handle", default=None, help="org.people.handle (default: random)")
     p_inj.add_argument("--channel", default="#general", help="slack/discord channel")

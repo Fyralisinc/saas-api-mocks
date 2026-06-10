@@ -255,6 +255,13 @@ async def _db_signals(pool: asyncpg.Pool, run_id: UUID) -> dict[str, int]:
                     WHERE c.run_id = $1)""", run_id)
     out["quickbooks"] = int(val or 0)
 
+    # ---- grafana: annotations (the org-wide observability stream)
+    val = await pool.fetchval(
+        """SELECT count(*) FROM app_grafana.annotations a
+             JOIN app_grafana.instances i ON i.id = a.instance_pk
+            WHERE i.run_id = $1""", run_id)
+    out["grafana"] = int(val or 0)
+
     return out
 
 

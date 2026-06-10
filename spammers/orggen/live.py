@@ -1180,6 +1180,77 @@ async def inject_grafana_alert(
     return event_id
 
 
+async def inject_aws_event(
+    pool: asyncpg.Pool,
+    run_id: UUID,
+    *,
+    event_name: str = "RunInstances",
+    event_source: str = "ec2.amazonaws.com",
+    handle: Optional[str] = None,
+    at_virtual: Optional[datetime] = None,
+) -> str:
+    """Append a fresh CloudTrail management event (is_historical=FALSE) so the
+    consumer's LIVE POLL re-walk (incremental ``LookupEvents`` from high-water+1ms)
+    picks it up.
+
+    AWS has NO webhook and NO HMAC — its live edge is a POLL of the customer's own
+    queue (SQS/EventBridge), so unlike grafana/mercury this does NOT write a
+    timeline event or sign anything; it just grows the ``app_aws.events`` stream.
+    Returns the CloudTrail ``eventID`` (the immutable dedup key the poll observes)."""
+    import hashlib as _hashlib
+    from spammers.aws.seed import ACCOUNT_ID, REGION, _principal
+
+    inst = await pool.fetchrow(
+        "SELECT id, account_id, region FROM app_aws.installations WHERE run_id=$1", run_id)
+    if inst is None:
+        raise LookupError("no aws install in this run; did you forget `prepare`?")
+    if handle is None:
+        handle = await pool.fetchval(
+            "SELECT handle FROM org.people WHERE run_id=$1 ORDER BY random() LIMIT 1", run_id)
+    handle = handle or "deploy-bot"
+    clock = await get_clock(pool, run_id)
+    when = at_virtual or clock.virtual_now
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+
+    principal = _principal(inst["account_id"], handle)
+    event_id = str(uuid4())  # urandom-backed: unique even at the frozen instant
+    req_id = str(uuid4())
+    res_name = "i-" + _hashlib.blake2b(event_id.encode(), digest_size=6).hexdigest()
+    record = {
+        "eventVersion": "1.11",
+        "userIdentity": principal,
+        "eventTime": when.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "eventSource": event_source,
+        "eventName": event_name,
+        "awsRegion": inst["region"],
+        "sourceIPAddress": "34.221.10.42",
+        "userAgent": "Boto3/1.34.69 md/Botocore#1.34.69 ua/2.0 os/linux#6.5",
+        "requestParameters": {"resourceName": res_name},
+        "responseElements": {"requestId": req_id, "_result": "ok"},
+        "requestID": req_id,
+        "eventID": event_id,
+        "readOnly": False,
+        "eventType": "AwsApiCall",
+        "managementEvent": True,
+        "recipientAccountId": inst["account_id"],
+        "eventCategory": "Management",
+        "tlsDetails": {"tlsVersion": "TLSv1.3", "cipherSuite": "TLS_AES_128_GCM_SHA256",
+                       "clientProvidedHostHeader": event_source},
+    }
+    resources = [{"ResourceType": "AWS::EC2::Instance", "ResourceName": res_name}]
+    await pool.execute(
+        """INSERT INTO app_aws.events
+            (id, install_pk, event_id, event_time_ms, event_name, event_source,
+             aws_region, username, access_key_id, read_only, resources, record,
+             is_alarm, created_at, is_historical)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,FALSE,$10::jsonb,$11::jsonb,FALSE,$12,FALSE)""",
+        uuid4(), inst["id"], event_id, int(when.timestamp() * 1000), event_name,
+        event_source, inst["region"], handle, principal["accessKeyId"],
+        json.dumps(resources), json.dumps(record), when)
+    return event_id
+
+
 async def inject_mercury_transaction(
     pool: asyncpg.Pool,
     run_id: UUID,

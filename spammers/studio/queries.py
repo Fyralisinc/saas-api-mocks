@@ -295,11 +295,24 @@ async def provider_status(pool: asyncpg.Pool, run_id: UUID) -> dict:
         carta["convertibleNotes"] = int(await pool.fetchval(
             "SELECT count(*) FROM app_carta.convertible_notes WHERE issuer_pk=$1", cis["id"]) or 0)
 
+    # LinkedIn
+    linkedin = {"posts": 0, "shareStats": 0, "followerStats": 0}
+    lorg = await pool.fetchrow(
+        "SELECT id FROM app_linkedin.organizations WHERE run_id=$1", run_id)
+    if lorg:
+        linkedin["posts"] = int(await pool.fetchval(
+            "SELECT count(*) FROM app_linkedin.posts WHERE org_pk=$1", lorg["id"]) or 0)
+        linkedin["shareStats"] = int(await pool.fetchval(
+            "SELECT count(*) FROM app_linkedin.share_stats WHERE org_pk=$1", lorg["id"]) or 0)
+        linkedin["followerStats"] = int(await pool.fetchval(
+            "SELECT count(*) FROM app_linkedin.follower_stats WHERE org_pk=$1", lorg["id"]) or 0)
+
     return {"people": people, "teams": teams, "slack": slack, "discord": discord,
             "github": github, "calendar": calendar, "notion": notion, "gmail": gmail,
             "drive": drive, "jira": jira, "quickbooks": quickbooks, "grafana": grafana,
             "mercury": mercury, "ashby": ashby, "brex": brex, "deel": deel, "hibob": hibob,
-            "figma": figma, "miro": miro, "ramp": ramp, "gusto": gusto, "carta": carta}
+            "figma": figma, "miro": miro, "ramp": ramp, "gusto": gusto, "carta": carta,
+            "linkedin": linkedin}
 
 
 # --------------------------------------------------------------------------- people / channels / repos

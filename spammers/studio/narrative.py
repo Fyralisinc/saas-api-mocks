@@ -336,6 +336,13 @@ async def _db_signals(pool: asyncpg.Pool, run_id: UUID) -> dict[str, int]:
             WHERE i.run_id = $1""", run_id)
     out["carta"] = int(val or 0)
 
+    # ---- linkedin: the org-page post stream (one observation per published post)
+    val = await pool.fetchval(
+        """SELECT count(*) FROM app_linkedin.posts p
+             JOIN app_linkedin.organizations o ON o.id = p.org_pk
+            WHERE o.run_id = $1""", run_id)
+    out["linkedin"] = int(val or 0)
+
     return out
 
 

@@ -158,6 +158,14 @@ async def _cmd_prepare(args: argparse.Namespace) -> int:
     from spammers.carta.seed import seed_carta
     ca = await seed_carta(pool, rid, at=as_of)
     _eprint(f"carta seeded: {ca}")
+    # LinkedIn is a net-new Tier-C source: project the run's company into a LinkedIn
+    # organization Page — published posts/shares + lifetime share & follower stats
+    # (REAL api.linkedin.com /rest Community-Management Rest.li finders with OFFSET
+    # paging + epoch-millis timestamps, not the Fyralis QBO/Carta SQL-query clone —
+    # divergence logged in linkedin-fidelity-audit; LinkedIn is POLL-ONLY, no webhook).
+    from spammers.linkedin.seed import seed_linkedin
+    li = await seed_linkedin(pool, rid, at=as_of)
+    _eprint(f"linkedin seeded: {li}")
     _eprint(f"backfill summary: total={sum(counts.values())} kinds={len(counts)}")
     for k, v in sorted(counts.items(), key=lambda x: -x[1])[:8]:
         _eprint(f"  {v:>6d}  {k}")
@@ -455,7 +463,7 @@ async def _cmd_reset(args: argparse.Namespace) -> int:
                "app_calendar", "app_notion", "app_drive", "app_jira", "app_quickbooks",
                "app_grafana", "app_mercury", "app_ashby", "app_brex", "app_deel",
                "app_hibob", "app_figma", "app_miro", "app_ramp", "app_gusto",
-               "app_carta", "oauth", "org"]
+               "app_carta", "app_linkedin", "oauth", "org"]
     for s in schemas:
         await pool.execute(f"DROP SCHEMA IF EXISTS {s} CASCADE")
     _eprint(f"dropped schemas: {schemas}")

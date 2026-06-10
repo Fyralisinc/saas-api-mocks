@@ -127,6 +127,13 @@ async def _cmd_prepare(args: argparse.Namespace) -> int:
     from spammers.figma.seed import seed_figma
     fg = await seed_figma(pool, rid, at=as_of)
     _eprint(f"figma seeded: {fg}")
+    # Miro is a net-new Tier-C source: project the run's people into a Miro org
+    # with collaborative whiteboards + their items (REAL api.miro.com /v2 offset
+    # boards + cursor items, not the Fyralis Brex-clone single-paginator — divergence
+    # logged in miro-fidelity-audit; Miro is POLL-ONLY, webhooks discontinued 2025-12-05).
+    from spammers.miro.seed import seed_miro
+    mi = await seed_miro(pool, rid, at=as_of)
+    _eprint(f"miro seeded: {mi}")
     _eprint(f"backfill summary: total={sum(counts.values())} kinds={len(counts)}")
     for k, v in sorted(counts.items(), key=lambda x: -x[1])[:8]:
         _eprint(f"  {v:>6d}  {k}")
@@ -411,7 +418,7 @@ async def _cmd_reset(args: argparse.Namespace) -> int:
     schemas = ["timeline", "app_slack", "app_discord", "app_github", "app_gmail",
                "app_calendar", "app_notion", "app_drive", "app_jira", "app_quickbooks",
                "app_grafana", "app_mercury", "app_ashby", "app_brex", "app_deel",
-               "app_hibob", "app_figma", "oauth", "org"]
+               "app_hibob", "app_figma", "app_miro", "oauth", "org"]
     for s in schemas:
         await pool.execute(f"DROP SCHEMA IF EXISTS {s} CASCADE")
     _eprint(f"dropped schemas: {schemas}")

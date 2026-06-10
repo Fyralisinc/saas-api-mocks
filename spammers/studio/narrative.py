@@ -307,6 +307,14 @@ async def _db_signals(pool: asyncpg.Pool, run_id: UUID) -> dict[str, int]:
             WHERE t.run_id = $1""", run_id)
     out["figma"] = int(val or 0)
 
+    # ---- miro: the whiteboard item stream (one observation per board item)
+    val = await pool.fetchval(
+        """SELECT count(*) FROM app_miro.items i
+             JOIN app_miro.boards b ON b.id = i.board_pk
+             JOIN app_miro.orgs o ON o.id = b.org_pk
+            WHERE o.run_id = $1""", run_id)
+    out["miro"] = int(val or 0)
+
     return out
 
 

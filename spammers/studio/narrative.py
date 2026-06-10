@@ -292,6 +292,13 @@ async def _db_signals(pool: asyncpg.Pool, run_id: UUID) -> dict[str, int]:
             WHERE o.run_id = $1""", run_id)
     out["deel"] = int(val or 0)
 
+    # ---- hibob: the HR People directory (the HR system-of-record signal)
+    val = await pool.fetchval(
+        """SELECT count(*) FROM app_hibob.employees e
+             JOIN app_hibob.companies c ON c.id = e.company_pk
+            WHERE c.run_id = $1""", run_id)
+    out["hibob"] = int(val or 0)
+
     return out
 
 

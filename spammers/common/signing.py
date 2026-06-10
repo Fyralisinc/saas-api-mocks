@@ -253,6 +253,29 @@ def deel_verify(secret: Union[str, bytes], header: str, body: Union[str, bytes])
     return hmac.compare_digest(expected, (header or "").strip())
 
 
+# ---------- HiBob (Bob HR webhook) ----------
+
+def hibob_sign(secret: Union[str, bytes], body: Union[str, bytes]) -> str:
+    """Return the value for HiBob's ``Bob-Signature`` webhook header.
+
+    Real HiBob (apidocs.hibob.com/reference/getting-started-webhooks): a
+    **base64-encoded HMAC-SHA512** digest computed over the **raw request body
+    alone** — NOT SHA256, NOT hex, NO ``sha512=`` prefix, and NO timestamp in the
+    signed bytes. The base64 is the plain digest with NO line breaks (the docs'
+    JS/PHP ``digest("base64")`` form, not Ruby's newline-wrapping ``encode64``).
+    (Contrast GitHub's ``sha256=<hex>``, Deel's bare-hex-over-"POST"+body, Brex's
+    Svix.)
+    """
+    import base64 as _b64
+    mac = hmac.new(_to_bytes(secret), _to_bytes(body), hashlib.sha512).digest()
+    return _b64.b64encode(mac).decode("ascii")
+
+
+def hibob_verify(secret: Union[str, bytes], header: str, body: Union[str, bytes]) -> bool:
+    expected = hibob_sign(secret, body)
+    return hmac.compare_digest(expected, (header or "").strip())
+
+
 def github_sign_sha1(secret: Union[str, bytes], body: Union[str, bytes]) -> str:
     """Return the value for the legacy ``X-Hub-Signature`` header.
 

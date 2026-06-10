@@ -1487,3 +1487,88 @@ async def inject_deel_event(
     return event_id
 
 
+async def inject_hibob_event(
+    pool: asyncpg.Pool,
+    run_id: UUID,
+    *,
+    entity: str = "employee",
+    event_type: Optional[str] = None,
+    at_virtual: Optional[datetime] = None,
+) -> UUID:
+    """Append a thin ``hibob.event`` timeline event that drives the signed HiBob
+    **webhook** (``Bob-Signature`` base64 HMAC-SHA512 over the body).
+
+    HiBob's live push channel is the **Webhooks v2** metadata-only envelope —
+    ``{companyId, type, triggeredBy, triggeredAt, version, data}`` where ``data``
+    carries IDs (NOT the full object). Two correlatable shapes:
+
+      * ``entity="employee"`` → bump an existing employee's ``modified`` and emit
+        ``employee.updated`` with ``data:{employeeId, fieldUpdatesIds:[…]}``; a
+        consumer fetches back via ``POST /v1/people/search`` filtered on the id.
+      * ``entity="timeoff"`` → write a fresh time-off CHANGE row and emit
+        ``timeoff.request.approved`` with ``data:{timeoffRequestId, employeeId,
+        getApi}``; a consumer fetches back via the ``/timeoff/requests/changes``
+        feed and matches ``requestId``.
+    """
+    import secrets as _secrets
+    co = await pool.fetchrow(
+        "SELECT id, company_id, base_url FROM app_hibob.companies WHERE run_id=$1", run_id)
+    if co is None:
+        raise LookupError("no hibob company in this run; did you forget `prepare`?")
+
+    clock = await get_clock(pool, run_id)
+    when = at_virtual or clock.virtual_now
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+
+    if entity == "timeoff":
+        emp = await pool.fetchrow(
+            "SELECT employee_id, full_name, email FROM app_hibob.employees "
+            "WHERE company_pk=$1 AND is_active ORDER BY sort_key LIMIT 1", co["id"])
+        if emp is None:
+            raise LookupError("no active hibob employee for this company")
+        request_id = _secrets.randbelow(9_000_000) + 9_000_000
+        leave_start = (when + timedelta(days=10)).date()
+        await pool.execute(
+            """INSERT INTO app_hibob.timeoff_changes
+                (id, company_pk, request_id, employee_id, employee_display_name,
+                 employee_email, policy_type_display_name, change_type, status, created_on,
+                 start_date, end_date, duration_unit, total_duration, total_cost,
+                 request_type, sort_key, is_historical)
+               VALUES ($1,$2,$3,$4,$5,$6,'Holiday','Created','approved',$7,$8,$9,'days',
+                       2,2,'days',$10,FALSE)""",
+            uuid4(), co["id"], request_id, emp["employee_id"], emp["full_name"],
+            emp["email"], when, leave_start, leave_start + timedelta(days=1),
+            int(when.timestamp()))
+        payload = {
+            "event_type": event_type or "timeoff.request.approved",
+            "triggered_by": emp["employee_id"],
+            "data": {"timeoffRequestId": request_id, "employeeId": emp["employee_id"],
+                     "getApi": f"{co['base_url']}/v1/timeoff/requests/changes"},
+        }
+    else:
+        emp = await pool.fetchrow(
+            "SELECT id, employee_id FROM app_hibob.employees "
+            "WHERE company_pk=$1 AND is_active ORDER BY random() LIMIT 1", co["id"])
+        if emp is None:
+            raise LookupError("no active hibob employee for this company")
+        await pool.execute(
+            "UPDATE app_hibob.employees SET modified=$2 WHERE id=$1", emp["id"], when)
+        payload = {
+            "event_type": event_type or "employee.updated",
+            "triggered_by": emp["employee_id"],
+            "data": {"employeeId": emp["employee_id"],
+                     "fieldUpdatesIds": [{"id": "root.displayName"}]},
+        }
+
+    actor = await pool.fetchval(
+        "SELECT id FROM org.people WHERE run_id=$1 ORDER BY random() LIMIT 1", run_id)
+    event_id = uuid4()
+    await pool.execute(
+        """INSERT INTO timeline.events
+            (id, run_id, virtual_ts, type, actor_id, payload, cross_refs, is_historical)
+           VALUES ($1,$2,$3,'hibob.event',$4,$5::jsonb,'{}'::jsonb,FALSE)""",
+        event_id, run_id, when, actor, json.dumps(payload))
+    return event_id
+
+

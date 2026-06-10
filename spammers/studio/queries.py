@@ -220,10 +220,22 @@ async def provider_status(pool: asyncpg.Pool, run_id: UUID) -> dict:
         deel["invoices"] = int(await pool.fetchval(
             "SELECT count(*) FROM app_deel.invoices WHERE org_pk=$1", dorg["id"]) or 0)
 
+    # HiBob
+    hibob = {"employees": 0, "salaries": 0, "timeoff": 0}
+    hco = await pool.fetchrow(
+        "SELECT id FROM app_hibob.companies WHERE run_id=$1", run_id)
+    if hco:
+        hibob["employees"] = int(await pool.fetchval(
+            "SELECT count(*) FROM app_hibob.employees WHERE company_pk=$1", hco["id"]) or 0)
+        hibob["salaries"] = int(await pool.fetchval(
+            "SELECT count(*) FROM app_hibob.salaries WHERE company_pk=$1", hco["id"]) or 0)
+        hibob["timeoff"] = int(await pool.fetchval(
+            "SELECT count(*) FROM app_hibob.timeoff_changes WHERE company_pk=$1", hco["id"]) or 0)
+
     return {"people": people, "teams": teams, "slack": slack, "discord": discord,
             "github": github, "calendar": calendar, "notion": notion, "gmail": gmail,
             "drive": drive, "jira": jira, "quickbooks": quickbooks, "grafana": grafana,
-            "mercury": mercury, "ashby": ashby, "brex": brex, "deel": deel}
+            "mercury": mercury, "ashby": ashby, "brex": brex, "deel": deel, "hibob": hibob}
 
 
 # --------------------------------------------------------------------------- people / channels / repos

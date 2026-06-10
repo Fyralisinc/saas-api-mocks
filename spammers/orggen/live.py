@@ -1986,3 +1986,83 @@ async def inject_fireflies_transcript(
         event_id, run_id, when, actor, json.dumps(payload))
     return event_id
 
+
+async def inject_telegram_message(
+    pool: asyncpg.Pool,
+    run_id: UUID,
+    *,
+    handle: Optional[str] = None,
+    dialog_title: Optional[str] = None,
+    text: Optional[str] = None,
+    edit: bool = False,
+    at_virtual: Optional[datetime] = None,
+) -> UUID:
+    """Append one ``telegram.message`` event (not-historical) to the timeline.
+
+    The Telegram mock's ``UpdatesDispatcher`` picks it up, projects it into
+    ``app_telegram.messages`` (so a later backfill walk sees the same row → the
+    cross-path dedup invariant) and pushes an ``updateNewMessage`` (or, if
+    ``edit=True``, an ``updateEditMessage`` on the dialog's newest message) over
+    the persistent updates connection — there is NO webhook and NO HMAC (the
+    authenticated connection is the trust boundary, like Discord's gateway).
+
+    Defaults: the ``eng-general`` supergroup, a random non-self teammate as sender,
+    virtual_now + 1s. Returns the timeline event id."""
+    from spammers.telegram.seed import _uid
+
+    inst = await pool.fetchrow(
+        "SELECT id, self_username FROM app_telegram.installations WHERE run_id = $1",
+        run_id)
+    if inst is None:
+        raise LookupError("no telegram install in this run; did you forget `prepare`?")
+
+    if dialog_title is not None:
+        dialog = await pool.fetchrow(
+            "SELECT dialog_id, dialog_kind, title FROM app_telegram.dialogs "
+            "WHERE install_pk = $1 AND title = $2", inst["id"], dialog_title)
+    else:
+        dialog = await pool.fetchrow(
+            "SELECT dialog_id, dialog_kind, title FROM app_telegram.dialogs "
+            "WHERE install_pk = $1 AND dialog_kind = 'channel' AND title = 'eng-general'",
+            inst["id"])
+    if dialog is None:
+        dialog = await pool.fetchrow(
+            "SELECT dialog_id, dialog_kind, title FROM app_telegram.dialogs "
+            "WHERE install_pk = $1 ORDER BY dialog_id LIMIT 1", inst["id"])
+    if dialog is None:
+        raise LookupError("no telegram dialogs in this run; did you forget `prepare`?")
+
+    # Sender: a random teammate who isn't the self account (so from_id is present).
+    sender = handle or await pool.fetchval(
+        "SELECT handle FROM org.people WHERE run_id = $1 AND handle <> $2 "
+        "ORDER BY random() LIMIT 1", run_id, inst["self_username"] or "")
+    sender = sender or (inst["self_username"] or "teammate")
+    is_self = (sender == (inst["self_username"]))
+    actor = await pool.fetchval(
+        "SELECT id FROM org.people WHERE run_id = $1 AND handle = $2", run_id, sender)
+
+    clock = await get_clock(pool, run_id)
+    when = at_virtual or (clock.virtual_now + timedelta(seconds=1))
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+
+    if text is None:
+        verb = "edited" if edit else "live"
+        text = f"[{verb}] {sender}: ping @ {when.isoformat()}"
+
+    payload = {
+        "dialog_id": int(dialog["dialog_id"]),
+        "dialog_kind": dialog["dialog_kind"],
+        "from_user_id": None if is_self else int(_uid(sender)),
+        "out": bool(is_self),
+        "text": text,
+        "kind": "edit" if edit else "new",
+    }
+    event_id = uuid4()
+    await pool.execute(
+        """INSERT INTO timeline.events
+            (id, run_id, virtual_ts, type, actor_id, payload, cross_refs, is_historical)
+           VALUES ($1,$2,$3,'telegram.message',$4,$5::jsonb,'{}'::jsonb,FALSE)""",
+        event_id, run_id, when, actor, json.dumps(payload))
+    return event_id
+

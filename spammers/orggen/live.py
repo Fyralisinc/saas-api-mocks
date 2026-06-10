@@ -1416,3 +1416,74 @@ async def inject_brex_transfer(
     return event_id
 
 
+async def inject_deel_event(
+    pool: asyncpg.Pool,
+    run_id: UUID,
+    *,
+    event_type: str = "invoice.paid",
+    amount_usd: Optional[float] = None,
+    at_virtual: Optional[datetime] = None,
+) -> UUID:
+    """Append a thin ``deel.event`` timeline event that drives the signed Deel
+    **webhook** (``x-deel-signature`` bare-hex HMAC over ``"POST"+body``).
+
+    Deel's live push channel is the nested ``{data:{meta:{event_type,
+    organization_id}, resource:[…]}, timestamp}`` webhook. To make the event
+    correlatable the inject writes a fresh **invoice** (a new paid worker invoice)
+    onto an existing contract and carries that full invoice object as the
+    ``resource`` — so a consumer can fetch-on-notify by listing
+    ``GET /rest/v2/invoices?status=all`` and matching the wire ``id``."""
+    import secrets as _secrets
+
+    from spammers.deel import dto as _deel_dto
+
+    org = await pool.fetchrow(
+        "SELECT id, organization_id FROM app_deel.organizations WHERE run_id=$1", run_id)
+    if org is None:
+        raise LookupError("no deel organization in this run; did you forget `prepare`?")
+    contract = await pool.fetchrow(
+        "SELECT id, contract_id, comp_amount_cents, comp_currency, worker_name "
+        "FROM app_deel.contracts WHERE org_pk=$1 ORDER BY sort_key LIMIT 1", org["id"])
+    if contract is None:
+        raise LookupError("no deel contract for this org")
+
+    clock = await get_clock(pool, run_id)
+    when = at_virtual or clock.virtual_now
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+
+    amount_cents = (int(round(amount_usd * 100)) if amount_usd is not None
+                    else int(contract["comp_amount_cents"]))
+    fee = max(500, amount_cents // 100)
+    total = amount_cents + fee
+    invoice_id = "inv_" + _secrets.token_hex(7)
+    inv_pk = uuid4()
+    await pool.execute(
+        """INSERT INTO app_deel.invoices
+            (id, org_pk, contract_pk, invoice_id, contract_id, label, total_cents,
+             amount_cents, vat_cents, deel_fee_cents, currency, status, issued_at,
+             due_date, paid_at, created_at, is_overdue, recipient_legal_entity_id,
+             sort_key, is_historical)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,0,$9,$10,'paid',$11,$11,$11,$11,FALSE,$12,$13,FALSE)""",
+        inv_pk, org["id"], contract["id"], invoice_id, contract["contract_id"],
+        f"INV-live {contract['worker_name']}", total, amount_cents, fee,
+        contract["comp_currency"], when, "le_" + _secrets.token_hex(6),
+        int(when.timestamp()))
+
+    inv_row = await pool.fetchrow(
+        "SELECT invoice_id, contract_id, label, total_cents, amount_cents, vat_cents, "
+        "deel_fee_cents, currency, status, issued_at, due_date, paid_at, created_at, "
+        "is_overdue, recipient_legal_entity_id FROM app_deel.invoices WHERE id=$1", inv_pk)
+    payload = {"event_type": event_type, "resource": _deel_dto.invoice_dto(dict(inv_row))}
+
+    actor = await pool.fetchval(
+        "SELECT id FROM org.people WHERE run_id=$1 ORDER BY random() LIMIT 1", run_id)
+    event_id = uuid4()
+    await pool.execute(
+        """INSERT INTO timeline.events
+            (id, run_id, virtual_ts, type, actor_id, payload, cross_refs, is_historical)
+           VALUES ($1,$2,$3,'deel.event',$4,$5::jsonb,'{}'::jsonb,FALSE)""",
+        event_id, run_id, when, actor, json.dumps(payload))
+    return event_id
+
+

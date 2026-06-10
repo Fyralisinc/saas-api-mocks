@@ -210,10 +210,20 @@ async def provider_status(pool: asyncpg.Pool, run_id: UUID) -> dict:
                 "JOIN app_brex.accounts a ON a.id = t.account_pk "
                 "WHERE a.org_pk=$1 AND t.account_kind=$2", borg["id"], kind) or 0)
 
+    # Deel
+    deel = {"contracts": 0, "invoices": 0}
+    dorg = await pool.fetchrow(
+        "SELECT id FROM app_deel.organizations WHERE run_id=$1", run_id)
+    if dorg:
+        deel["contracts"] = int(await pool.fetchval(
+            "SELECT count(*) FROM app_deel.contracts WHERE org_pk=$1", dorg["id"]) or 0)
+        deel["invoices"] = int(await pool.fetchval(
+            "SELECT count(*) FROM app_deel.invoices WHERE org_pk=$1", dorg["id"]) or 0)
+
     return {"people": people, "teams": teams, "slack": slack, "discord": discord,
             "github": github, "calendar": calendar, "notion": notion, "gmail": gmail,
             "drive": drive, "jira": jira, "quickbooks": quickbooks, "grafana": grafana,
-            "mercury": mercury, "ashby": ashby, "brex": brex}
+            "mercury": mercury, "ashby": ashby, "brex": brex, "deel": deel}
 
 
 # --------------------------------------------------------------------------- people / channels / repos

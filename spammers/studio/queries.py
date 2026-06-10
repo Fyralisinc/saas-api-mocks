@@ -246,11 +246,22 @@ async def provider_status(pool: asyncpg.Pool, run_id: UUID) -> dict:
             "SELECT count(*) FROM app_figma.comments c JOIN app_figma.files f "
             "ON f.id=c.file_pk WHERE f.team_pk=$1", fteam["id"]) or 0)
 
+    # Miro
+    miro = {"boards": 0, "items": 0}
+    morg = await pool.fetchrow(
+        "SELECT id FROM app_miro.orgs WHERE run_id=$1", run_id)
+    if morg:
+        miro["boards"] = int(await pool.fetchval(
+            "SELECT count(*) FROM app_miro.boards WHERE org_pk=$1", morg["id"]) or 0)
+        miro["items"] = int(await pool.fetchval(
+            "SELECT count(*) FROM app_miro.items i JOIN app_miro.boards b "
+            "ON b.id=i.board_pk WHERE b.org_pk=$1", morg["id"]) or 0)
+
     return {"people": people, "teams": teams, "slack": slack, "discord": discord,
             "github": github, "calendar": calendar, "notion": notion, "gmail": gmail,
             "drive": drive, "jira": jira, "quickbooks": quickbooks, "grafana": grafana,
             "mercury": mercury, "ashby": ashby, "brex": brex, "deel": deel, "hibob": hibob,
-            "figma": figma}
+            "figma": figma, "miro": miro}
 
 
 # --------------------------------------------------------------------------- people / channels / repos

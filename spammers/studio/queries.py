@@ -257,11 +257,25 @@ async def provider_status(pool: asyncpg.Pool, run_id: UUID) -> dict:
             "SELECT count(*) FROM app_miro.items i JOIN app_miro.boards b "
             "ON b.id=i.board_pk WHERE b.org_pk=$1", morg["id"]) or 0)
 
+    # Ramp
+    ramp = {"users": 0, "cards": 0, "transactions": 0, "reimbursements": 0}
+    rorg = await pool.fetchrow(
+        "SELECT id FROM app_ramp.organizations WHERE run_id=$1", run_id)
+    if rorg:
+        ramp["users"] = int(await pool.fetchval(
+            "SELECT count(*) FROM app_ramp.users WHERE org_pk=$1", rorg["id"]) or 0)
+        ramp["cards"] = int(await pool.fetchval(
+            "SELECT count(*) FROM app_ramp.cards WHERE org_pk=$1", rorg["id"]) or 0)
+        ramp["transactions"] = int(await pool.fetchval(
+            "SELECT count(*) FROM app_ramp.transactions WHERE org_pk=$1", rorg["id"]) or 0)
+        ramp["reimbursements"] = int(await pool.fetchval(
+            "SELECT count(*) FROM app_ramp.reimbursements WHERE org_pk=$1", rorg["id"]) or 0)
+
     return {"people": people, "teams": teams, "slack": slack, "discord": discord,
             "github": github, "calendar": calendar, "notion": notion, "gmail": gmail,
             "drive": drive, "jira": jira, "quickbooks": quickbooks, "grafana": grafana,
             "mercury": mercury, "ashby": ashby, "brex": brex, "deel": deel, "hibob": hibob,
-            "figma": figma, "miro": miro}
+            "figma": figma, "miro": miro, "ramp": ramp}
 
 
 # --------------------------------------------------------------------------- people / channels / repos

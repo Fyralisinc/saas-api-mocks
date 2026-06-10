@@ -45,6 +45,7 @@ from spammers.orggen.live import (
     inject_deel_event,
     inject_hibob_event,
     inject_figma_event,
+    inject_ramp_transaction,
     inject_notion_page,
     inject_notion_page_update,
     inject_slack_message,
@@ -134,6 +135,13 @@ async def _cmd_prepare(args: argparse.Namespace) -> int:
     from spammers.miro.seed import seed_miro
     mi = await seed_miro(pool, rid, at=as_of)
     _eprint(f"miro seeded: {mi}")
+    # Ramp is a net-new Tier-C source: project the run's vendor purchases onto a
+    # corporate-card spend stream + people onto users/cards + a reimbursement feed
+    # (REAL api.ramp.com /developer/v1 keyset-cursor REST, not the Fyralis QBO-query
+    # clone — divergence logged in ramp-fidelity-audit).
+    from spammers.ramp.seed import seed_ramp
+    rp = await seed_ramp(pool, rid, at=as_of)
+    _eprint(f"ramp seeded: {rp}")
     _eprint(f"backfill summary: total={sum(counts.values())} kinds={len(counts)}")
     for k, v in sorted(counts.items(), key=lambda x: -x[1])[:8]:
         _eprint(f"  {v:>6d}  {k}")
@@ -195,6 +203,7 @@ async def _cmd_emit(args: argparse.Namespace) -> int:
     deel_webhook_url = args.deel_webhook_url or f"{fyralis_base}/webhooks/deel"
     hibob_webhook_url = args.hibob_webhook_url or f"{fyralis_base}/webhooks/hibob"
     figma_webhook_url = args.figma_webhook_url or f"{fyralis_base}/webhooks/figma"
+    ramp_webhook_url = args.ramp_webhook_url or f"{fyralis_base}/webhooks/ramp"
 
     # set live mode at requested speed
     await set_mode(pool, rid, mode="live", speed_multiplier=args.speed)
@@ -218,7 +227,8 @@ async def _cmd_emit(args: argparse.Namespace) -> int:
                         brex_webhook_url=brex_webhook_url,
                         deel_webhook_url=deel_webhook_url,
                         hibob_webhook_url=hibob_webhook_url,
-                        figma_webhook_url=figma_webhook_url)
+                        figma_webhook_url=figma_webhook_url,
+                        ramp_webhook_url=ramp_webhook_url)
     loop.start()
     _eprint(f"emitting → slack:{slack_events_url} github:{github_events_url} "
             f"discord:{discord_interactions_url} notion:{notion_webhook_url} "
@@ -339,6 +349,10 @@ async def _cmd_inject(args: argparse.Namespace) -> int:
         event_id = await inject_figma_event(
             pool, rid, entity=args.target or "version",
         )
+    elif args.provider == "ramp":
+        event_id = await inject_ramp_transaction(
+            pool, rid, merchant=args.target or "Amazon Web Services",
+        )
     else:
         event_id = await inject_slack_message(
             pool, rid,
@@ -418,7 +432,7 @@ async def _cmd_reset(args: argparse.Namespace) -> int:
     schemas = ["timeline", "app_slack", "app_discord", "app_github", "app_gmail",
                "app_calendar", "app_notion", "app_drive", "app_jira", "app_quickbooks",
                "app_grafana", "app_mercury", "app_ashby", "app_brex", "app_deel",
-               "app_hibob", "app_figma", "app_miro", "oauth", "org"]
+               "app_hibob", "app_figma", "app_miro", "app_ramp", "oauth", "org"]
     for s in schemas:
         await pool.execute(f"DROP SCHEMA IF EXISTS {s} CASCADE")
     _eprint(f"dropped schemas: {schemas}")
@@ -487,6 +501,8 @@ def main() -> None:
                         help="defaults to {fyralis_base}/webhooks/hibob")
     p_emit.add_argument("--figma-webhook-url", default=None,
                         help="defaults to {fyralis_base}/webhooks/figma")
+    p_emit.add_argument("--ramp-webhook-url", default=None,
+                        help="defaults to {fyralis_base}/webhooks/ramp")
     p_emit.set_defaults(func=_cmd_emit)
 
     p_inj = sub.add_parser("inject", help="inject a one-off live event")
@@ -494,7 +510,8 @@ def main() -> None:
     p_inj.add_argument("--provider",
                        choices=["slack", "discord", "github", "notion", "gmail",
                                 "calendar", "drive", "jira", "quickbooks", "grafana",
-                                "mercury", "ashby", "brex", "deel", "hibob", "figma"],
+                                "mercury", "ashby", "brex", "deel", "hibob", "figma",
+                                "ramp"],
                        default="slack")
     p_inj.add_argument("--handle", default=None, help="org.people.handle (default: random)")
     p_inj.add_argument("--channel", default="#general", help="slack/discord channel")
@@ -513,7 +530,7 @@ def main() -> None:
     p_inj.add_argument("--repo", default=None, help="github repo name (default: first)")
     p_inj.add_argument("--target", default=None,
                        help="notion database / gmail recipient handle / calendar attendee handle "
-                            "/ figma version|comment")
+                            "/ figma version|comment / ramp merchant name")
     p_inj.add_argument("--text", default=None,
                        help="slack/discord text · github/notion title · gmail body · calendar summary")
     p_inj.set_defaults(func=_cmd_inject)

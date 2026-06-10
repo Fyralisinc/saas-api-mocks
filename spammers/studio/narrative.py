@@ -315,6 +315,13 @@ async def _db_signals(pool: asyncpg.Pool, run_id: UUID) -> dict[str, int]:
             WHERE o.run_id = $1""", run_id)
     out["miro"] = int(val or 0)
 
+    # ---- ramp: the corporate-card spend stream (one observation per transaction)
+    val = await pool.fetchval(
+        """SELECT count(*) FROM app_ramp.transactions t
+             JOIN app_ramp.organizations o ON o.id = t.org_pk
+            WHERE o.run_id = $1""", run_id)
+    out["ramp"] = int(val or 0)
+
     return out
 
 

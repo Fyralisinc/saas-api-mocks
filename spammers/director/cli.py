@@ -39,6 +39,7 @@ from spammers.orggen.live import (
     inject_jira_issue,
     inject_quickbooks_change,
     inject_grafana_alert,
+    inject_aws_event,
     inject_mercury_transaction,
     inject_ashby_application_change,
     inject_brex_transfer,
@@ -174,6 +175,14 @@ async def _cmd_prepare(args: argparse.Namespace) -> int:
     from spammers.fireflies.seed import seed_fireflies
     ff = await seed_fireflies(pool, rid, at=as_of)
     _eprint(f"fireflies seeded: {ff}")
+    # AWS is a net-new Tier-C source: synthesize a realistic Organization-CloudTrail
+    # stream — control-plane management events (people -> IAM principals, repos ->
+    # services) + CloudWatch alarm-state changes — read via the SigV4-signed
+    # CloudTrail LookupEvents API (the REAL AWS wire, not a plain REST mock; POLL +
+    # incremental-poll live, NO webhook — divergence note in aws-fidelity-audit).
+    from spammers.aws.seed import seed_aws
+    aw = await seed_aws(pool, rid, at=as_of)
+    _eprint(f"aws seeded: {aw}")
     _eprint(f"backfill summary: total={sum(counts.values())} kinds={len(counts)}")
     for k, v in sorted(counts.items(), key=lambda x: -x[1])[:8]:
         _eprint(f"  {v:>6d}  {k}")
@@ -397,6 +406,10 @@ async def _cmd_inject(args: argparse.Namespace) -> int:
         event_id = await inject_fireflies_transcript(
             pool, rid, title=args.target or "Engineering Standup",
         )
+    elif args.provider == "aws":
+        event_id = await inject_aws_event(
+            pool, rid, event_name=args.target or "RunInstances",
+        )
     else:
         event_id = await inject_slack_message(
             pool, rid,
@@ -560,7 +573,7 @@ def main() -> None:
                        choices=["slack", "discord", "github", "notion", "gmail",
                                 "calendar", "drive", "jira", "quickbooks", "grafana",
                                 "mercury", "ashby", "brex", "deel", "hibob", "figma",
-                                "ramp", "gusto", "fireflies"],
+                                "ramp", "gusto", "fireflies", "aws"],
                        default="slack")
     p_inj.add_argument("--handle", default=None, help="org.people.handle (default: random)")
     p_inj.add_argument("--channel", default="#general", help="slack/discord channel")

@@ -32,14 +32,16 @@ from spammers.studio import companies
 # provider -> port
 SERVERS = {"slack": 7001, "discord": 7002, "github": 7003,
            "gmail": 7004, "calendar": 7005, "notion": 7006,
-           "drive": 7007, "jira": 7008, "quickbooks": 7009, "grafana": 7010}
+           "drive": 7007, "jira": 7008, "quickbooks": 7009, "grafana": 7010,
+           "mercury": 7011}
 _PY = sys.executable
 _CLI = [_PY, "-m", "spammers.director.cli"]
 _SERVER_MODULE = {"slack": "spammers.slack", "discord": "spammers.discord",
                   "github": "spammers.github", "gmail": "spammers.gmail",
                   "calendar": "spammers.calendar", "notion": "spammers.notion",
                   "drive": "spammers.drive", "jira": "spammers.jira",
-                  "quickbooks": "spammers.quickbooks", "grafana": "spammers.grafana"}
+                  "quickbooks": "spammers.quickbooks", "grafana": "spammers.grafana",
+                  "mercury": "spammers.mercury"}
 
 
 @dataclass

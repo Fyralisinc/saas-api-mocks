@@ -262,6 +262,14 @@ async def _db_signals(pool: asyncpg.Pool, run_id: UUID) -> dict[str, int]:
             WHERE i.run_id = $1""", run_id)
     out["grafana"] = int(val or 0)
 
+    # ---- mercury: bank transactions (the cash-movement stream)
+    val = await pool.fetchval(
+        """SELECT count(*) FROM app_mercury.transactions t
+             JOIN app_mercury.accounts a ON a.id = t.account_pk
+             JOIN app_mercury.organizations o ON o.id = a.org_pk
+            WHERE o.run_id = $1""", run_id)
+    out["mercury"] = int(val or 0)
+
     return out
 
 

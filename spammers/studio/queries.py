@@ -175,9 +175,22 @@ async def provider_status(pool: asyncpg.Pool, run_id: UUID) -> dict:
             "SELECT count(*) FROM app_grafana.annotations WHERE instance_pk=$1 "
             "AND alert_id IS NOT NULL", ginst["id"]) or 0)
 
+    # Mercury
+    mercury = {"accounts": 0, "transactions": 0}
+    morg = await pool.fetchrow(
+        "SELECT id FROM app_mercury.organizations WHERE run_id=$1", run_id)
+    if morg:
+        mercury["accounts"] = int(await pool.fetchval(
+            "SELECT count(*) FROM app_mercury.accounts WHERE org_pk=$1", morg["id"]) or 0)
+        mercury["transactions"] = int(await pool.fetchval(
+            "SELECT count(*) FROM app_mercury.transactions t "
+            "JOIN app_mercury.accounts a ON a.id = t.account_pk WHERE a.org_pk=$1",
+            morg["id"]) or 0)
+
     return {"people": people, "teams": teams, "slack": slack, "discord": discord,
             "github": github, "calendar": calendar, "notion": notion, "gmail": gmail,
-            "drive": drive, "jira": jira, "quickbooks": quickbooks, "grafana": grafana}
+            "drive": drive, "jira": jira, "quickbooks": quickbooks, "grafana": grafana,
+            "mercury": mercury}
 
 
 # --------------------------------------------------------------------------- people / channels / repos

@@ -1180,3 +1180,88 @@ async def inject_grafana_alert(
     return event_id
 
 
+async def inject_mercury_transaction(
+    pool: asyncpg.Pool,
+    run_id: UUID,
+    *,
+    amount_usd: Optional[float] = None,
+    counterparty: str = "Stripe Inc.",
+    kind: str = "externalTransfer",
+    operation: str = "create",
+    at_virtual: Optional[datetime] = None,
+) -> UUID:
+    """Append a thin ``mercury.transaction`` timeline event that drives the signed
+    Mercury **transaction webhook** (a JSON-merge-patch event).
+
+    Mercury's live push channel is the transaction webhook (``Mercury-Signature:
+    t=…,v1=…``), distinct from the pulled accounts/transactions channel. A ``create``
+    inserts a fresh **pending** checking transaction and carries the full resource
+    as the merge patch, so the consumer can re-fetch
+    ``GET /account/{accountId}/transaction/{id}`` (the row is persisted here)."""
+    import secrets as _secrets
+    org = await pool.fetchrow(
+        "SELECT id FROM app_mercury.organizations WHERE run_id=$1", run_id)
+    if org is None:
+        raise LookupError("no mercury organization in this run; did you forget `prepare`?")
+    acct = await pool.fetchrow(
+        "SELECT id, account_id FROM app_mercury.accounts "
+        "WHERE org_pk=$1 AND kind='checking' ORDER BY sort_key LIMIT 1", org["id"])
+    if acct is None:
+        raise LookupError("no checking account for this mercury org")
+
+    clock = await get_clock(pool, run_id)
+    when = at_virtual or clock.virtual_now
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+
+    # A live vendor payment is an outflow: negative amount, pending until it settles.
+    cents = int(round((amount_usd if amount_usd is not None
+                       else _secrets.randbelow(90_000) + 1_000) * 100))
+    amount_cents = -abs(cents)
+    txn_id = uuid4()
+    cp_id = uuid4()
+    edd = when + timedelta(days=1)
+    amount_usd_val = round(amount_cents / 100, 2)
+    dashboard = f"https://mercury.com/transactions/{txn_id}"
+    await pool.execute(
+        """INSERT INTO app_mercury.transactions
+            (id, account_pk, txn_id, amount_cents, status, kind, counterparty_id,
+             counterparty_name, counterparty_nickname, external_memo, dashboard_link,
+             version, created_at, posted_at, estimated_delivery_date, is_historical)
+           VALUES ($1,$2,$1,$3,'pending',$4,$5,$6,$6,$7,$8,1,$9,NULL,$10,FALSE)""",
+        txn_id, acct["id"], amount_cents, kind, cp_id, counterparty,
+        f"Payment to {counterparty}", dashboard, when, edd)
+
+    merge_patch = {
+        "id": str(txn_id),
+        "accountId": str(acct["account_id"]),
+        "amount": amount_usd_val,
+        "status": "pending",
+        "kind": kind,
+        "counterpartyId": str(cp_id),
+        "counterpartyName": counterparty,
+        "createdAt": when.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "postedAt": None,
+        "estimatedDeliveryDate": edd.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "dashboardLink": dashboard,
+    }
+    payload = {
+        "account_id": str(acct["account_id"]),
+        "txn_id": str(txn_id),
+        "operation": operation,
+        "resource_version": 1,
+        "changed_paths": sorted(merge_patch.keys()),
+        "merge_patch": merge_patch,
+        "previous_values": {},
+    }
+    actor = await pool.fetchval(
+        "SELECT id FROM org.people WHERE run_id=$1 ORDER BY random() LIMIT 1", run_id)
+    event_id = uuid4()
+    await pool.execute(
+        """INSERT INTO timeline.events
+            (id, run_id, virtual_ts, type, actor_id, payload, cross_refs, is_historical)
+           VALUES ($1,$2,$3,'mercury.transaction',$4,$5::jsonb,'{}'::jsonb,FALSE)""",
+        event_id, run_id, when, actor, json.dumps(payload))
+    return event_id
+
+

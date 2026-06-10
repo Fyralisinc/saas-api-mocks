@@ -122,6 +122,45 @@ def grafana_verify(secret: Union[str, bytes], header: str, body: Union[str, byte
     return hmac.compare_digest(expected, header or "")
 
 
+# ---------- Mercury (transaction webhook) ----------
+
+def mercury_sign(secret: Union[str, bytes], body: Union[str, bytes],
+                 timestamp: Union[str, int]) -> str:
+    """Return the value for Mercury's ``Mercury-Signature`` webhook header.
+
+    Real Mercury: a Stripe-style ``t=<unix_seconds>,v1=<hex>`` pair where the hex
+    is HMAC-SHA256 over the string ``"{timestamp}.{rawBody}"`` (the unix-seconds
+    timestamp, a literal ``.``, then the raw request body). Bare lowercase hex —
+    NO ``sha256=`` prefix, NOT base64.
+    """
+    ts = str(timestamp)
+    signed = ts.encode("ascii") + b"." + _to_bytes(body)
+    mac = hmac.new(_to_bytes(secret), signed, hashlib.sha256).hexdigest()
+    return f"t={ts},v1={mac}"
+
+
+def mercury_verify(secret: Union[str, bytes], header: str,
+                   body: Union[str, bytes]) -> bool:
+    """Constant-time verify of a ``t=…,v1=…`` Mercury-Signature header.
+
+    Parses the timestamp out of the header, recomputes the digest over
+    ``"{t}.{body}"`` and compares the ``v1`` value. (Replay-window enforcement is
+    the receiver's job — Mercury recommends rejecting timestamps older than 5m.)
+    """
+    if not header:
+        return False
+    parts = {}
+    for seg in header.split(","):
+        if "=" in seg:
+            k, v = seg.split("=", 1)
+            parts[k.strip()] = v.strip()
+    ts, got = parts.get("t"), parts.get("v1")
+    if not ts or not got:
+        return False
+    expected = mercury_sign(secret, body, ts)
+    return hmac.compare_digest(expected.split("v1=", 1)[1], got)
+
+
 def github_sign_sha1(secret: Union[str, bytes], body: Union[str, bytes]) -> str:
     """Return the value for the legacy ``X-Hub-Signature`` header.
 

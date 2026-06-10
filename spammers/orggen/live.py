@@ -1265,3 +1265,87 @@ async def inject_mercury_transaction(
     return event_id
 
 
+async def inject_ashby_application_change(
+    pool: asyncpg.Pool,
+    run_id: UUID,
+    *,
+    action: str = "applicationSubmit",
+    candidate_name: Optional[str] = None,
+    at_virtual: Optional[datetime] = None,
+) -> UUID:
+    """Append a thin ``ashby.object`` timeline event that drives the signed Ashby
+    **webhook** (``{action, data:{application:{…}}}``, ``Ashby-Signature: sha256=…``).
+
+    Ashby's live push channel is the HMAC-signed webhook, distinct from the pulled
+    ``.list`` channel. A new application is inserted into ``app_ashby.entities`` (so
+    a consumer can re-fetch it via ``application.info``) and the FULL application
+    body rides in the webhook ``data`` — Ashby webhooks carry the whole entity, so
+    the consumer can build its draft directly. The org dedups on
+    ``ashby:{org}:application:{id}`` (NOT version-suffixed; relies on ``updatedAt``).
+    """
+    from spammers.ashby import dto as ashby_dto
+
+    org = await pool.fetchrow(
+        "SELECT id FROM app_ashby.organizations WHERE run_id=$1", run_id)
+    if org is None:
+        raise LookupError("no ashby organization in this run; did you forget `prepare`?")
+    cand = await pool.fetchrow(
+        "SELECT entity_id, data FROM app_ashby.entities "
+        "WHERE org_pk=$1 AND kind='candidate' ORDER BY random() LIMIT 1", org["id"])
+    if cand is None:
+        raise LookupError("no ashby candidate in this run to attach an application to")
+    job = await pool.fetchrow(
+        "SELECT data FROM app_ashby.entities "
+        "WHERE org_pk=$1 AND kind='job' AND status='Open' ORDER BY random() LIMIT 1",
+        org["id"])
+    if job is None:
+        job = await pool.fetchrow(
+            "SELECT data FROM app_ashby.entities WHERE org_pk=$1 AND kind='job' "
+            "ORDER BY random() LIMIT 1", org["id"])
+    if job is None:
+        raise LookupError("no ashby job in this run to apply to")
+
+    cdata = cand["data"] if isinstance(cand["data"], dict) else json.loads(cand["data"])
+    jdata = job["data"] if isinstance(job["data"], dict) else json.loads(job["data"])
+
+    clock = await get_clock(pool, run_id)
+    when = at_virtual or clock.virtual_now
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+
+    app_id = uuid4()
+    cand_ref = {"id": str(cand["entity_id"]), "name": cdata.get("name"),
+                "primaryEmailAddress": cdata.get("primaryEmailAddress"),
+                "primaryPhoneNumber": cdata.get("primaryPhoneNumber")}
+    job_ref = {"id": jdata.get("id"), "title": jdata.get("title"),
+               "locationId": jdata.get("locationId"), "departmentId": jdata.get("departmentId")}
+    stage = {"id": str(uuid4()), "title": "Application Review",
+             "type": "PreInterviewScreen", "orderInInterviewPlan": 0,
+             "interviewStageGroupId": str(uuid4()),
+             "interviewPlanId": jdata.get("defaultInterviewPlanId")}
+    source = {"id": str(uuid4()), "title": "Company Website",
+              "isArchived": False, "sourceType": "JobPost"}
+    app_data = ashby_dto.application_dto(
+        entity_id=str(app_id), created_at=when, updated_at=when, status="Active",
+        candidate_ref=cand_ref, current_stage=stage, job_ref=job_ref, source=source,
+        hiring_team=[])
+
+    await pool.execute(
+        """INSERT INTO app_ashby.entities
+            (id, org_pk, kind, entity_id, status, data, created_at, updated_at,
+             is_historical, timeline_event_id)
+           VALUES ($1,$2,'application',$1,'Active',$3::jsonb,$4,$4,FALSE,$5)""",
+        app_id, org["id"], json.dumps(app_data), when, app_id)
+
+    payload = {"action": action, "data": {"application": app_data}}
+    actor = await pool.fetchval(
+        "SELECT id FROM org.people WHERE run_id=$1 ORDER BY random() LIMIT 1", run_id)
+    event_id = uuid4()
+    await pool.execute(
+        """INSERT INTO timeline.events
+            (id, run_id, virtual_ts, type, actor_id, payload, cross_refs, is_historical)
+           VALUES ($1,$2,$3,'ashby.object',$4,$5::jsonb,'{}'::jsonb,FALSE)""",
+        event_id, run_id, when, actor, json.dumps(payload))
+    return event_id
+
+

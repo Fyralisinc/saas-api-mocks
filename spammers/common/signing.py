@@ -300,6 +300,32 @@ def ramp_verify(secret: Union[str, bytes], header: str, body: Union[str, bytes])
     return hmac.compare_digest(expected, (header or "").strip())
 
 
+def gusto_sign(secret: Union[str, bytes], body: Union[str, bytes]) -> str:
+    """Return the value for Gusto's ``X-Gusto-Signature`` webhook header.
+
+    Real Gusto (docs.gusto.com/embedded-payroll/docs/webhooks): every webhook
+    delivery carries an ``X-Gusto-Signature`` header = an HMAC-SHA256 of the raw
+    request body, keyed by the webhook subscription's ``verification_token``. No
+    ``sha256=`` prefix, no timestamp in the signed bytes (GitHub's
+    ``X-Hub-Signature-256`` shape minus the prefix).
+
+    NOTE — the digest ENCODING (hex vs base64) is the ONE wire detail Gusto does
+    NOT document in prose, and the official auto-generated SDK ships no verifier
+    to settle it. We default to **lowercase HEX** (the dominant convention for a
+    bare single-header HMAC-SHA256: GitHub, Ramp, Deel all hex). This is the only
+    INFERRED fact in the Gusto contract; it is a one-line switch if a real
+    captured delivery proves base64. (Contrast: the Fyralis QBO-archetype clone
+    assumes ``Gusto-Signature`` — NO ``X-`` prefix — + base64; see the
+    gusto-fidelity-audit memory's logged divergence.)
+    """
+    return hmac.new(_to_bytes(secret), _to_bytes(body), hashlib.sha256).hexdigest()
+
+
+def gusto_verify(secret: Union[str, bytes], header: str, body: Union[str, bytes]) -> bool:
+    expected = gusto_sign(secret, body)
+    return hmac.compare_digest(expected, (header or "").strip())
+
+
 def github_sign_sha1(secret: Union[str, bytes], body: Union[str, bytes]) -> str:
     """Return the value for the legacy ``X-Hub-Signature`` header.
 

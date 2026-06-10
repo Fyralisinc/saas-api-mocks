@@ -326,6 +326,29 @@ def gusto_verify(secret: Union[str, bytes], header: str, body: Union[str, bytes]
     return hmac.compare_digest(expected, (header or "").strip())
 
 
+def fireflies_sign(secret: Union[str, bytes], body: Union[str, bytes]) -> str:
+    """Return the value for Fireflies' ``x-hub-signature`` webhook header.
+
+    Real Fireflies (docs.fireflies.ai/graphql-api/webhooks-v2): the header is named
+    ``x-hub-signature`` (NOT ``x-hub-signature-256``) but the digest is
+    **HMAC-SHA256** (NOT GitHub's original SHA-1), hex-encoded, with a ``sha256=``
+    prefix, over the **raw request body alone** (no timestamp). The docs' verbatim
+    verifier is ``'sha256=' + createHmac('sha256', secret).update(body).digest('hex')``.
+
+    So the wire shape is exactly GitHub's ``X-Hub-Signature-256`` value, just under
+    the legacy ``x-hub-signature`` header name — which is the ONE webhook detail the
+    Fyralis clone left as a TODO and defaulted to GitHub-style (``sha256=`` + hex):
+    that default turns out to be CORRECT (a rare positive — logged as such).
+    """
+    mac = hmac.new(_to_bytes(secret), _to_bytes(body), hashlib.sha256).hexdigest()
+    return f"sha256={mac}"
+
+
+def fireflies_verify(secret: Union[str, bytes], header: str, body: Union[str, bytes]) -> bool:
+    expected = fireflies_sign(secret, body)
+    return hmac.compare_digest(expected, (header or "").strip())
+
+
 def github_sign_sha1(secret: Union[str, bytes], body: Union[str, bytes]) -> str:
     """Return the value for the legacy ``X-Hub-Signature`` header.
 

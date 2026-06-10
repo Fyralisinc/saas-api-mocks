@@ -47,6 +47,7 @@ from spammers.orggen.live import (
     inject_figma_event,
     inject_ramp_transaction,
     inject_gusto_event,
+    inject_fireflies_transcript,
     inject_notion_page,
     inject_notion_page_update,
     inject_slack_message,
@@ -166,6 +167,13 @@ async def _cmd_prepare(args: argparse.Namespace) -> int:
     from spammers.linkedin.seed import seed_linkedin
     li = await seed_linkedin(pool, rid, at=as_of)
     _eprint(f"linkedin seeded: {li}")
+    # Fireflies is a net-new Tier-C source: project the run's people into a stream of
+    # meeting transcripts — Fireflies' AI-notetaker signal (REAL api.fireflies.ai
+    # GraphQL transcripts/transcript/user queries, not the Fyralis fake Brex REST
+    # clone — divergence logged in fireflies-fidelity-audit; POLL + webhook PUSH).
+    from spammers.fireflies.seed import seed_fireflies
+    ff = await seed_fireflies(pool, rid, at=as_of)
+    _eprint(f"fireflies seeded: {ff}")
     _eprint(f"backfill summary: total={sum(counts.values())} kinds={len(counts)}")
     for k, v in sorted(counts.items(), key=lambda x: -x[1])[:8]:
         _eprint(f"  {v:>6d}  {k}")
@@ -229,6 +237,7 @@ async def _cmd_emit(args: argparse.Namespace) -> int:
     figma_webhook_url = args.figma_webhook_url or f"{fyralis_base}/webhooks/figma"
     ramp_webhook_url = args.ramp_webhook_url or f"{fyralis_base}/webhooks/ramp"
     gusto_webhook_url = args.gusto_webhook_url or f"{fyralis_base}/webhooks/gusto"
+    fireflies_webhook_url = args.fireflies_webhook_url or f"{fyralis_base}/webhooks/fireflies"
 
     # set live mode at requested speed
     await set_mode(pool, rid, mode="live", speed_multiplier=args.speed)
@@ -254,7 +263,8 @@ async def _cmd_emit(args: argparse.Namespace) -> int:
                         hibob_webhook_url=hibob_webhook_url,
                         figma_webhook_url=figma_webhook_url,
                         ramp_webhook_url=ramp_webhook_url,
-                        gusto_webhook_url=gusto_webhook_url)
+                        gusto_webhook_url=gusto_webhook_url,
+                        fireflies_webhook_url=fireflies_webhook_url)
     loop.start()
     _eprint(f"emitting → slack:{slack_events_url} github:{github_events_url} "
             f"discord:{discord_interactions_url} notion:{notion_webhook_url} "
@@ -383,6 +393,10 @@ async def _cmd_inject(args: argparse.Namespace) -> int:
         event_id = await inject_gusto_event(
             pool, rid, target=args.target or "payroll",
         )
+    elif args.provider == "fireflies":
+        event_id = await inject_fireflies_transcript(
+            pool, rid, title=args.target or "Engineering Standup",
+        )
     else:
         event_id = await inject_slack_message(
             pool, rid,
@@ -463,7 +477,7 @@ async def _cmd_reset(args: argparse.Namespace) -> int:
                "app_calendar", "app_notion", "app_drive", "app_jira", "app_quickbooks",
                "app_grafana", "app_mercury", "app_ashby", "app_brex", "app_deel",
                "app_hibob", "app_figma", "app_miro", "app_ramp", "app_gusto",
-               "app_carta", "app_linkedin", "oauth", "org"]
+               "app_carta", "app_linkedin", "app_fireflies", "oauth", "org"]
     for s in schemas:
         await pool.execute(f"DROP SCHEMA IF EXISTS {s} CASCADE")
     _eprint(f"dropped schemas: {schemas}")
@@ -536,6 +550,8 @@ def main() -> None:
                         help="defaults to {fyralis_base}/webhooks/ramp")
     p_emit.add_argument("--gusto-webhook-url", default=None,
                         help="defaults to {fyralis_base}/webhooks/gusto")
+    p_emit.add_argument("--fireflies-webhook-url", default=None,
+                        help="defaults to {fyralis_base}/webhooks/fireflies")
     p_emit.set_defaults(func=_cmd_emit)
 
     p_inj = sub.add_parser("inject", help="inject a one-off live event")
@@ -544,7 +560,7 @@ def main() -> None:
                        choices=["slack", "discord", "github", "notion", "gmail",
                                 "calendar", "drive", "jira", "quickbooks", "grafana",
                                 "mercury", "ashby", "brex", "deel", "hibob", "figma",
-                                "ramp", "gusto"],
+                                "ramp", "gusto", "fireflies"],
                        default="slack")
     p_inj.add_argument("--handle", default=None, help="org.people.handle (default: random)")
     p_inj.add_argument("--channel", default="#general", help="slack/discord channel")

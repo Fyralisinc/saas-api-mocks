@@ -49,6 +49,7 @@ from spammers.orggen.live import (
     inject_ramp_transaction,
     inject_gusto_event,
     inject_fireflies_transcript,
+    inject_telegram_message,
     inject_notion_page,
     inject_notion_page_update,
     inject_slack_message,
@@ -183,6 +184,15 @@ async def _cmd_prepare(args: argparse.Namespace) -> int:
     from spammers.aws.seed import seed_aws
     aw = await seed_aws(pool, rid, at=as_of)
     _eprint(f"aws seeded: {aw}")
+    # Telegram is a net-new Tier-C source: project the run's people into ONE Telegram
+    # account's dialogs (channels/supergroups/basic-groups/1:1 DMs) + message history —
+    # consumed via the MTProto user API through Telethon (messages.getHistory backward
+    # offset_id paging + a persistent updates connection; NO webhook/HMAC). The mock
+    # reproduces the METHOD contract over a transport substitution (HTTP reads + a WS
+    # gateway, the Discord-gateway analog) — divergence note in telegram-fidelity-audit.
+    from spammers.telegram.seed import seed_telegram
+    tg = await seed_telegram(pool, rid, at=as_of)
+    _eprint(f"telegram seeded: {tg}")
     _eprint(f"backfill summary: total={sum(counts.values())} kinds={len(counts)}")
     for k, v in sorted(counts.items(), key=lambda x: -x[1])[:8]:
         _eprint(f"  {v:>6d}  {k}")
@@ -409,6 +419,11 @@ async def _cmd_inject(args: argparse.Namespace) -> int:
     elif args.provider == "aws":
         event_id = await inject_aws_event(
             pool, rid, event_name=args.target or "RunInstances",
+        )
+    elif args.provider == "telegram":
+        event_id = await inject_telegram_message(
+            pool, rid, handle=args.handle, dialog_title=args.target, text=args.text,
+            edit=(args.kind == "edit"),
         )
     else:
         event_id = await inject_slack_message(

@@ -50,6 +50,7 @@ from spammers.orggen.live import (
     inject_gusto_event,
     inject_fireflies_transcript,
     inject_telegram_message,
+    inject_signal_message,
     inject_notion_page,
     inject_notion_page_update,
     inject_slack_message,
@@ -193,6 +194,15 @@ async def _cmd_prepare(args: argparse.Namespace) -> int:
     from spammers.telegram.seed import seed_telegram
     tg = await seed_telegram(pool, rid, at=as_of)
     _eprint(f"telegram seeded: {tg}")
+    # Signal is a net-new Tier-C source (the LAST of the 25): project the run's people
+    # into ONE Signal linked account's threads (groups + 1:1 direct) + message history
+    # — consumed via a signal-cli linked device (forward-only receive; the Fyralis
+    # get_history backward-walk CONTRACT is served over an HTTP+WS shim carrying REAL
+    # signal-cli envelopes; NO webhook/HMAC). Signal is "cloned from Telegram"
+    # (ADR-0003 Topology B) — divergence note in signal-fidelity-audit.
+    from spammers.signal.seed import seed_signal
+    sg = await seed_signal(pool, rid, at=as_of)
+    _eprint(f"signal seeded: {sg}")
     _eprint(f"backfill summary: total={sum(counts.values())} kinds={len(counts)}")
     for k, v in sorted(counts.items(), key=lambda x: -x[1])[:8]:
         _eprint(f"  {v:>6d}  {k}")
@@ -425,6 +435,11 @@ async def _cmd_inject(args: argparse.Namespace) -> int:
             pool, rid, handle=args.handle, dialog_title=args.target, text=args.text,
             edit=(args.kind == "edit"),
         )
+    elif args.provider == "signal":
+        event_id = await inject_signal_message(
+            pool, rid, handle=args.handle, thread_title=args.target, text=args.text,
+            self_sent=(args.kind == "trash"),  # reuse --kind trash as the self-sent skip probe
+        )
     else:
         event_id = await inject_slack_message(
             pool, rid,
@@ -588,7 +603,8 @@ def main() -> None:
                        choices=["slack", "discord", "github", "notion", "gmail",
                                 "calendar", "drive", "jira", "quickbooks", "grafana",
                                 "mercury", "ashby", "brex", "deel", "hibob", "figma",
-                                "ramp", "gusto", "fireflies", "aws"],
+                                "ramp", "gusto", "fireflies", "aws", "telegram",
+                                "signal"],
                        default="slack")
     p_inj.add_argument("--handle", default=None, help="org.people.handle (default: random)")
     p_inj.add_argument("--channel", default="#general", help="slack/discord channel")

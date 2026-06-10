@@ -299,6 +299,14 @@ async def _db_signals(pool: asyncpg.Pool, run_id: UUID) -> dict[str, int]:
             WHERE c.run_id = $1""", run_id)
     out["hibob"] = int(val or 0)
 
+    # ---- figma: the design event stream (file versions + comments merged)
+    val = await pool.fetchval(
+        """SELECT count(*) FROM app_figma.versions v
+             JOIN app_figma.files f ON f.id = v.file_pk
+             JOIN app_figma.teams t ON t.id = f.team_pk
+            WHERE t.run_id = $1""", run_id)
+    out["figma"] = int(val or 0)
+
     return out
 
 

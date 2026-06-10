@@ -32,6 +32,7 @@ from spammers.ashby import webhooks as ashby_webhooks
 from spammers.brex import webhooks as brex_webhooks
 from spammers.deel import webhooks as deel_webhooks
 from spammers.hibob import webhooks as hibob_webhooks
+from spammers.figma import webhooks as figma_webhooks
 from spammers.notion import webhooks as notion_webhooks
 from spammers.slack import events as slack_events
 
@@ -58,6 +59,7 @@ class EmissionLoop:
         brex_webhook_url: Optional[str] = None,
         deel_webhook_url: Optional[str] = None,
         hibob_webhook_url: Optional[str] = None,
+        figma_webhook_url: Optional[str] = None,
         poll_interval_s: float = 0.5,
         batch_size: int = 20,
     ) -> None:
@@ -76,6 +78,7 @@ class EmissionLoop:
         self._brex_webhook_url = brex_webhook_url
         self._deel_webhook_url = deel_webhook_url
         self._hibob_webhook_url = hibob_webhook_url
+        self._figma_webhook_url = figma_webhook_url
         self._poll_interval_s = poll_interval_s
         self._batch_size = batch_size
         self._stop = asyncio.Event()
@@ -192,6 +195,13 @@ class EmissionLoop:
                         run_id=self._run_id,
                         event_id=row["id"],
                         hibob_webhook_url=self._hibob_webhook_url,
+                    )
+                elif etype == "figma.event" and self._figma_webhook_url:
+                    await figma_webhooks.emit_event(
+                        self._pool,
+                        run_id=self._run_id,
+                        event_id=row["id"],
+                        figma_webhook_url=self._figma_webhook_url,
                     )
                 else:
                     # No emitter registered — mark as emitted to skip

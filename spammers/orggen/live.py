@@ -1487,6 +1487,117 @@ async def inject_deel_event(
     return event_id
 
 
+async def inject_figma_event(
+    pool: asyncpg.Pool,
+    run_id: UUID,
+    *,
+    entity: str = "version",
+    event_type: Optional[str] = None,
+    at_virtual: Optional[datetime] = None,
+) -> UUID:
+    """Append a thin ``figma.event`` timeline event that drives the Figma
+    **Webhooks-v2 body-passcode** delivery (NO HMAC — the passcode is a plaintext
+    body field).
+
+    Figma's live push is the merged version+comment event stream. Two correlatable
+    shapes:
+
+      * ``entity="version"`` → write a fresh **version** row on a file (new
+        ``version_id`` > max) + emit ``FILE_VERSION_UPDATE`` with
+        ``{version_id, file_key, file_name, triggered_by, created_at, description}``;
+        a consumer fetches back via ``GET /v1/files/{key}/versions`` matching ``version_id``.
+      * ``entity="comment"`` → write a fresh **comment** row + emit ``FILE_COMMENT``
+        with ``{comment:[{text}], comment_id, file_key, file_name, triggered_by,
+        created_at}``; a consumer fetches back via ``GET /v1/files/{key}/comments``
+        matching ``comment_id``.
+    """
+    team = await pool.fetchrow(
+        "SELECT id, team_id, base_url FROM app_figma.teams WHERE run_id=$1", run_id)
+    if team is None:
+        raise LookupError("no figma team in this run; did you forget `prepare`?")
+    file_row = await pool.fetchrow(
+        "SELECT id, file_key, name FROM app_figma.files WHERE team_pk=$1 "
+        "ORDER BY sort_key LIMIT 1", team["id"])
+    if file_row is None:
+        raise LookupError("no figma file for this team")
+    actor_user = await pool.fetchrow(
+        "SELECT id, figma_user_id, handle, img_url FROM app_figma.users "
+        "WHERE team_pk=$1 AND is_me=FALSE ORDER BY random() LIMIT 1", team["id"])
+    if actor_user is None:
+        actor_user = await pool.fetchrow(
+            "SELECT id, figma_user_id, handle, img_url FROM app_figma.users "
+            "WHERE team_pk=$1 LIMIT 1", team["id"])
+    triggered_by = {"id": actor_user["figma_user_id"], "handle": actor_user["handle"],
+                    "img_url": actor_user["img_url"]}
+
+    clock = await get_clock(pool, run_id)
+    when = at_virtual or clock.virtual_now
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+    created_z = when.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    if entity == "comment":
+        import secrets as _secrets
+        comment_id = str(_secrets.randbelow(900_000_000) + 9_000_000_000)
+        await pool.execute(
+            """INSERT INTO app_figma.comments
+                (id, file_pk, comment_id, parent_id, user_pk, message, order_id,
+                 client_meta, reactions, created_at, resolved_at, sort_key, is_historical)
+               VALUES ($1,$2,$3,NULL,$4,$5,$6,$7::jsonb,'[]'::jsonb,$8,NULL,$9,FALSE)""",
+            uuid4(), file_row["id"], comment_id, actor_user["id"],
+            "Live review comment", "999999999",
+            json.dumps({"x": 120.0, "y": 240.0}), when, int(when.timestamp()))
+        payload = {
+            "event_type": event_type or "FILE_COMMENT",
+            "event": {
+                "comment": [{"text": "Live review comment"}],
+                "comment_id": comment_id,
+                "created_at": created_z,
+                "file_key": file_row["file_key"],
+                "file_name": file_row["name"],
+                "mentions": [],
+                "triggered_by": triggered_by,
+            },
+        }
+    else:
+        seq = int(await pool.fetchval(
+            "SELECT COALESCE(MAX(v.version_seq), 1100000000000) FROM app_figma.versions v "
+            "JOIN app_figma.files f ON f.id = v.file_pk WHERE f.team_pk=$1",
+            team["id"])) + 1
+        version_id = str(seq)
+        await pool.execute(
+            """INSERT INTO app_figma.versions
+                (id, file_pk, version_id, version_seq, label, description, user_pk,
+                 created_at, is_historical)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,FALSE)""",
+            uuid4(), file_row["id"], version_id, seq, "Live update",
+            "Live update for " + file_row["name"], actor_user["id"], when)
+        await pool.execute(
+            "UPDATE app_figma.files SET current_version_id=$2, last_modified=$3 WHERE id=$1",
+            file_row["id"], version_id, when)
+        payload = {
+            "event_type": event_type or "FILE_VERSION_UPDATE",
+            "event": {
+                "created_at": created_z,
+                "description": "Live update for " + file_row["name"],
+                "file_key": file_row["file_key"],
+                "file_name": file_row["name"],
+                "triggered_by": triggered_by,
+                "version_id": version_id,
+            },
+        }
+
+    actor = await pool.fetchval(
+        "SELECT id FROM org.people WHERE run_id=$1 ORDER BY random() LIMIT 1", run_id)
+    event_id = uuid4()
+    await pool.execute(
+        """INSERT INTO timeline.events
+            (id, run_id, virtual_ts, type, actor_id, payload, cross_refs, is_historical)
+           VALUES ($1,$2,$3,'figma.event',$4,$5::jsonb,'{}'::jsonb,FALSE)""",
+        event_id, run_id, when, actor, json.dumps(payload))
+    return event_id
+
+
 async def inject_hibob_event(
     pool: asyncpg.Pool,
     run_id: UUID,

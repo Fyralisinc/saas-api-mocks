@@ -34,7 +34,7 @@ SERVERS = {"slack": 7001, "discord": 7002, "github": 7003,
            "gmail": 7004, "calendar": 7005, "notion": 7006,
            "drive": 7007, "jira": 7008, "quickbooks": 7009, "grafana": 7010,
            "mercury": 7011, "ashby": 7012, "brex": 7013, "deel": 7014,
-           "hibob": 7015}
+           "hibob": 7015, "figma": 7016}
 _PY = sys.executable
 _CLI = [_PY, "-m", "spammers.director.cli"]
 _SERVER_MODULE = {"slack": "spammers.slack", "discord": "spammers.discord",
@@ -44,7 +44,7 @@ _SERVER_MODULE = {"slack": "spammers.slack", "discord": "spammers.discord",
                   "quickbooks": "spammers.quickbooks", "grafana": "spammers.grafana",
                   "mercury": "spammers.mercury", "ashby": "spammers.ashby",
                   "brex": "spammers.brex", "deel": "spammers.deel",
-                  "hibob": "spammers.hibob"}
+                  "hibob": "spammers.hibob", "figma": "spammers.figma"}
 
 
 @dataclass

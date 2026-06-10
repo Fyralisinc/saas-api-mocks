@@ -44,6 +44,7 @@ from spammers.orggen.live import (
     inject_brex_transfer,
     inject_deel_event,
     inject_hibob_event,
+    inject_figma_event,
     inject_notion_page,
     inject_notion_page_update,
     inject_slack_message,
@@ -119,6 +120,13 @@ async def _cmd_prepare(args: argparse.Namespace) -> int:
     from spammers.hibob.seed import seed_hibob
     h = await seed_hibob(pool, rid, at=as_of)
     _eprint(f"hibob seeded: {h}")
+    # Figma is a net-new Tier-C source: project the run's people into a Figma team
+    # with files + version history + comments (REAL api.figma.com versions+comments
+    # MERGE, not the Fyralis Brex-clone /events — divergence logged in
+    # figma-fidelity-audit).
+    from spammers.figma.seed import seed_figma
+    fg = await seed_figma(pool, rid, at=as_of)
+    _eprint(f"figma seeded: {fg}")
     _eprint(f"backfill summary: total={sum(counts.values())} kinds={len(counts)}")
     for k, v in sorted(counts.items(), key=lambda x: -x[1])[:8]:
         _eprint(f"  {v:>6d}  {k}")
@@ -179,6 +187,7 @@ async def _cmd_emit(args: argparse.Namespace) -> int:
     brex_webhook_url = args.brex_webhook_url or f"{fyralis_base}/webhooks/brex"
     deel_webhook_url = args.deel_webhook_url or f"{fyralis_base}/webhooks/deel"
     hibob_webhook_url = args.hibob_webhook_url or f"{fyralis_base}/webhooks/hibob"
+    figma_webhook_url = args.figma_webhook_url or f"{fyralis_base}/webhooks/figma"
 
     # set live mode at requested speed
     await set_mode(pool, rid, mode="live", speed_multiplier=args.speed)
@@ -201,7 +210,8 @@ async def _cmd_emit(args: argparse.Namespace) -> int:
                         ashby_webhook_url=ashby_webhook_url,
                         brex_webhook_url=brex_webhook_url,
                         deel_webhook_url=deel_webhook_url,
-                        hibob_webhook_url=hibob_webhook_url)
+                        hibob_webhook_url=hibob_webhook_url,
+                        figma_webhook_url=figma_webhook_url)
     loop.start()
     _eprint(f"emitting → slack:{slack_events_url} github:{github_events_url} "
             f"discord:{discord_interactions_url} notion:{notion_webhook_url} "
@@ -318,6 +328,10 @@ async def _cmd_inject(args: argparse.Namespace) -> int:
         event_id = await inject_hibob_event(
             pool, rid, entity=args.target or "employee",
         )
+    elif args.provider == "figma":
+        event_id = await inject_figma_event(
+            pool, rid, entity=args.target or "version",
+        )
     else:
         event_id = await inject_slack_message(
             pool, rid,
@@ -397,7 +411,7 @@ async def _cmd_reset(args: argparse.Namespace) -> int:
     schemas = ["timeline", "app_slack", "app_discord", "app_github", "app_gmail",
                "app_calendar", "app_notion", "app_drive", "app_jira", "app_quickbooks",
                "app_grafana", "app_mercury", "app_ashby", "app_brex", "app_deel",
-               "app_hibob", "oauth", "org"]
+               "app_hibob", "app_figma", "oauth", "org"]
     for s in schemas:
         await pool.execute(f"DROP SCHEMA IF EXISTS {s} CASCADE")
     _eprint(f"dropped schemas: {schemas}")
@@ -464,6 +478,8 @@ def main() -> None:
                         help="defaults to {fyralis_base}/webhooks/deel")
     p_emit.add_argument("--hibob-webhook-url", default=None,
                         help="defaults to {fyralis_base}/webhooks/hibob")
+    p_emit.add_argument("--figma-webhook-url", default=None,
+                        help="defaults to {fyralis_base}/webhooks/figma")
     p_emit.set_defaults(func=_cmd_emit)
 
     p_inj = sub.add_parser("inject", help="inject a one-off live event")
@@ -471,7 +487,7 @@ def main() -> None:
     p_inj.add_argument("--provider",
                        choices=["slack", "discord", "github", "notion", "gmail",
                                 "calendar", "drive", "jira", "quickbooks", "grafana",
-                                "mercury", "ashby", "brex", "deel", "hibob"],
+                                "mercury", "ashby", "brex", "deel", "hibob", "figma"],
                        default="slack")
     p_inj.add_argument("--handle", default=None, help="org.people.handle (default: random)")
     p_inj.add_argument("--channel", default="#general", help="slack/discord channel")
@@ -489,7 +505,8 @@ def main() -> None:
                        help="github PR/issue number to target (reviews, comments, transitions)")
     p_inj.add_argument("--repo", default=None, help="github repo name (default: first)")
     p_inj.add_argument("--target", default=None,
-                       help="notion database / gmail recipient handle / calendar attendee handle")
+                       help="notion database / gmail recipient handle / calendar attendee handle "
+                            "/ figma version|comment")
     p_inj.add_argument("--text", default=None,
                        help="slack/discord text · github/notion title · gmail body · calendar summary")
     p_inj.set_defaults(func=_cmd_inject)

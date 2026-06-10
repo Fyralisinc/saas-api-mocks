@@ -232,10 +232,25 @@ async def provider_status(pool: asyncpg.Pool, run_id: UUID) -> dict:
         hibob["timeoff"] = int(await pool.fetchval(
             "SELECT count(*) FROM app_hibob.timeoff_changes WHERE company_pk=$1", hco["id"]) or 0)
 
+    # Figma
+    figma = {"files": 0, "versions": 0, "comments": 0}
+    fteam = await pool.fetchrow(
+        "SELECT id FROM app_figma.teams WHERE run_id=$1", run_id)
+    if fteam:
+        figma["files"] = int(await pool.fetchval(
+            "SELECT count(*) FROM app_figma.files WHERE team_pk=$1", fteam["id"]) or 0)
+        figma["versions"] = int(await pool.fetchval(
+            "SELECT count(*) FROM app_figma.versions v JOIN app_figma.files f "
+            "ON f.id=v.file_pk WHERE f.team_pk=$1", fteam["id"]) or 0)
+        figma["comments"] = int(await pool.fetchval(
+            "SELECT count(*) FROM app_figma.comments c JOIN app_figma.files f "
+            "ON f.id=c.file_pk WHERE f.team_pk=$1", fteam["id"]) or 0)
+
     return {"people": people, "teams": teams, "slack": slack, "discord": discord,
             "github": github, "calendar": calendar, "notion": notion, "gmail": gmail,
             "drive": drive, "jira": jira, "quickbooks": quickbooks, "grafana": grafana,
-            "mercury": mercury, "ashby": ashby, "brex": brex, "deel": deel, "hibob": hibob}
+            "mercury": mercury, "ashby": ashby, "brex": brex, "deel": deel, "hibob": hibob,
+            "figma": figma}
 
 
 # --------------------------------------------------------------------------- people / channels / repos

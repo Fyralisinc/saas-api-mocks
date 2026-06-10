@@ -1349,3 +1349,70 @@ async def inject_ashby_application_change(
     return event_id
 
 
+async def inject_brex_transfer(
+    pool: asyncpg.Pool,
+    run_id: UUID,
+    *,
+    amount_usd: Optional[float] = None,
+    counterparty: str = "Stripe Inc.",
+    payment_type: str = "ACH",
+    event_type: str = "TRANSFER_PROCESSED",
+    at_virtual: Optional[datetime] = None,
+) -> UUID:
+    """Append a thin ``brex.transfer`` timeline event that drives the signed Brex
+    **webhook** (Svix scheme — ``Webhook-Signature: v1,<base64>``).
+
+    Brex's live push channel is the ``TRANSFER_PROCESSED`` / ``TRANSFER_FAILED``
+    webhook (transfer_id + company_id only — the full transfer detail lives behind
+    the Payments API, out of scope). To make the event correlatable the inject also
+    writes a fresh **cash transaction** carrying the same ``transfer_id`` onto the
+    primary cash account, so a consumer can fetch-on-notify by listing
+    ``GET /v2/transactions/cash/{id}`` and matching ``transfer_id`` (the wire field
+    cash transactions expose)."""
+    import secrets as _secrets
+    org = await pool.fetchrow(
+        "SELECT id FROM app_brex.organizations WHERE run_id=$1", run_id)
+    if org is None:
+        raise LookupError("no brex organization in this run; did you forget `prepare`?")
+    acct = await pool.fetchrow(
+        "SELECT id, account_id FROM app_brex.accounts "
+        "WHERE org_pk=$1 AND kind='cash' AND is_primary ORDER BY sort_key LIMIT 1", org["id"])
+    if acct is None:
+        raise LookupError("no primary cash account for this brex org")
+
+    clock = await get_clock(pool, run_id)
+    when = at_virtual or clock.virtual_now
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+
+    # A processed transfer is incoming cash: a positive PAYMENT on the cash account.
+    cents = int(round((amount_usd if amount_usd is not None
+                       else _secrets.randbelow(90_000) + 1_000) * 100))
+    amount_cents = abs(cents)
+    transfer_id = "trnsfr_" + _secrets.token_hex(12)
+    txn_id = "txn_" + _secrets.token_hex(12)
+    await pool.execute(
+        """INSERT INTO app_brex.transactions
+            (id, account_pk, account_kind, txn_id, description, amount_cents, currency,
+             txn_type, initiated_at, posted_at, transfer_id, sort_key, is_historical)
+           VALUES ($1,$2,'cash',$3,$4,$5,'USD','PAYMENT',$6,$6,$7,$8,FALSE)""",
+        uuid4(), acct["id"], txn_id, f"Transfer from {counterparty}", amount_cents,
+        when, transfer_id, int(when.timestamp()))
+
+    payload = {
+        "transfer_id": transfer_id,
+        "payment_type": payment_type,
+        "event_type": event_type,
+        "account_id": str(acct["account_id"]),
+    }
+    actor = await pool.fetchval(
+        "SELECT id FROM org.people WHERE run_id=$1 ORDER BY random() LIMIT 1", run_id)
+    event_id = uuid4()
+    await pool.execute(
+        """INSERT INTO timeline.events
+            (id, run_id, virtual_ts, type, actor_id, payload, cross_refs, is_historical)
+           VALUES ($1,$2,$3,'brex.transfer',$4,$5::jsonb,'{}'::jsonb,FALSE)""",
+        event_id, run_id, when, actor, json.dumps(payload))
+    return event_id
+
+

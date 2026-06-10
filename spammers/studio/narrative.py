@@ -277,6 +277,14 @@ async def _db_signals(pool: asyncpg.Pool, run_id: UUID) -> dict[str, int]:
             WHERE o.run_id = $1""", run_id)
     out["ashby"] = int(val or 0)
 
+    # ---- brex: corporate-card + cash transactions (the spend/cash stream)
+    val = await pool.fetchval(
+        """SELECT count(*) FROM app_brex.transactions t
+             JOIN app_brex.accounts a ON a.id = t.account_pk
+             JOIN app_brex.organizations o ON o.id = a.org_pk
+            WHERE o.run_id = $1""", run_id)
+    out["brex"] = int(val or 0)
+
     return out
 
 

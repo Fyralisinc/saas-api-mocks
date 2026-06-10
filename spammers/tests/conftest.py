@@ -91,7 +91,7 @@ os.environ["SPAMMERS_DB_URL"] = test_db_url()
 
 _SCHEMAS = ["timeline", "app_slack", "app_discord", "app_github", "app_gmail",
             "app_calendar", "app_notion", "app_drive", "app_jira", "app_quickbooks",
-            "app_grafana", "app_mercury", "app_ashby", "oauth", "org"]
+            "app_grafana", "app_mercury", "app_ashby", "app_brex", "oauth", "org"]
 
 
 async def _reset_schemas(pool) -> None:

@@ -14,6 +14,7 @@ Real-provider-compatible byte concatenations:
 """
 from __future__ import annotations
 
+import binascii
 import hashlib
 import hmac
 from typing import Union
@@ -178,6 +179,56 @@ def ashby_sign(secret: Union[str, bytes], body: Union[str, bytes]) -> str:
 def ashby_verify(secret: Union[str, bytes], header: str, body: Union[str, bytes]) -> bool:
     expected = ashby_sign(secret, body)
     return hmac.compare_digest(expected, header or "")
+
+
+# ---------- Brex (Svix-scheme webhook) ----------
+
+def brex_sign(secret: Union[str, bytes], body: Union[str, bytes],
+              *, msg_id: str, timestamp: Union[str, int]) -> str:
+    """Return the value for Brex's ``Webhook-Signature`` header (Svix scheme).
+
+    Real Brex webhooks are signed with **Svix's standard symmetric scheme**, with
+    the headers renamed ``Webhook-Id`` / ``Webhook-Timestamp`` / ``Webhook-Signature``:
+
+      signed content = ``"{Webhook-Id}.{Webhook-Timestamp}.{rawBody}"`` (literal dots)
+      key            = base64-decode of the secret AFTER its ``whsec_`` prefix
+      signature      = ``"v1," + base64(HMAC-SHA256(key, signedContent))``
+
+    The header is a SPACE-delimited list of ``version,signature`` pairs (so a
+    secret rotation can carry two). Base64 (NOT hex), ``v1,`` version tag (NOT
+    ``sha256=``), and the timestamp lives in a SEPARATE header (NOT Stripe's
+    ``t=,v1=``). Returns a single ``v1,<base64>`` token.
+    """
+    import base64
+    raw_secret = secret.decode() if isinstance(secret, (bytes, bytearray)) else str(secret)
+    key_b64 = raw_secret[len("whsec_"):] if raw_secret.startswith("whsec_") else raw_secret
+    try:
+        key = base64.b64decode(key_b64)
+    except (ValueError, binascii.Error):
+        key = _to_bytes(raw_secret)
+    signed = f"{msg_id}.{timestamp}.".encode("ascii") + _to_bytes(body)
+    mac = hmac.new(key, signed, hashlib.sha256).digest()
+    return "v1," + base64.b64encode(mac).decode("ascii")
+
+
+def brex_verify(secret: Union[str, bytes], header: str, body: Union[str, bytes],
+                *, msg_id: str, timestamp: Union[str, int]) -> bool:
+    """Constant-time verify of a Svix ``Webhook-Signature`` header.
+
+    The header may carry MULTIPLE space-delimited ``v1,<base64>`` tokens (rotation);
+    any one matching is a pass. Compares only the base64 portion after ``v1,``.
+    """
+    if not header:
+        return False
+    expected = brex_sign(secret, body, msg_id=msg_id, timestamp=timestamp).split(",", 1)[1]
+    for token in header.split(" "):
+        token = token.strip()
+        if not token:
+            continue
+        version, _, sig = token.partition(",")
+        if version == "v1" and hmac.compare_digest(expected, sig):
+            return True
+    return False
 
 
 def github_sign_sha1(secret: Union[str, bytes], body: Union[str, bytes]) -> str:

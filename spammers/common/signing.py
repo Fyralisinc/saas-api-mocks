@@ -161,6 +161,25 @@ def mercury_verify(secret: Union[str, bytes], header: str,
     return hmac.compare_digest(expected.split("v1=", 1)[1], got)
 
 
+# ---------- Ashby (recruiting webhook) ----------
+
+def ashby_sign(secret: Union[str, bytes], body: Union[str, bytes]) -> str:
+    """Return the value for Ashby's ``Ashby-Signature`` webhook header.
+
+    Real Ashby: ``sha256=`` + lowercase-hex(HMAC-SHA256(secret, rawBody)). The
+    ``sha256=`` prefix IS present (it names the digest algorithm) — unlike Grafana
+    (bare hex) and Mercury (``t=…,v1=…``). Signed over the RAW request body alone,
+    no timestamp / replay window. Same wire shape as GitHub's ``X-Hub-Signature-256``.
+    """
+    mac = hmac.new(_to_bytes(secret), _to_bytes(body), hashlib.sha256).hexdigest()
+    return f"sha256={mac}"
+
+
+def ashby_verify(secret: Union[str, bytes], header: str, body: Union[str, bytes]) -> bool:
+    expected = ashby_sign(secret, body)
+    return hmac.compare_digest(expected, header or "")
+
+
 def github_sign_sha1(secret: Union[str, bytes], body: Union[str, bytes]) -> str:
     """Return the value for the legacy ``X-Hub-Signature`` header.
 

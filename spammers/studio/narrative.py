@@ -270,6 +270,13 @@ async def _db_signals(pool: asyncpg.Pool, run_id: UUID) -> dict[str, int]:
             WHERE o.run_id = $1""", run_id)
     out["mercury"] = int(val or 0)
 
+    # ---- ashby: recruiting entities (candidate/application/job/interview/offer)
+    val = await pool.fetchval(
+        """SELECT count(*) FROM app_ashby.entities e
+             JOIN app_ashby.organizations o ON o.id = e.org_pk
+            WHERE o.run_id = $1""", run_id)
+    out["ashby"] = int(val or 0)
+
     return out
 
 

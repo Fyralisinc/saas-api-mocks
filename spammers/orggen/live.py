@@ -1416,6 +1416,71 @@ async def inject_brex_transfer(
     return event_id
 
 
+async def inject_ramp_transaction(
+    pool: asyncpg.Pool,
+    run_id: UUID,
+    *,
+    amount_usd: Optional[float] = None,
+    merchant: str = "Amazon Web Services",
+    event_type: str = "transactions.cleared",
+    at_virtual: Optional[datetime] = None,
+) -> UUID:
+    """Append a thin ``ramp.transaction`` timeline event that drives the signed Ramp
+    **webhook** (``X-Ramp-Signature`` bare-hex HMAC over the raw body).
+
+    Ramp's live push channel is the thin transaction event ``{id, type, created_at,
+    business_id, object:{id}}`` — it carries only the resource id, so the inject also
+    writes a fresh **CLEARED transaction** for that id onto the org, letting a consumer
+    fetch-on-notify ``GET /developer/v1/transactions/{id}`` to pull the full record."""
+    import secrets as _secrets
+    org = await pool.fetchrow(
+        "SELECT id, business_id FROM app_ramp.organizations WHERE run_id=$1", run_id)
+    if org is None:
+        raise LookupError("no ramp organization in this run; did you forget `prepare`?")
+    holder = await pool.fetchrow(
+        "SELECT c.card_id, c.cardholder_id, c.cardholder_name FROM app_ramp.cards c "
+        "WHERE c.org_pk=$1 ORDER BY c.sort_key LIMIT 1", org["id"])
+    next_sort = await pool.fetchval(
+        "SELECT COALESCE(MAX(sort_key), 0) + 1 FROM app_ramp.transactions WHERE org_pk=$1",
+        org["id"])
+
+    clock = await get_clock(pool, run_id)
+    when = at_virtual or clock.virtual_now
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+
+    cents = int(round((amount_usd if amount_usd is not None
+                       else _secrets.randbelow(90_000) + 1_000) * 100))
+    txn_id = str(UUID(int=_secrets.randbits(128), version=4))
+    settled = when + timedelta(days=1)
+    await pool.execute(
+        """INSERT INTO app_ramp.transactions
+            (id, org_pk, txn_id, amount_cents, currency_code, state, sync_status,
+             card_id, card_present, user_id, cardholder_name, merchant_id, merchant_name,
+             merchant_category_code, user_transaction_time, accounting_date,
+             settlement_date, synced_at, sort_key, is_historical)
+           VALUES ($1,$2,$3,$4,'USD','CLEARED','SYNCED',$5,FALSE,$6,$7,$8,$9,'5734',
+                   $10,$11,$11,NULL,$12,FALSE)""",
+        uuid4(), org["id"], txn_id, abs(cents),
+        holder["card_id"] if holder else None,
+        holder["cardholder_id"] if holder else None,
+        holder["cardholder_name"] if holder else None,
+        str(UUID(int=_secrets.randbits(128), version=4)), merchant, when, settled,
+        next_sort)
+
+    payload = {"txn_id": txn_id, "event_type": event_type,
+               "business_id": org["business_id"]}
+    actor = await pool.fetchval(
+        "SELECT id FROM org.people WHERE run_id=$1 ORDER BY random() LIMIT 1", run_id)
+    event_id = uuid4()
+    await pool.execute(
+        """INSERT INTO timeline.events
+            (id, run_id, virtual_ts, type, actor_id, payload, cross_refs, is_historical)
+           VALUES ($1,$2,$3,'ramp.transaction',$4,$5::jsonb,'{}'::jsonb,FALSE)""",
+        event_id, run_id, when, actor, json.dumps(payload))
+    return event_id
+
+
 async def inject_deel_event(
     pool: asyncpg.Pool,
     run_id: UUID,

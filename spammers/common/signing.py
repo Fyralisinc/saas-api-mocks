@@ -276,6 +276,30 @@ def hibob_verify(secret: Union[str, bytes], header: str, body: Union[str, bytes]
     return hmac.compare_digest(expected, (header or "").strip())
 
 
+# ---------- Ramp (corporate-card / spend webhook) ----------
+
+def ramp_sign(secret: Union[str, bytes], body: Union[str, bytes]) -> str:
+    """Return the value for Ramp's ``X-Ramp-Signature`` webhook header.
+
+    Real Ramp (docs.ramp.com/developer-api/v1/guides/webhooks): *"Every webhook
+    request from Ramp includes an X-Ramp-Signature header, which contains an
+    HMAC-SHA256 hash of the raw request body, signed with your webhook secret."*
+    The sample value in the docs is **bare lowercase hex** — NO ``sha256=`` /
+    ``v1,`` prefix, NOT base64 — over the **raw request body alone** (no timestamp,
+    no method prefix). It is the simplest possible HMAC shape: GitHub's
+    ``X-Hub-Signature-256`` minus the ``sha256=`` prefix. (Contrast GitHub's
+    ``sha256=<hex>``, Deel's bare-hex over ``"POST"+body``, Brex's Svix base64,
+    HiBob's base64-SHA512.) NB: this is the ramp.com spend-management Ramp, NOT
+    "Ramp Network" the crypto on/off-ramp (which uses ECDSA + ``X-Body-Signature``).
+    """
+    return hmac.new(_to_bytes(secret), _to_bytes(body), hashlib.sha256).hexdigest()
+
+
+def ramp_verify(secret: Union[str, bytes], header: str, body: Union[str, bytes]) -> bool:
+    expected = ramp_sign(secret, body)
+    return hmac.compare_digest(expected, (header or "").strip())
+
+
 def github_sign_sha1(secret: Union[str, bytes], body: Union[str, bytes]) -> str:
     """Return the value for the legacy ``X-Hub-Signature`` header.
 

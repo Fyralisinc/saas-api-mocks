@@ -27,6 +27,7 @@ from spammers.gmail import webhooks as gmail_webhooks
 from spammers.jira import webhooks as jira_webhooks
 from spammers.quickbooks import webhooks as quickbooks_webhooks
 from spammers.grafana import webhooks as grafana_webhooks
+from spammers.mercury import webhooks as mercury_webhooks
 from spammers.notion import webhooks as notion_webhooks
 from spammers.slack import events as slack_events
 
@@ -48,6 +49,7 @@ class EmissionLoop:
         jira_webhook_url: Optional[str] = None,
         quickbooks_webhook_url: Optional[str] = None,
         grafana_webhook_url: Optional[str] = None,
+        mercury_webhook_url: Optional[str] = None,
         poll_interval_s: float = 0.5,
         batch_size: int = 20,
     ) -> None:
@@ -61,6 +63,7 @@ class EmissionLoop:
         self._jira_webhook_url = jira_webhook_url
         self._quickbooks_webhook_url = quickbooks_webhook_url
         self._grafana_webhook_url = grafana_webhook_url
+        self._mercury_webhook_url = mercury_webhook_url
         self._poll_interval_s = poll_interval_s
         self._batch_size = batch_size
         self._stop = asyncio.Event()
@@ -142,6 +145,13 @@ class EmissionLoop:
                         run_id=self._run_id,
                         event_id=row["id"],
                         grafana_webhook_url=self._grafana_webhook_url,
+                    )
+                elif etype == "mercury.transaction" and self._mercury_webhook_url:
+                    await mercury_webhooks.emit_event(
+                        self._pool,
+                        run_id=self._run_id,
+                        event_id=row["id"],
+                        mercury_webhook_url=self._mercury_webhook_url,
                     )
                 else:
                     # No emitter registered — mark as emitted to skip

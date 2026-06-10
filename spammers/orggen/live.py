@@ -2066,3 +2066,94 @@ async def inject_telegram_message(
         event_id, run_id, when, actor, json.dumps(payload))
     return event_id
 
+
+async def inject_signal_message(
+    pool: asyncpg.Pool,
+    run_id: UUID,
+    *,
+    handle: Optional[str] = None,
+    thread_title: Optional[str] = None,
+    text: Optional[str] = None,
+    self_sent: bool = False,
+    at_virtual: Optional[datetime] = None,
+) -> UUID:
+    """Append one ``signal.message`` event (not-historical) to the timeline.
+
+    The Signal mock's ``ReceiveDispatcher`` picks it up, projects it into
+    ``app_signal.messages`` (so a later backfill walk sees the same row → the
+    cross-path dedup invariant) and pushes a signal-cli ``receive`` notification
+    over the persistent linked-device connection — there is NO webhook and NO HMAC
+    (the authenticated session is the trust boundary, like Discord/Telegram). The
+    linked account's OWN outgoing messages (``self_sent`` → out=True) are projected
+    for backfill parity but SKIPPED on the live fan-out (flow doc §7.3).
+
+    Defaults: the ``Eng War Room`` group, a random non-self teammate as sender
+    (out=False inbound), virtual_now + 1s. Returns the timeline event id."""
+    from spammers.signal.seed import _number, _signal_uuid
+
+    inst = await pool.fetchrow(
+        "SELECT id, account_username, account_uuid, account_number "
+        "FROM app_signal.installations WHERE run_id = $1 AND disabled_at IS NULL",
+        run_id)
+    if inst is None:
+        raise LookupError("no signal install in this run; did you forget `prepare`?")
+
+    if thread_title is not None:
+        thread = await pool.fetchrow(
+            "SELECT thread_id, thread_kind, thread_title FROM app_signal.threads "
+            "WHERE install_pk = $1 AND thread_title = $2", inst["id"], thread_title)
+    else:
+        thread = await pool.fetchrow(
+            "SELECT thread_id, thread_kind, thread_title FROM app_signal.threads "
+            "WHERE install_pk = $1 AND thread_kind = 'group' AND thread_title = 'Eng War Room'",
+            inst["id"])
+    if thread is None:
+        thread = await pool.fetchrow(
+            "SELECT thread_id, thread_kind, thread_title FROM app_signal.threads "
+            "WHERE install_pk = $1 ORDER BY thread_id LIMIT 1", inst["id"])
+    if thread is None:
+        raise LookupError("no signal threads in this run; did you forget `prepare`?")
+
+    self_handle = inst["account_username"] or ""
+    # Sender: a random teammate who isn't the self account (so source* is present),
+    # unless self_sent was requested (the own-outgoing skip path).
+    sender = handle or await pool.fetchval(
+        "SELECT handle FROM org.people WHERE run_id = $1 AND handle <> $2 "
+        "ORDER BY random() LIMIT 1", run_id, self_handle)
+    sender = sender or self_handle or "teammate"
+    is_self = self_sent or (sender == self_handle)
+    actor = await pool.fetchval(
+        "SELECT id FROM org.people WHERE run_id = $1 AND handle = $2",
+        run_id, (self_handle if is_self else sender))
+
+    clock = await get_clock(pool, run_id)
+    when = at_virtual or (clock.virtual_now + timedelta(seconds=1))
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+
+    if text is None:
+        kind = "self-sent" if is_self else "live"
+        text = f"[{kind}] {sender}: ping @ {when.isoformat()}"
+
+    payload = {
+        "thread_id": thread["thread_id"],
+        "thread_kind": thread["thread_kind"],
+        "out": bool(is_self),
+        "body": text,
+        # an inbound message carries its sender; a self-sent one carries none.
+        "sender_uuid": None if is_self else _signal_uuid(sender),
+        "sender_number": None if is_self else _number(sender),
+        "sender_name": None if is_self else sender,
+        # a direct self-sent message's destination is the peer (the thread uuid).
+        "direct_peer_uuid": (thread["thread_id"]
+                             if thread["thread_kind"] == "direct" else None),
+        "direct_peer_number": None,
+    }
+    event_id = uuid4()
+    await pool.execute(
+        """INSERT INTO timeline.events
+            (id, run_id, virtual_ts, type, actor_id, payload, cross_refs, is_historical)
+           VALUES ($1,$2,$3,'signal.message',$4,$5::jsonb,'{}'::jsonb,FALSE)""",
+        event_id, run_id, when, actor, json.dumps(payload))
+    return event_id
+

@@ -94,7 +94,7 @@ _SCHEMAS = ["timeline", "app_slack", "app_discord", "app_github", "app_gmail",
             "app_grafana", "app_mercury", "app_ashby", "app_brex", "app_deel",
             "app_hibob", "app_figma", "app_miro", "app_ramp", "app_gusto",
             "app_carta", "app_linkedin", "app_fireflies", "app_aws", "app_telegram",
-            "oauth", "org"]
+            "app_signal", "oauth", "org"]
 
 
 async def _reset_schemas(pool) -> None:

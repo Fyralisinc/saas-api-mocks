@@ -1830,3 +1830,88 @@ async def inject_hibob_event(
     return event_id
 
 
+async def inject_fireflies_transcript(
+    pool: asyncpg.Pool,
+    run_id: UUID,
+    *,
+    title: str = "Engineering Standup",
+    event_type: str = "meeting.transcribed",
+    at_virtual: Optional[datetime] = None,
+) -> UUID:
+    """Append a thin ``fireflies.transcript`` timeline event that drives the signed
+    Fireflies **webhook** (``x-hub-signature: sha256=<hex>`` HMAC-SHA256 over the body).
+
+    Fireflies' live push channel is a THIN V2 event ``{event, timestamp, meeting_id,
+    client_reference_id}`` — it carries only the meeting id, so the inject also writes
+    a fresh **processed transcript** for that id onto the workspace, letting a consumer
+    fetch-on-notify the GraphQL ``transcript(id:)`` query to pull the full record."""
+    import json as _json
+    import secrets as _secrets
+    import string as _string
+    ws = await pool.fetchrow(
+        "SELECT id, owner_email, owner_user_id, owner_name "
+        "FROM app_fireflies.workspaces WHERE run_id=$1", run_id)
+    if ws is None:
+        raise LookupError("no fireflies workspace in this run; did you forget `prepare`?")
+
+    clock = await get_clock(pool, run_id)
+    when = at_virtual or clock.virtual_now
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+
+    alnum = _string.ascii_letters + _string.digits
+    tid = "".join(_secrets.choice(alnum) for _ in range(10))
+    next_sort = await pool.fetchval(
+        "SELECT COALESCE(MAX(sort_key), 0) + 1 FROM app_fireflies.transcripts WHERE workspace_pk=$1",
+        ws["id"])
+    cref = f"cal-{uuid4().hex[:12]}"
+    parts = await pool.fetch(
+        "SELECT full_name, email FROM org.people WHERE run_id=$1 "
+        "ORDER BY random() LIMIT 4", run_id)
+    emails = [p["email"] for p in parts if p["email"]] or [ws["owner_email"]]
+    attendees = [{"displayName": p["full_name"], "email": p["email"],
+                  "name": p["full_name"], "phoneNumber": None, "location": None}
+                 for p in parts if p["email"]] or [
+        {"displayName": ws["owner_name"], "email": ws["owner_email"],
+         "name": ws["owner_name"], "phoneNumber": None, "location": None}]
+    speakers = [{"id": "".join(_secrets.choice(alnum) for _ in range(10)),
+                 "name": a["name"]} for a in attendees]
+    summary = {
+        "overview": f"The team met for {title} and discussed live updates.",
+        "action_items": [f"Follow up after {title}."],
+        "keywords": ["standup", "updates"],
+        "meeting_type": "standup", "topics_discussed": ["status updates"],
+        "short_summary": f"{title} with assigned follow-ups.",
+    }
+    await pool.execute(
+        """INSERT INTO app_fireflies.transcripts
+            (id, workspace_pk, transcript_id, title, meeting_date, duration_minutes,
+             organizer_email, host_email, participants, fireflies_users,
+             meeting_attendees, speakers, summary, sentences, meeting_info,
+             calendar_id, transcript_url, audio_url, video_url, meeting_link,
+             client_reference_id, version, sort_key, is_historical)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$7,$8::jsonb,$9::jsonb,$10::jsonb,$11::jsonb,
+                   $12::jsonb,'[]'::jsonb,$13::jsonb,$14,$15,$16,$17,$18,$19,1,$20,FALSE)""",
+        uuid4(), ws["id"], tid, title, when, 18.0, ws["owner_email"],
+        _json.dumps(emails), _json.dumps(emails[: max(1, len(emails) // 2)]),
+        _json.dumps(attendees), _json.dumps(speakers), _json.dumps(summary),
+        _json.dumps({"fred_joined": True, "silent_meeting": False,
+                     "summary_status": "processed"}),
+        f"cal_{uuid4().hex[:16]}",
+        f"https://app.fireflies.ai/view/{tid}",
+        f"https://api.fireflies.ai/audio/{tid}.mp3",
+        f"https://api.fireflies.ai/video/{tid}.mp4",
+        "https://meet.google.com/abc-defg-hij", cref, next_sort)
+
+    payload = {"transcript_id": tid, "event_type": event_type,
+               "client_reference_id": cref}
+    actor = await pool.fetchval(
+        "SELECT id FROM org.people WHERE run_id=$1 ORDER BY random() LIMIT 1", run_id)
+    event_id = uuid4()
+    await pool.execute(
+        """INSERT INTO timeline.events
+            (id, run_id, virtual_ts, type, actor_id, payload, cross_refs, is_historical)
+           VALUES ($1,$2,$3,'fireflies.transcript',$4,$5::jsonb,'{}'::jsonb,FALSE)""",
+        event_id, run_id, when, actor, json.dumps(payload))
+    return event_id
+

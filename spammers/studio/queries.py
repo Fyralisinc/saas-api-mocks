@@ -307,12 +307,21 @@ async def provider_status(pool: asyncpg.Pool, run_id: UUID) -> dict:
         linkedin["followerStats"] = int(await pool.fetchval(
             "SELECT count(*) FROM app_linkedin.follower_stats WHERE org_pk=$1", lorg["id"]) or 0)
 
+    # Fireflies
+    fireflies = {"transcripts": 0}
+    ffw = await pool.fetchrow(
+        "SELECT id FROM app_fireflies.workspaces WHERE run_id=$1", run_id)
+    if ffw:
+        fireflies["transcripts"] = int(await pool.fetchval(
+            "SELECT count(*) FROM app_fireflies.transcripts WHERE workspace_pk=$1",
+            ffw["id"]) or 0)
+
     return {"people": people, "teams": teams, "slack": slack, "discord": discord,
             "github": github, "calendar": calendar, "notion": notion, "gmail": gmail,
             "drive": drive, "jira": jira, "quickbooks": quickbooks, "grafana": grafana,
             "mercury": mercury, "ashby": ashby, "brex": brex, "deel": deel, "hibob": hibob,
             "figma": figma, "miro": miro, "ramp": ramp, "gusto": gusto, "carta": carta,
-            "linkedin": linkedin}
+            "linkedin": linkedin, "fireflies": fireflies}
 
 
 # --------------------------------------------------------------------------- people / channels / repos

@@ -343,6 +343,13 @@ async def _db_signals(pool: asyncpg.Pool, run_id: UUID) -> dict[str, int]:
             WHERE o.run_id = $1""", run_id)
     out["linkedin"] = int(val or 0)
 
+    # ---- fireflies: the meeting-transcript stream (one observation per transcript)
+    val = await pool.fetchval(
+        """SELECT count(*) FROM app_fireflies.transcripts t
+             JOIN app_fireflies.workspaces w ON w.id = t.workspace_pk
+            WHERE w.run_id = $1""", run_id)
+    out["fireflies"] = int(val or 0)
+
     return out
 
 

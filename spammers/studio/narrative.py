@@ -322,6 +322,13 @@ async def _db_signals(pool: asyncpg.Pool, run_id: UUID) -> dict[str, int]:
             WHERE o.run_id = $1""", run_id)
     out["ramp"] = int(val or 0)
 
+    # ---- gusto: the payroll-run stream (one observation per processed payroll)
+    val = await pool.fetchval(
+        """SELECT count(*) FROM app_gusto.payrolls p
+             JOIN app_gusto.companies c ON c.id = p.company_pk
+            WHERE c.run_id = $1""", run_id)
+    out["gusto"] = int(val or 0)
+
     return out
 
 

@@ -271,11 +271,21 @@ async def provider_status(pool: asyncpg.Pool, run_id: UUID) -> dict:
         ramp["reimbursements"] = int(await pool.fetchval(
             "SELECT count(*) FROM app_ramp.reimbursements WHERE org_pk=$1", rorg["id"]) or 0)
 
+    # Gusto
+    gusto = {"employees": 0, "payrolls": 0}
+    gco = await pool.fetchrow(
+        "SELECT id FROM app_gusto.companies WHERE run_id=$1", run_id)
+    if gco:
+        gusto["employees"] = int(await pool.fetchval(
+            "SELECT count(*) FROM app_gusto.employees WHERE company_pk=$1", gco["id"]) or 0)
+        gusto["payrolls"] = int(await pool.fetchval(
+            "SELECT count(*) FROM app_gusto.payrolls WHERE company_pk=$1", gco["id"]) or 0)
+
     return {"people": people, "teams": teams, "slack": slack, "discord": discord,
             "github": github, "calendar": calendar, "notion": notion, "gmail": gmail,
             "drive": drive, "jira": jira, "quickbooks": quickbooks, "grafana": grafana,
             "mercury": mercury, "ashby": ashby, "brex": brex, "deel": deel, "hibob": hibob,
-            "figma": figma, "miro": miro, "ramp": ramp}
+            "figma": figma, "miro": miro, "ramp": ramp, "gusto": gusto}
 
 
 # --------------------------------------------------------------------------- people / channels / repos

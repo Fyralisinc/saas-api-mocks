@@ -1481,6 +1481,88 @@ async def inject_ramp_transaction(
     return event_id
 
 
+async def inject_gusto_event(
+    pool: asyncpg.Pool,
+    run_id: UUID,
+    *,
+    target: str = "payroll",
+    event_type: Optional[str] = None,
+    at_virtual: Optional[datetime] = None,
+) -> UUID:
+    """Append a thin ``gusto.event`` timeline event that drives the signed Gusto
+    **webhook** (``X-Gusto-Signature`` bare-hex HMAC over the raw body).
+
+    Gusto's live push channel is the thin event ``{uuid, event_type, resource_type,
+    resource_uuid, entity_type, entity_uuid, timestamp}`` — it carries only
+    references, so the inject also materialises the referenced record (a fresh
+    processed PAYROLL, or an employee version bump) so a consumer can fetch-on-notify
+    ``GET /v1/companies/{co}/payrolls/{uuid}`` to pull the full record."""
+    import secrets as _secrets
+    co = await pool.fetchrow(
+        "SELECT id, company_uuid, pay_schedule_uuid FROM app_gusto.companies WHERE run_id=$1",
+        run_id)
+    if co is None:
+        raise LookupError("no gusto company in this run; did you forget `prepare`?")
+
+    clock = await get_clock(pool, run_id)
+    when = at_virtual or clock.virtual_now
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+
+    if target == "employee":
+        emp = await pool.fetchrow(
+            "SELECT employee_uuid FROM app_gusto.employees WHERE company_pk=$1 "
+            "AND terminated=FALSE ORDER BY sort_key LIMIT 1", co["id"])
+        if emp is None:
+            raise LookupError("no active gusto employee to update")
+        resource_uuid = emp["employee_uuid"]
+        new_version = "%032x" % _secrets.randbits(128)
+        await pool.execute(
+            "UPDATE app_gusto.employees SET version=$3, is_historical=FALSE "
+            "WHERE company_pk=$1 AND employee_uuid=$2",
+            co["id"], resource_uuid, new_version)
+        payload = {"resource_type": "Employee", "resource_uuid": resource_uuid,
+                   "event_type": event_type or "employee.updated"}
+    else:
+        # materialise a fresh processed payroll for this period
+        next_sort = await pool.fetchval(
+            "SELECT COALESCE(MAX(sort_key), 0) + 1 FROM app_gusto.payrolls WHERE company_pk=$1",
+            co["id"])
+        period_gross = await pool.fetchval(
+            "SELECT COALESCE(SUM(rate_cents) / 24, 0) FROM app_gusto.employees "
+            "WHERE company_pk=$1 AND terminated=FALSE", co["id"]) or 1_000_00
+        gross = int(period_gross)
+        emp_taxes = int(gross * 0.18)
+        net = gross - emp_taxes - int(gross * 0.04)
+        resource_uuid = str(UUID(int=_secrets.randbits(128), version=4))
+        check = when.date()
+        await pool.execute(
+            """INSERT INTO app_gusto.payrolls
+                (id, company_pk, payroll_uuid, pay_period_start, pay_period_end,
+                 check_date, pay_schedule_uuid, processed, off_cycle, external,
+                 payroll_type, processed_at, calculated_at, payroll_deadline,
+                 gross_pay_cents, net_pay_cents, employer_taxes_cents,
+                 employee_taxes_cents, benefits_cents, reimbursements_cents,
+                 sort_key, is_historical)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,TRUE,FALSE,FALSE,'regular',$8,$8,$8,
+                       $9,$10,$11,$12,$13,0,$14,FALSE)""",
+            uuid4(), co["id"], resource_uuid, check - timedelta(days=16),
+            check - timedelta(days=3), check, co["pay_schedule_uuid"], when,
+            gross, net, int(gross * 0.0765), emp_taxes, int(gross * 0.04), next_sort)
+        payload = {"resource_type": "Payroll", "resource_uuid": resource_uuid,
+                   "event_type": event_type or "payroll.processed"}
+
+    actor = await pool.fetchval(
+        "SELECT id FROM org.people WHERE run_id=$1 ORDER BY random() LIMIT 1", run_id)
+    event_id = uuid4()
+    await pool.execute(
+        """INSERT INTO timeline.events
+            (id, run_id, virtual_ts, type, actor_id, payload, cross_refs, is_historical)
+           VALUES ($1,$2,$3,'gusto.event',$4,$5::jsonb,'{}'::jsonb,FALSE)""",
+        event_id, run_id, when, actor, json.dumps(payload))
+    return event_id
+
+
 async def inject_deel_event(
     pool: asyncpg.Pool,
     run_id: UUID,

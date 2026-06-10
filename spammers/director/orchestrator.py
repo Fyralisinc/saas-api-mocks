@@ -34,6 +34,7 @@ from spammers.deel import webhooks as deel_webhooks
 from spammers.hibob import webhooks as hibob_webhooks
 from spammers.figma import webhooks as figma_webhooks
 from spammers.ramp import webhooks as ramp_webhooks
+from spammers.gusto import webhooks as gusto_webhooks
 from spammers.notion import webhooks as notion_webhooks
 from spammers.slack import events as slack_events
 
@@ -62,6 +63,7 @@ class EmissionLoop:
         hibob_webhook_url: Optional[str] = None,
         figma_webhook_url: Optional[str] = None,
         ramp_webhook_url: Optional[str] = None,
+        gusto_webhook_url: Optional[str] = None,
         poll_interval_s: float = 0.5,
         batch_size: int = 20,
     ) -> None:
@@ -82,6 +84,7 @@ class EmissionLoop:
         self._hibob_webhook_url = hibob_webhook_url
         self._figma_webhook_url = figma_webhook_url
         self._ramp_webhook_url = ramp_webhook_url
+        self._gusto_webhook_url = gusto_webhook_url
         self._poll_interval_s = poll_interval_s
         self._batch_size = batch_size
         self._stop = asyncio.Event()
@@ -212,6 +215,13 @@ class EmissionLoop:
                         run_id=self._run_id,
                         event_id=row["id"],
                         ramp_webhook_url=self._ramp_webhook_url,
+                    )
+                elif etype == "gusto.event" and self._gusto_webhook_url:
+                    await gusto_webhooks.emit_event(
+                        self._pool,
+                        run_id=self._run_id,
+                        event_id=row["id"],
+                        gusto_webhook_url=self._gusto_webhook_url,
                     )
                 else:
                     # No emitter registered — mark as emitted to skip

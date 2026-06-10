@@ -42,6 +42,7 @@ from spammers.orggen.live import (
     inject_mercury_transaction,
     inject_ashby_application_change,
     inject_brex_transfer,
+    inject_deel_event,
     inject_notion_page,
     inject_notion_page_update,
     inject_slack_message,
@@ -104,6 +105,12 @@ async def _cmd_prepare(args: argparse.Namespace) -> int:
     from spammers.brex.seed import seed_brex
     b = await seed_brex(pool, rid, at=as_of)
     _eprint(f"brex seeded: {b}")
+    # Deel is a net-new Tier-C source: project the run's people into global-payroll
+    # contracts + a monthly paid-invoice stream (REAL api.letsdeel.com/rest/v2 API,
+    # not the Fyralis Mercury-clone — divergence logged in deel-fidelity-audit).
+    from spammers.deel.seed import seed_deel
+    d = await seed_deel(pool, rid, at=as_of)
+    _eprint(f"deel seeded: {d}")
     _eprint(f"backfill summary: total={sum(counts.values())} kinds={len(counts)}")
     for k, v in sorted(counts.items(), key=lambda x: -x[1])[:8]:
         _eprint(f"  {v:>6d}  {k}")
@@ -162,6 +169,7 @@ async def _cmd_emit(args: argparse.Namespace) -> int:
     mercury_webhook_url = args.mercury_webhook_url or f"{fyralis_base}/webhooks/mercury"
     ashby_webhook_url = args.ashby_webhook_url or f"{fyralis_base}/webhooks/ashby"
     brex_webhook_url = args.brex_webhook_url or f"{fyralis_base}/webhooks/brex"
+    deel_webhook_url = args.deel_webhook_url or f"{fyralis_base}/webhooks/deel"
 
     # set live mode at requested speed
     await set_mode(pool, rid, mode="live", speed_multiplier=args.speed)
@@ -182,7 +190,8 @@ async def _cmd_emit(args: argparse.Namespace) -> int:
                         grafana_webhook_url=grafana_webhook_url,
                         mercury_webhook_url=mercury_webhook_url,
                         ashby_webhook_url=ashby_webhook_url,
-                        brex_webhook_url=brex_webhook_url)
+                        brex_webhook_url=brex_webhook_url,
+                        deel_webhook_url=deel_webhook_url)
     loop.start()
     _eprint(f"emitting → slack:{slack_events_url} github:{github_events_url} "
             f"discord:{discord_interactions_url} notion:{notion_webhook_url} "
@@ -291,6 +300,10 @@ async def _cmd_inject(args: argparse.Namespace) -> int:
         event_id = await inject_brex_transfer(
             pool, rid, counterparty=args.target or "Stripe Inc.",
         )
+    elif args.provider == "deel":
+        event_id = await inject_deel_event(
+            pool, rid, event_type=args.target or "invoice.paid",
+        )
     else:
         event_id = await inject_slack_message(
             pool, rid,
@@ -369,7 +382,8 @@ async def _cmd_reset(args: argparse.Namespace) -> int:
         return 2
     schemas = ["timeline", "app_slack", "app_discord", "app_github", "app_gmail",
                "app_calendar", "app_notion", "app_drive", "app_jira", "app_quickbooks",
-               "app_grafana", "app_mercury", "app_ashby", "app_brex", "oauth", "org"]
+               "app_grafana", "app_mercury", "app_ashby", "app_brex", "app_deel",
+               "oauth", "org"]
     for s in schemas:
         await pool.execute(f"DROP SCHEMA IF EXISTS {s} CASCADE")
     _eprint(f"dropped schemas: {schemas}")
@@ -432,6 +446,8 @@ def main() -> None:
                         help="defaults to {fyralis_base}/webhooks/ashby")
     p_emit.add_argument("--brex-webhook-url", default=None,
                         help="defaults to {fyralis_base}/webhooks/brex")
+    p_emit.add_argument("--deel-webhook-url", default=None,
+                        help="defaults to {fyralis_base}/webhooks/deel")
     p_emit.set_defaults(func=_cmd_emit)
 
     p_inj = sub.add_parser("inject", help="inject a one-off live event")
@@ -439,7 +455,7 @@ def main() -> None:
     p_inj.add_argument("--provider",
                        choices=["slack", "discord", "github", "notion", "gmail",
                                 "calendar", "drive", "jira", "quickbooks", "grafana",
-                                "mercury", "ashby", "brex"],
+                                "mercury", "ashby", "brex", "deel"],
                        default="slack")
     p_inj.add_argument("--handle", default=None, help="org.people.handle (default: random)")
     p_inj.add_argument("--channel", default="#general", help="slack/discord channel")

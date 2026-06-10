@@ -30,6 +30,7 @@ from spammers.grafana import webhooks as grafana_webhooks
 from spammers.mercury import webhooks as mercury_webhooks
 from spammers.ashby import webhooks as ashby_webhooks
 from spammers.brex import webhooks as brex_webhooks
+from spammers.deel import webhooks as deel_webhooks
 from spammers.notion import webhooks as notion_webhooks
 from spammers.slack import events as slack_events
 
@@ -54,6 +55,7 @@ class EmissionLoop:
         mercury_webhook_url: Optional[str] = None,
         ashby_webhook_url: Optional[str] = None,
         brex_webhook_url: Optional[str] = None,
+        deel_webhook_url: Optional[str] = None,
         poll_interval_s: float = 0.5,
         batch_size: int = 20,
     ) -> None:
@@ -70,6 +72,7 @@ class EmissionLoop:
         self._mercury_webhook_url = mercury_webhook_url
         self._ashby_webhook_url = ashby_webhook_url
         self._brex_webhook_url = brex_webhook_url
+        self._deel_webhook_url = deel_webhook_url
         self._poll_interval_s = poll_interval_s
         self._batch_size = batch_size
         self._stop = asyncio.Event()
@@ -172,6 +175,13 @@ class EmissionLoop:
                         run_id=self._run_id,
                         event_id=row["id"],
                         brex_webhook_url=self._brex_webhook_url,
+                    )
+                elif etype == "deel.event" and self._deel_webhook_url:
+                    await deel_webhooks.emit_event(
+                        self._pool,
+                        run_id=self._run_id,
+                        event_id=row["id"],
+                        deel_webhook_url=self._deel_webhook_url,
                     )
                 else:
                     # No emitter registered — mark as emitted to skip

@@ -154,7 +154,8 @@ cmd_serve() {
         mercury)  default_port=7011 ;;
         ashby)    default_port=7012 ;;
         brex)     default_port=7013 ;;
-        *) c_red "unknown provider: $provider (use slack|discord|github|gmail|calendar|notion|drive|jira|quickbooks|grafana|mercury|ashby|brex)"; exit 1 ;;
+        deel)     default_port=7014 ;;
+        *) c_red "unknown provider: $provider (use slack|discord|github|gmail|calendar|notion|drive|jira|quickbooks|grafana|mercury|ashby|brex|deel)"; exit 1 ;;
     esac
     local port="${PORT:-$default_port}"
     echo "$provider mock on http://localhost:$port  (health: /_health)"
@@ -200,11 +201,11 @@ dev.sh — setup + task runner for the Gharelu-Alpen spammer
   ./dev.sh test [pytest args] Run the fidelity suite
   ./dev.sh prepare            Backfill the Gharelu-Alpen corpus into the mock DBs
                               (CORPUS_PATH and AS_OF env vars override defaults)
-  ./dev.sh serve [slack|discord|github|gmail|calendar|notion|drive|jira|quickbooks|grafana|mercury|ashby|brex]
+  ./dev.sh serve [slack|discord|github|gmail|calendar|notion|drive|jira|quickbooks|grafana|mercury|ashby|brex|deel]
                               Start a mock (slack:7001 discord:7002 github:7003
                               gmail:7004 calendar:7005 notion:7006 drive:7007
                               jira:7008 quickbooks:7009 grafana:7010 mercury:7011
-                              ashby:7012 brex:7013;
+                              ashby:7012 brex:7013 deel:7014;
                               \$PORT overrides)
   ./dev.sh studio             Launch the Studio control UI (http://localhost:7000)
   ./dev.sh stop               Stop the mock (frees port \$PORT, default 7001)

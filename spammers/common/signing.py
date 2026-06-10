@@ -231,6 +231,28 @@ def brex_verify(secret: Union[str, bytes], header: str, body: Union[str, bytes],
     return False
 
 
+# ---------- Deel (global payroll webhook) ----------
+
+def deel_sign(secret: Union[str, bytes], body: Union[str, bytes]) -> str:
+    """Return the value for Deel's ``x-deel-signature`` webhook header.
+
+    Real Deel: a **bare lowercase-hex** HMAC-SHA256 digest — NO ``sha256=`` prefix,
+    NOT base64 — computed over the string **``"POST" + rawBody``** (the literal HTTP
+    method ``POST`` prepended to the raw request body; there is NO timestamp in the
+    signed string). The delivery also carries companion headers ``x-deel-hmac-label``
+    (which signing key) and ``x-deel-webhook-version`` (serialization version) — those
+    name/select the key, the signature itself is just this digest. (Contrast GitHub's
+    ``sha256=<hex>`` over the body alone, Mercury's ``t=,v1=`` and Brex's Svix base64.)
+    """
+    signed = b"POST" + _to_bytes(body)
+    return hmac.new(_to_bytes(secret), signed, hashlib.sha256).hexdigest()
+
+
+def deel_verify(secret: Union[str, bytes], header: str, body: Union[str, bytes]) -> bool:
+    expected = deel_sign(secret, body)
+    return hmac.compare_digest(expected, (header or "").strip())
+
+
 def github_sign_sha1(secret: Union[str, bytes], body: Union[str, bytes]) -> str:
     """Return the value for the legacy ``X-Hub-Signature`` header.
 

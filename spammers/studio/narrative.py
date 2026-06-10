@@ -285,6 +285,13 @@ async def _db_signals(pool: asyncpg.Pool, run_id: UUID) -> dict[str, int]:
             WHERE o.run_id = $1""", run_id)
     out["brex"] = int(val or 0)
 
+    # ---- deel: contractor/payroll invoices (the global-payroll payment stream)
+    val = await pool.fetchval(
+        """SELECT count(*) FROM app_deel.invoices i
+             JOIN app_deel.organizations o ON o.id = i.org_pk
+            WHERE o.run_id = $1""", run_id)
+    out["deel"] = int(val or 0)
+
     return out
 
 

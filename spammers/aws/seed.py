@@ -255,10 +255,13 @@ async def seed_aws(
     window_start = now - timedelta(days=_BACKFILL_DAYS)
     rows: list[tuple] = []  # (event_id, ms, name, source, region, username, akid, ro, resources, record, is_alarm)
 
-    # 1) Management events — ~control-plane activity per day.
+    # 1) Management events — control-plane activity per day. An active infra-heavy
+    #    team (sequencers, prover fleet, RPC nodes, EKS) generates a steady, high
+    #    volume of console/IAM/EC2/EKS/S3/KMS management events — CloudTrail is a
+    #    firehose. ~50/day is realistic for this org's footprint.
     day = window_start
     while day < now:
-        n = rng.randint(8, 26)
+        n = rng.randint(28, 72)
         for _ in range(n):
             name, source, read_only, res_type, res_prefix = rng.choice(_MGMT)
             handle = rng.choice(handles)
@@ -280,7 +283,7 @@ async def seed_aws(
     # 2) CloudWatch alarm-state changes — firing→resolved pairs every ~2-3 days.
     day = window_start + timedelta(days=rng.randint(1, 3))
     while day < now - timedelta(hours=2):
-        if rng.random() < 0.4:
+        if rng.random() < 0.55:
             alarm = rng.choice(_ALARMS)
             service = rng.choice(services)
             fire = day + timedelta(hours=rng.randint(0, 23), minutes=rng.randint(0, 59))

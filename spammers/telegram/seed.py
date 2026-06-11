@@ -35,7 +35,11 @@ SESSION_STRING = "spam-telegram"   # matches Fyralis's spammer-mode preset
 API_ID = "2040"
 API_HASH = "b18441a1ff607e10a989891a5462e627"
 
-_BACKFILL_DAYS = 430  # ~14 months of history
+_BACKFILL_DAYS = 430  # nominal density reference (~14 months)
+# Fixed adoption date: the team's Telegram forms after the seed round / first
+# hiring ramp. Anchoring here (instead of a rolling `now - 430d` window) means
+# advancing virtual-now ACCUMULATES history forward and never predates adoption.
+_ADOPTED = datetime(2024, 6, 1, tzinfo=timezone.utc)
 
 # (kind, title, broadcast, target_messages). broadcast channels post with NO
 # from_id; supergroups/groups/users are multi/▒ two-party.
@@ -147,8 +151,10 @@ async def seed_telegram(
         inst_pk, run_id, ACCOUNT_LABEL, SESSION_STRING, API_ID, API_HASH,
         self_user_id, self_handle, "+15550000001", now)
 
-    window_start = now - timedelta(days=_BACKFILL_DAYS)
-    span = (now - window_start).total_seconds()
+    window_start = _ADOPTED if _ADOPTED < now else now - timedelta(days=14)
+    span = max(1.0, (now - window_start).total_seconds())
+    # Keep per-day message density ~constant as the window grows past 14 months.
+    density = max(1.0, (now - window_start).days / _BACKFILL_DAYS)
 
     # Build the dialog plan: the named channels/groups + a 1:1 DM per (non-self)
     # person (capped so the corpus stays a realistic size).
@@ -187,7 +193,7 @@ async def seed_telegram(
             participants = handles
 
         # Deterministic ascending timestamps → message_id 1..N in date order.
-        n = max(1, n_target)
+        n = max(1, int(n_target * density))
         ts_list = sorted(
             window_start + timedelta(seconds=rng.uniform(0, span)) for _ in range(n))
         rows = []

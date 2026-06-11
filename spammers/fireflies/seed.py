@@ -155,8 +155,12 @@ async def seed_fireflies(
         WEBHOOK_SECRET, owner_id, owner_email, owner_name, now - timedelta(days=460))
 
     # ---- Build the meeting schedule -----------------------------------------
-    # Meeting templates: (kind label, meeting_type, cadence_days, duration, n_part).
-    start = now - timedelta(days=430)
+    # Fixed adoption date: Fireflies (AI notetaker) is adopted LATER than the
+    # core tools — once the team is larger and most meetings are remote. Anchoring
+    # here (not a rolling `now - 430d` window) means the transcript history starts
+    # at a deliberate adoption date and accumulates forward as virtual-now advances.
+    _ADOPTED_FF = datetime(2025, 1, 1, tzinfo=timezone.utc)
+    start = _ADOPTED_FF if _ADOPTED_FF < now else now - timedelta(days=14)
     meetings: list[tuple[datetime, str, str, float, int]] = []
 
     def _slot(d: datetime, hour: int) -> datetime:

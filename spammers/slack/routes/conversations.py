@@ -20,6 +20,7 @@ from fastapi import APIRouter, Request
 
 from spammers.common.errors import slack_error
 from spammers.common.pagination import slack_paginate
+from spammers.common.rate_limit import sweep_mode_enabled
 from spammers.slack.params import bool_param, int_param, read_params, str_param
 from spammers.slack.responses import SlackJSONResponse as JSONResponse
 from spammers.slack.auth import require_identity
@@ -220,6 +221,8 @@ def _history_limit(ident: dict, params: dict) -> tuple[int, JSONResponse | None]
     Non-Marketplace apps (post 2025-05-29) are capped to 15 objects/page on
     conversations.history/replies; Marketplace/internal keep up to 1000.
     """
+    if sweep_mode_enabled():
+        return int_param(params, "limit", 100, lo=1, hi=1000), None
     non_mkt = ident.get("app_distribution") != "marketplace"
     default = 15 if non_mkt else 100
     hi = 15 if non_mkt else 1000

@@ -303,3 +303,35 @@ patterns:
     weekend_msg_factor: 0.46
     standup_attendance: 0.89
     review_thoroughness: 0.6
+  person:sabin-thapa:
+    ship_lag_hours: 8.0
+    review_response_hours: 11.0
+    msg_hour_peak: 14
+    msg_hour_spread: 3.0
+    weekend_msg_factor: 0.30
+    standup_attendance: 0.90
+    review_thoroughness: 0.80
+  person:nisha-maharjan:
+    ship_lag_hours: -3.5
+    review_response_hours: 7.0
+    msg_hour_peak: 15
+    msg_hour_spread: 3.0
+    weekend_msg_factor: 0.25
+    standup_attendance: 0.93
+    review_thoroughness: 0.90
+  person:roshan-kc:
+    ship_lag_hours: 28.0
+    review_response_hours: 26.0
+    msg_hour_peak: 13
+    msg_hour_spread: 3.0
+    weekend_msg_factor: 0.35
+    standup_attendance: 0.80
+    review_thoroughness: 0.85
+  person:lena-fischer:
+    ship_lag_hours: 2.0
+    review_response_hours: 9.0
+    msg_hour_peak: 16
+    msg_hour_spread: 2.5
+    weekend_msg_factor: 0.20
+    standup_attendance: 0.88
+    review_thoroughness: 0.87

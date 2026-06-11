@@ -130,12 +130,17 @@ async def seed_linkedin(
         org_pk, run_id, "https://api.linkedin.com", ORG_ID, org_urn, LOCALIZED_NAME,
         VANITY_NAME, WEBSITE, ACCESS_TOKEN, CLIENT_ID, CLIENT_SECRET, incorporated)
 
-    # ---- POSTS: ~2 dozen company updates over the last ~14 months ------------
-    n_posts = 26
+    # ---- POSTS: company updates from the org Page's first post onward --------
+    # Fixed adoption date: the org Page starts posting around the seed-round
+    # announcement / public launch. Anchoring here (not a rolling `now - 430d`
+    # window) accumulates posts forward as virtual-now advances and keeps cadence
+    # (~1 post / 16 days) stable regardless of how far out `at` is.
+    _ADOPTED_LI = datetime(2024, 4, 1, tzinfo=timezone.utc)
+    first_post_at = _ADOPTED_LI if _ADOPTED_LI < now else now - timedelta(days=14)
+    span_days = max(14, (now - first_post_at).days)
+    n_posts = max(6, round(span_days / 16.5))
     # A large, LinkedIn-shaped 19-digit share-id base; bump per post deterministically.
     post_id_base = 7_120_000_000_000_000_000
-    span_days = 430
-    first_post_at = now - timedelta(days=span_days)
     total_likes = total_comments = total_shares = total_clicks = total_impr = 0
     for i in range(n_posts):
         topic = _POST_TOPICS[i % len(_POST_TOPICS)]

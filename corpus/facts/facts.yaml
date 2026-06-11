@@ -1081,6 +1081,72 @@ people:
   bio: Cofounder at Alpen Labs.
   commits: 0
   top_repos: []
+# --- H1 2026 hires (synthetic — the post-Mosaic hiring wave) -----------------
+- id: person:sabin-thapa
+  github_handle: sabin-thapa
+  full_name: Sabin Thapa
+  email: sabin@alpenlabs.io
+  role: engineer
+  level: ic
+  team: team:protocol
+  started_at: '2026-01-20'
+  last_active: '2026-05-27'
+  twitter: null
+  blog_url: null
+  bio: 'Protocol engineer — Rust + Bitcoin.'
+  commits: 6
+  top_repos:
+  - alpen
+  - strata-common
+- id: person:nisha-maharjan
+  github_handle: nisha-maharjan
+  full_name: Nisha Maharjan
+  email: nisha@alpenlabs.io
+  role: engineer
+  level: senior
+  team: team:bridge
+  started_at: '2026-02-17'
+  last_active: '2026-05-27'
+  twitter: null
+  blog_url: null
+  bio: 'Bridge engineer.'
+  commits: 4
+  top_repos:
+  - strata-bridge
+  - alpen
+- id: person:roshan-kc
+  github_handle: roshan-kc
+  full_name: Roshan KC
+  email: roshan@alpenlabs.io
+  role: research
+  level: ic
+  team: team:research
+  started_at: '2026-03-09'
+  last_active: '2026-05-27'
+  twitter: null
+  blog_url: null
+  bio: 'Cryptography researcher — garbled circuits.'
+  commits: 3
+  top_repos:
+  - mosaic
+  - ckt
+- id: person:lena-fischer
+  github_handle: lena-fischer
+  full_name: Lena Fischer
+  email: lena@alpenlabs.io
+  role: infra
+  level: ic
+  team: team:infra
+  started_at: '2026-04-13'
+  last_active: '2026-05-27'
+  twitter: null
+  blog_url: null
+  location: Berlin
+  bio: 'Infrastructure / SRE.'
+  commits: 2
+  top_repos:
+  - alpen-dashboards
+  - faucet-api
 teams_template:
 - id: team:protocol
   name: Protocol Engineering

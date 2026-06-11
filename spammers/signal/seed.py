@@ -41,7 +41,11 @@ ACCOUNT_LABEL = "alpenlabs"
 SESSION_STRING = "spam-signal"   # matches Fyralis's spammer-mode preset
 ACCOUNT_NUMBER = "+15550100001"
 
-_BACKFILL_DAYS = 430  # ~14 months of history
+_BACKFILL_DAYS = 430  # nominal density reference (~14 months)
+# Fixed adoption date: security-conscious Bitcoin founders use Signal from near
+# founding. Anchoring here (not a rolling `now - 430d` window) accumulates
+# history forward as virtual-now advances and never predates adoption.
+_ADOPTED = datetime(2024, 3, 1, tzinfo=timezone.utc)
 
 # (kind, title, n_target). Groups are multi-sender; the hero is a multi-page walk.
 _GROUPS = [
@@ -146,8 +150,10 @@ async def seed_signal(
         inst_pk, run_id, ACCOUNT_LABEL, SESSION_STRING, ACCOUNT_NUMBER, self_uuid,
         self_handle, now)
 
-    window_start = now - timedelta(days=_BACKFILL_DAYS)
-    span = (now - window_start).total_seconds()
+    window_start = _ADOPTED if _ADOPTED < now else now - timedelta(days=14)
+    span = max(1.0, (now - window_start).total_seconds())
+    # Keep per-day message density ~constant as the window grows past 14 months.
+    density = max(1.0, (now - window_start).days / _BACKFILL_DAYS)
 
     # Build the thread plan: the named groups + a 1:1 direct thread per (non-self)
     # person (capped so the corpus stays a realistic size).
@@ -178,7 +184,7 @@ async def seed_signal(
             thr_pk, inst_pk, thread_id, kind, thread_title, window_start)
 
         # Strictly-increasing ms timestamps → unique per-thread message ids.
-        n = max(1, n_target)
+        n = max(1, int(n_target * density))
         raw_ts = sorted(window_start + timedelta(seconds=rng.uniform(0, span))
                         for _ in range(n))
         rows = []

@@ -527,6 +527,22 @@ def _is_departed(person_id: str | None, when: datetime, facts: dict) -> bool:
         return False
 
 
+def _has_started(person_id: str | None, when: datetime, facts: dict) -> bool:
+    """Has this person joined the company by `when`? (and not yet departed)"""
+    if not person_id:
+        return False
+    person = next((p for p in facts["people"] if p["id"] == person_id), None)
+    if not person:
+        return False
+    sa = (person.get("started_at") or facts["company"]["founded"])[:10]
+    try:
+        if when.date() < date.fromisoformat(sa):
+            return False
+    except Exception:
+        return False
+    return not _is_departed(person_id, when, facts)
+
+
 def _person_id_for_login(facts: dict, login: str | None) -> str | None:
     if not login:
         return None
@@ -1615,6 +1631,24 @@ PROD_INCIDENT_TEMPLATES = [
     {"summary": "Mainnet shadow proof generation regression", "severity": "P2",
      "description": "Proof gen latency jumped 4x after dependency bump.",
      "channel_kind": "incident"},
+    {"summary": "Sequencer stalled on L1 fee spike", "severity": "P1",
+     "description": "Checkpoint posting wedged when mempool fees spiked; sequencer fell behind.",
+     "channel_kind": "incident"},
+    {"summary": "Faucet drained by scripted abuse", "severity": "P2",
+     "description": "PoW faucet emptied by a scripted client; rate-limit bypass.",
+     "channel_kind": "incident"},
+    {"summary": "Prover cluster OOM cascade", "severity": "P1",
+     "description": "GPU prover workers OOM-cascaded after a witness-size regression.",
+     "channel_kind": "incident"},
+    {"summary": "Checkpoint explorer outage", "severity": "P2",
+     "description": "Indexer fell over under load; public explorer returned 5xx for ~2h.",
+     "channel_kind": "incident"},
+    {"summary": "RPC provider failover desync", "severity": "P2",
+     "description": "Quicknode failover left nodes on a stale tip; reconnection bug.",
+     "channel_kind": "incident"},
+    {"summary": "Testnet deposit indexer lag", "severity": "P2",
+     "description": "Deposit confirmations lagged after a Bitcoin Core upgrade.",
+     "channel_kind": "incident"},
 ]
 
 
@@ -1670,21 +1704,25 @@ def ci_flake_events(facts: dict, start: str, end: str) -> Iterator[dict]:
 
     # Production incidents: one per ~3 months. Each is a burst of activity
     # across #ci-flakes + a Notion postmortem + a Jira fix ticket.
-    n_incidents = max(1, ((d1 - d0).days // 90))
-    for i in range(min(n_incidents, len(PROD_INCIDENT_TEMPLATES) * 3)):
+    incident_spacing_days = 40   # a real ops team has a notable incident ~monthly+
+    n_incidents = max(1, ((d1 - d0).days // incident_spacing_days))
+    for i in range(min(n_incidents, len(PROD_INCIDENT_TEMPLATES) * 4)):
         tpl = PROD_INCIDENT_TEMPLATES[i % len(PROD_INCIDENT_TEMPLATES)]
-        when = d0 + timedelta(days=(i + 1) * 90 + _hash_int("inc", str(i), n=20))
+        when = d0 + timedelta(days=(i + 1) * incident_spacing_days
+                              + _hash_int("inc", str(i), n=20))
         if when > d1:
             break
-        # Pick an incident commander deterministically.
-        commander = posters[_hash_int("inc_cmd", str(i), n=len(posters))]
-        if _is_departed(commander, when, facts):
+        # Pick an incident commander deterministically — only from people who
+        # have actually joined (and not departed) by the incident date.
+        eligible = [pid for pid in posters if _has_started(pid, when, facts)]
+        if not eligible:
             continue
+        commander = eligible[_hash_int("inc_cmd", str(i), n=len(eligible))]
         # Slack burst: 4-7 messages in the first 2 hours, then 3-5 over the day.
         for hour_offset in (0, 1, 2, 4, 6, 8):
             poster = posters[_hash_int("inc_p", str(i), str(hour_offset),
                                         n=len(posters))]
-            if _is_on_pto(poster, when) or _is_departed(poster, when, facts):
+            if not _has_started(poster, when, facts) or _is_on_pto(poster, when):
                 continue
             msg_pool = (_CHATTER.get(poster, {}).get("incident_reaction") or
                         _CHATTER.get(poster, {}).get("random") or [])
@@ -1736,6 +1774,164 @@ def ci_flake_events(facts: dict, start: str, end: str) -> Iterator[dict]:
                "actor": commander,
                "payload": {"key": fix_key, "from_status": "In Progress",
                            "to_status": "Done"}}
+
+
+# -----------------------------------------------------------------------------
+# Sprint bugs — the everyday defect stream (Jira depth)
+# -----------------------------------------------------------------------------
+
+# Domain-appropriate defect titles per team. A real engineering org files these
+# continuously, not just during the ~quarterly P1/P2 incidents above. This is
+# the structured "issues / deviations" surface Fyralis should reason over.
+BUG_SUMMARIES = {
+    "team:protocol": [
+        "Sequencer panics on empty checkpoint batch",
+        "State root mismatch after deep reorg",
+        "Checkpoint not finalized when L1 fee spikes",
+        "Nonce gap accepted on out-of-order deposit",
+        "ASM block import slow on cold start",
+        "Withdrawal queue stalls under sustained load",
+        "Duplicate deposit credited on RBF replacement",
+        "Genesis config rejects a valid operator set",
+        "EVM gas accounting off-by-one on revert",
+        "SSZ deserialization fails on max-size payload",
+        "Reorg deeper than k blocks not handled gracefully",
+        "Block builder drops a tx on mempool eviction",
+        "Checkpoint signature verification intermittently flaky",
+        "Fee estimator underprices during congestion",
+    ],
+    "team:bridge": [
+        "Operator node wedged at a stale checkpoint",
+        "Peg-out signature aggregation times out",
+        "Bridge state machine deadlocks on concurrent claim",
+        "Disprove path not triggered on invalid assertion",
+        "Watchtower misses the challenge window",
+        "Operator-set rotation silently drops a signer",
+        "Deposit BOSD descriptor parse error on edge input",
+        "Peg-in confirmation count wrong under reorg",
+        "Claim transaction underfunded after fee bump",
+        "Assert-chain replay diverges across operators",
+    ],
+    "team:research": [
+        "Groth16 verifier rejects a valid proof on edge case",
+        "Garbled-circuit table size overflows on large gadget",
+        "DV-Pari verifier nondeterministic under parallel eval",
+        "Hash benchmark regression after field swap",
+        "Circuit compile OOMs at 2^24 constraints",
+        "Witness serialization mismatch across zkVMs",
+        "g16 pipeline drops public-input ordering",
+        "Mosaic garbling tables non-reproducible across runs",
+        "CKT evaluation off on degenerate wire labels",
+    ],
+    "team:infra": [
+        "Prover worker crash-loops on OOM",
+        "Faucet API rate limit bypassed",
+        "Dashboard metrics gap during rolling deploy",
+        "RPC node desync after Quicknode failover",
+        "CI runner disk fills on large artifact",
+        "Terraform drift on the EKS node group",
+        "Alertmanager silence not honored",
+        "Checkpoint-explorer indexer lag spikes",
+        "Prometheus scrape timeout on prover fleet",
+        "Secret rotation breaks the sequencer deploy",
+    ],
+    "team:ops": [
+        "Vendor invoice mismatch in monthly close",
+        "Access review flags a stale contractor account",
+        "Onboarding checklist missing GitHub team grant",
+    ],
+    "team:devrel": [
+        "Docs site 404 on the testnet faucet guide",
+        "Code sample in quickstart no longer compiles",
+        "Broken anchor links after docs restructure",
+    ],
+}
+
+
+def sprint_bug_events(facts: dict, start: str, end: str) -> Iterator[dict]:
+    """A continuous, biweekly stream of ordinary bugs across the engineering
+    teams — the everyday defect flow on top of the ~quarterly P1/P2 incidents.
+
+    Fyralis should be able to detect:
+      - per-team bug load + which team carries the most defects,
+      - fix-latency by assignee (ship_lag shows up in the Done transition),
+      - backlog rot (bugs that never leave To Do / In Progress),
+      - severity mix (a few P1/P2, mostly P3/P4).
+    """
+    d0 = datetime.fromisoformat(start).replace(tzinfo=timezone.utc)
+    d1 = datetime.fromisoformat(end).replace(tzinfo=timezone.utc)
+    by_id = {p["id"]: p for p in facts["people"]}
+    people_by_team: dict[str, list[str]] = {}
+    for p in facts["people"]:
+        people_by_team.setdefault(p.get("team"), []).append(p["id"])
+    bug_teams = ["team:protocol", "team:bridge", "team:research", "team:infra",
+                 "team:ops", "team:devrel"]
+
+    def _active(pid: str, when: datetime) -> bool:
+        p = by_id.get(pid)
+        if not p:
+            return False
+        sa = (p.get("started_at") or facts["company"]["founded"])[:10]
+        if when.date().isoformat() <= sa:   # strictly after join (bootstrap lands first)
+            return False
+        return not _is_departed(pid, when, facts)
+
+    seq = 0
+    sprint = 0
+    cur = d0
+    while cur < d1:
+        # 2-5 new bugs per fortnight, biased to the eng-heavy teams.
+        n_bugs = 2 + _hash_int("bug_n", sprint, n=4)
+        for bi in range(n_bugs):
+            # Eng teams carry ~85% of bugs; ops/devrel the rest.
+            pool = bug_teams[:4] if _det01("bug_eng", sprint, str(bi)) < 0.85 else bug_teams[4:]
+            team = pool[_hash_int("bug_team", sprint, str(bi), n=len(pool))]
+            members = [m for m in people_by_team.get(team, []) if _active(m, cur)]
+            if not members:
+                continue
+            assignee = members[_hash_int("bug_a", sprint, str(bi), n=len(members))]
+            reporter = members[_hash_int("bug_r", sprint, str(bi), n=len(members))]
+            bank = BUG_SUMMARIES.get(team) or BUG_SUMMARIES["team:protocol"]
+            summary = bank[_hash_int("bug_s", sprint, str(bi), n=len(bank))]
+            r = _det01("bug_sev", sprint, str(bi))
+            sev = "P1" if r < 0.04 else "P2" if r < 0.22 else "P3" if r < 0.62 else "P4"
+            pts = 1 + _hash_int("bug_pts", sprint, str(bi), n=5)
+            seq += 1
+            key = f"STR-{30000 + seq}"
+            created = _skew_to_peak(
+                _midday(cur.date(), hour=10) + timedelta(hours=bi * 2), reporter)
+            yield {"t": _iso(created), "provider": "jira", "kind": "issue.create",
+                   "actor": reporter,
+                   "payload": {"key": key, "project": "STR", "type": "Bug",
+                               "summary": summary,
+                               "reporter": reporter, "assignee": assignee,
+                               "story_points": pts,
+                               "labels": ["bug", sev, team.split(":")[1]]}}
+            # Lifecycle. ~15% sit untouched in the backlog (To Do).
+            if _det01("bug_life", sprint, str(bi)) < 0.15:
+                continue
+            ip_when = created + timedelta(
+                days=1 + _hash_int("bug_ip", sprint, str(bi), n=6))
+            yield {"t": _iso(ip_when), "provider": "jira", "kind": "issue.transition",
+                   "actor": assignee,
+                   "payload": {"key": key, "from_status": "To Do",
+                               "to_status": "In Progress"}}
+            # ~18% of P3/P4 stick in In Progress (stale WIP). P1/P2 always close.
+            if sev in ("P3", "P4") and _det01("bug_done", sprint, str(bi)) < 0.18:
+                continue
+            ship_lag = _PATTERNS.get(assignee, {}).get("ship_lag_hours", 0.0) or 0.0
+            done_when = (ip_when
+                         + timedelta(days=2 + _hash_int("bug_dn", sprint, str(bi), n=9))
+                         + timedelta(hours=max(0.0, ship_lag)))
+            done_when = min(done_when, d1 - timedelta(hours=1))
+            if done_when <= ip_when:
+                done_when = ip_when + timedelta(hours=3)
+            yield {"t": _iso(done_when), "provider": "jira", "kind": "issue.transition",
+                   "actor": assignee,
+                   "payload": {"key": key, "from_status": "In Progress",
+                               "to_status": "Done", "lag_hours": round(ship_lag, 1)}}
+        cur += timedelta(days=14)
+        sprint += 1
 
 
 # -----------------------------------------------------------------------------
@@ -2651,6 +2847,68 @@ DRIVE_AUDIT_REPORTS = [
     ("Audit Report — Settlement Layer — {y}",         "person:delbonis"),
 ]
 
+_GDOC = "application/vnd.google-apps.document"
+_GSHEET = "application/vnd.google-apps.spreadsheet"
+_PDF = "application/pdf"
+
+# Per-team working documents — design docs, specs, reviews. A real eng org keeps
+# a steady stream of these in Drive alongside the Notion workspace. Rotated
+# deterministically and stamped with the quarter so each period is distinct.
+TEAM_DOC_TITLES = {
+    "team:protocol": [
+        "Strata Sequencer Architecture", "Rollup State-Transition Spec",
+        "Checkpoint Format RFC", "Deposit & Withdrawal Flow Design",
+        "ASM Block Pipeline Notes", "Fee Market Design Review",
+        "EVM Execution Layer Spec", "Reorg Handling Design",
+    ],
+    "team:bridge": [
+        "Bridge State Machine Spec", "Operator-Set Rotation Design",
+        "Peg-out Flow Review", "Disprove Path Design Notes",
+        "Watchtower Architecture", "BOSD Descriptor Spec",
+    ],
+    "team:research": [
+        "SNARK Verifier Analysis", "Garbled-Circuit Optimization Notes",
+        "Mosaic Protocol Design", "DV-Pari Security Argument",
+        "Proof System Benchmark Report", "Glock Verifier Design Notes",
+        "Hash Function Survey",
+    ],
+    "team:infra": [
+        "Prover Cluster Capacity Plan", "Deployment Architecture",
+        "Observability & Alerting Setup", "Service Topology Review",
+        "CI/CD Pipeline Design", "Cost & Capacity Review",
+    ],
+    "team:devrel": [
+        "Docs Site Information Architecture", "Developer Onboarding Guide",
+        "Testnet Quickstart", "API Reference Outline",
+    ],
+    "team:ops": [
+        "Vendor Review", "Security & Access Policy",
+        "Business Continuity Plan", "Hiring Process Playbook",
+    ],
+    "team:exec": [
+        "Board Deck", "Fundraise Narrative", "Company OKRs",
+    ],
+}
+
+# Living operational docs — created early, refreshed ~yearly.
+DRIVE_RUNBOOKS = [
+    ("Engineering Onboarding Guide",  _GDOC, "person:chhetri22"),
+    ("Production Deploy Runbook",     _GDOC, "person:krsnapaudel"),
+    ("Incident Response Playbook",    _GDOC, "person:sapinb"),
+    ("Security Disclosure Policy",    _GDOC, "person:delbonis"),
+    ("On-Call Rotation Guide",        _GDOC, "person:purusang"),
+    ("Repo & Branch Conventions",     _GDOC, "person:storopoli"),
+]
+
+# Quarterly spreadsheets a small startup actually keeps in Drive.
+DRIVE_TRACKERS = [
+    ("Hiring Tracker",                  "person:chhetri22"),
+    ("Runway & Burn Model",             "person:delbonis"),
+    ("Company OKR Tracker",             "person:simanta-gautam"),
+    ("Headcount Plan",                  "person:chhetri22"),
+    ("Vendor & Subscriptions Register", "person:sapinb"),
+]
+
 
 def drive_events(facts: dict, start: str, end: str) -> Iterator[dict]:
     """A small footprint of files in Google Drive: PDFs and Google Docs that
@@ -2727,6 +2985,104 @@ def drive_events(facts: dict, start: str, end: str) -> Iterator[dict]:
                        f"Technical brief — revision tracked in Drive alongside Notion.",
                        who)
             if ev: yield ev
+
+    # ---- Per-team working docs, meeting notes, runbooks, trackers ----------
+    # The bulk of a real company's Drive: design docs/specs per team, sprint
+    # notes, operational runbooks, and quarterly tracker spreadsheets.
+    people_by_team: dict[str, list[dict]] = {}
+    for p in facts["people"]:
+        people_by_team.setdefault(p.get("team"), []).append(p)
+
+    def _team_author(team: str, when: datetime) -> str | None:
+        ms = [p for p in people_by_team.get(team, [])
+              if (p.get("started_at") or facts["company"]["founded"])[:10] <= when.date().isoformat()
+              and not _is_departed(p["id"], when, facts)
+              and not _is_on_pto(p["id"], when)]
+        if not ms:
+            return None
+        ms.sort(key=lambda p: -(p.get("commits") or 0))
+        return ms[0]["id"]
+
+    # Design docs / specs — each team produces one every ~35 days, rotating its
+    # topic bank; stamped with the quarter so each is distinct over time.
+    cur = d0
+    di = 0
+    while cur < d1:
+        for team, titles in TEAM_DOC_TITLES.items():
+            author = _team_author(team, cur)
+            if not author:
+                continue
+            title = titles[di % len(titles)]
+            q = ((cur.month - 1) // 3) + 1
+            ev = _emit(cur + timedelta(days=1 + _hash_int("ddoc", team, di, n=20),
+                                       hours=_hash_int("ddoc_h", team, di, n=6)),
+                       f"{title} — {cur.year} Q{q}",
+                       _GDOC if (di % 3) else _PDF,
+                       f"{title}: design notes and decisions for the "
+                       f"{team.split(':')[1]} team.",
+                       author)
+            if ev:
+                yield ev
+        cur += timedelta(days=35)
+        di += 1
+
+    # Sprint / meeting notes — monthly per engineering team.
+    cur = d0.replace(day=1)
+    mi = 0
+    while cur < d1:
+        for team in ("team:protocol", "team:research", "team:bridge", "team:infra"):
+            author = _team_author(team, cur + timedelta(days=2))
+            if not author:
+                continue
+            label = team.split(":")[1].capitalize()
+            ev = _emit(cur + timedelta(days=2 + _hash_int("mnote", team, mi, n=3)),
+                       f"{label} — Sprint Notes {cur.strftime('%Y-%m')}",
+                       _GDOC,
+                       "Sprint planning notes: goals, owners, carry-over, risks.",
+                       author)
+            if ev:
+                yield ev
+        cur = (cur + timedelta(days=32)).replace(day=1)
+        mi += 1
+
+    # Operational runbooks — created in the first months, refreshed ~a year on.
+    for ri, (title, mime, who) in enumerate(DRIVE_RUNBOOKS):
+        when0 = d0 + timedelta(days=24 + ri * 16)
+        ev = _emit(when0, title, mime, f"{title} — living operational doc.", who)
+        if ev:
+            yield ev
+        ev = _emit(when0 + timedelta(days=365), f"{title} (v2)", mime,
+                   f"{title} — annual refresh.", who)
+        if ev:
+            yield ev
+
+    # Quarterly tracker spreadsheets.
+    cur = d0.replace(day=1)
+    while cur < d1:
+        if cur.month in (1, 4, 7, 10):
+            q = ((cur.month - 1) // 3) + 1
+            for ti, (title, who) in enumerate(DRIVE_TRACKERS):
+                ev = _emit(cur + timedelta(days=8 + ti),
+                           f"{title} — {cur.year} Q{q}", _GSHEET,
+                           f"{title}: quarterly snapshot.", who)
+                if ev:
+                    yield ev
+        cur += timedelta(days=31)
+
+    # Product launch one-pagers — one per curated milestone (PDF brief).
+    for ms in facts.get("milestones_curated", []):
+        if not ms.get("date"):
+            continue
+        try:
+            mwhen = datetime.fromisoformat(ms["date"]).replace(tzinfo=timezone.utc)
+        except Exception:
+            continue
+        ev = _emit(mwhen - timedelta(days=4),
+                   f"{ms['title']} — Launch One-Pager", _PDF,
+                   f"Launch brief for: {ms['title']}.",
+                   "person:chhetri22")
+        if ev:
+            yield ev
 
     # Audit reports — once per audit window (which we read from office_life).
     audit_windows = [e for e in (_OFFICE.get("external_events") or [])
@@ -2811,6 +3167,7 @@ def main() -> None:
         events.extend(one_on_one_events(facts, facts["company"]["founded"], args.end))
     if args.include_ci_flakes or args.include_all:
         events.extend(ci_flake_events(facts, facts["company"]["founded"], args.end))
+        events.extend(sprint_bug_events(facts, facts["company"]["founded"], args.end))
     if args.include_hiring or args.include_all:
         events.extend(hiring_events(facts, facts["company"]["founded"], args.end))
     if args.include_gmail or args.include_all:

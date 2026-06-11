@@ -11,6 +11,7 @@ is the design.
 from __future__ import annotations
 
 import asyncio
+import os
 import time
 from dataclasses import dataclass
 from typing import Dict, Optional, Tuple
@@ -92,12 +93,24 @@ class RateLimiter:
         refill_per_sec: float,
         cost: float = 1.0,
     ) -> Tuple[bool, float, Bucket]:
+        if sweep_mode_enabled():
+            # Keep the configured bucket visible for response metadata, but do
+            # not pace broad corpus backfills used to exercise downstream layers.
+            b = self.get_or_configure(
+                key, capacity=capacity, refill_per_sec=refill_per_sec,
+            )
+            return True, 0.0, b
         async with self._lock:
             b = self.get_or_configure(
                 key, capacity=capacity, refill_per_sec=refill_per_sec,
             )
             ok, retry = b.take(cost)
             return ok, retry, b
+
+
+def sweep_mode_enabled() -> bool:
+    value = os.getenv("SPAMMER_SWEEP_MODE", "1")
+    return value.lower() not in {"0", "false", "no", "off"}
 
 
 # ---------- Provider-specific helpers ----------

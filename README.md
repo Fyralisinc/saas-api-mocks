@@ -3,8 +3,11 @@
 Wire-compatible, self-hosted replicas of **Slack / Discord / GitHub / Gmail**.
 
 Point any data-ingestion product at them via environment variables and they look
-exactly like the real services — same endpoints, same headers, same rate limits,
-same error shapes, same webhook signatures. A single deterministic generator
+exactly like the real services — same endpoints, same headers, same error
+shapes, same webhook signatures. Local testing defaults to sweep mode, which
+removes active rate-limit pacing so large ingestion runs finish quickly; set
+`SPAMMER_SWEEP_MODE=0` when you need strict rate-limit fidelity. A single
+deterministic generator
 ("OrgGen") builds a synthetic company's history; each mock projects its slice
 through wire-accurate REST APIs and signed webhooks.
 
@@ -75,8 +78,14 @@ The resolved connection string is written to `.env` and reused by every command.
 | `./dev.sh reset --confirm=yes` | Drop all mock data and start clean. |
 | `./dev.sh install --provider=slack …` | Walk the OAuth install into your consumer. |
 
-Overrides (inline env vars): `SIZE`, `RUNTIME`, `SEED`, `PORT`, `SPAMMERS_DB_CREDS`.
+Overrides (inline env vars): `SIZE`, `RUNTIME`, `SEED`, `PORT`,
+`SPAMMERS_DB_CREDS`, `SPAMMER_SWEEP_MODE`.
 Example: `SEED=7 ./dev.sh prepare`, or `PORT=7002 ./dev.sh serve`.
+
+`SPAMMER_SWEEP_MODE` defaults to `1` for local testing. In this mode the mocks
+keep normal response shapes and headers but remove rate-limit waits/blocks so
+full-corpus ingestion sweeps do not spend time on synthetic throttles. Use
+`SPAMMER_SWEEP_MODE=0` to restore rate-limit enforcement for fidelity checks.
 
 ---
 
@@ -366,8 +375,10 @@ SIZE=medium RUNTIME=one_year SEED=123 ./dev.sh prepare
 
 The suite asserts the mock matches **real Slack's documented behavior** —
 request/response shapes, headers, signing, pagination, rate-limit tiers, error
-codes, and the historical-vs-live flow. It creates and tears down its own
-temporary database (`SPAMMERS_TEST_DB_URL`), independent of your `prepare` data.
+codes, and the historical-vs-live flow. Because `SPAMMER_SWEEP_MODE=1` is the
+default for ingestion testing, run rate-limit fidelity checks with
+`SPAMMER_SWEEP_MODE=0`. The suite creates and tears down its own temporary
+database (`SPAMMERS_TEST_DB_URL`), independent of your `prepare` data.
 
 ---
 
@@ -380,6 +391,7 @@ temporary database (`SPAMMERS_TEST_DB_URL`), independent of your `prepare` data.
 | `SPAMMERS_DB_CREDS` | `user:password` for `setup` to auto-build the DSNs. |
 | `PORT` | Port for `serve` / `stop` (default 7001). |
 | `SIZE` / `RUNTIME` / `SEED` | `prepare` knobs (defaults: `small` / `few_months` / `42`). |
+| `SPAMMER_SWEEP_MODE` | Testing fast path for large sweeps. Defaults to `1`, which removes rate-limit waits/blocks while keeping response shapes. Set to `0` for rate-limit fidelity. |
 
 ---
 

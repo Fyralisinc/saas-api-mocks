@@ -26,7 +26,7 @@ from spammers.common.ids import (
     drive_file_id, gcal_event_id, gcal_ical_uid,
     github_app_id, github_installation_id, github_repo_id, github_user_id,
     github_webhook_secret,
-    gmail_message_id, gmail_thread_id,
+    gmail_message_id, gmail_rfc822_id, gmail_thread_id,
     jira_account_id, jira_api_token, jira_cloud_id,
     notion_id, notion_token, notion_verification_token,
     rand_hex, seed_ids,
@@ -780,11 +780,13 @@ async def _gmail_message(ctx: ReplayContext, event: Event) -> None:
         addrs = ["delbonis@alpenlabs.io"]
 
     thread_key = p.get("thread") or (p.get("subject", "") or "")[:40]
+    rfc_id = gmail_rfc822_id("alpenlabs.io")
     headers = [
         {"name": "From",    "value": p.get("from", "")},
         {"name": "To",      "value": ", ".join(p.get("to") or [])},
         {"name": "Subject", "value": p.get("subject", "")},
         {"name": "Date",    "value": when.isoformat()},
+        {"name": "Message-ID", "value": rfc_id},
     ]
     history_id = int(when.timestamp())
 
@@ -797,13 +799,13 @@ async def _gmail_message(ctx: ReplayContext, event: Event) -> None:
             ctx, mailbox_pk, thread_key,
             p.get("subject", "(no subject)"),
         )
+        gmid = gmail_message_id()
         try:
             await ctx.pool.execute(
                 "INSERT INTO app_gmail.messages (id, thread_pk, message_id, history_id, "
                 "rfc822_msg_id, headers, snippet, body_plain, internal_date) "
                 "VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9)",
-                uuid4(), thread_pk, gmail_message_id(), history_id,
-                f"<{gmail_message_id()}@alpenlabs.io>",
+                uuid4(), thread_pk, gmid, history_id, rfc_id,
                 json.dumps(headers),
                 (p.get("body", "")[:200]),
                 p.get("body", "")[:5000], when,

@@ -14,11 +14,17 @@ from typing import Optional, Tuple
 from fastapi import Request
 
 from spammers.common.errors import github_error
+from spammers.common.rate_limit import sweep_mode_enabled
 from spammers.github.responses import GitHubJSONResponse
 from spammers.github.state import state
 
 LIMIT = 5000
+SWEEP_LIMIT = 1_000_000
 WINDOW_S = 3600
+
+
+def _limit() -> int:
+    return SWEEP_LIMIT if sweep_mode_enabled() else LIMIT
 
 
 def _window(installation_id: int) -> dict:
@@ -32,12 +38,13 @@ def _window(installation_id: int) -> dict:
 
 
 def _headers(w: dict) -> dict[str, str]:
-    remaining = max(0, LIMIT - w["used"])
+    limit = _limit()
+    remaining = max(0, limit - w["used"])
     return {
-        "X-RateLimit-Limit": str(LIMIT),
+        "X-RateLimit-Limit": str(limit),
         "X-RateLimit-Remaining": str(remaining),
         "X-RateLimit-Reset": str(int(w["reset"])),
-        "X-RateLimit-Used": str(min(w["used"], LIMIT)),
+        "X-RateLimit-Used": str(min(w["used"], limit)),
         "X-RateLimit-Resource": "core",
     }
 
@@ -89,7 +96,7 @@ async def check(request: Request, installation_id: int) -> Tuple[dict[str, str],
 
     w["used"] += 1
     headers = _headers(w)
-    if w["used"] > LIMIT:
+    if w["used"] > _limit():
         body = github_error(
             f"API rate limit exceeded for installation ID {installation_id}.",
             documentation_url="https://docs.github.com/rest/overview/resources-in-the-rest-api#rate-limiting",

@@ -114,6 +114,10 @@ PY
 
 cmd_test() {
     require_setup; load_env
+    # Fidelity tests assert real provider throttling behavior. Keep sweep mode
+    # as the default for ingestion runs, but disable it for tests unless the
+    # caller intentionally overrides it.
+    export SPAMMER_SWEEP_MODE="${SPAMMER_SWEEP_MODE:-0}"
     # With no path args, pytest uses `testpaths` (spammers/tests) from pyproject.
     exec "$PY" -m pytest "$@"
 }

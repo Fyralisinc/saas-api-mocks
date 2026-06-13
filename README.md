@@ -414,4 +414,4 @@ saas-api-mocks/
     └── tests/                    # contract / behavior / fidelity suites
 ```
 
-For the full design, see [ARCHITECTURE.md](ARCHITECTURE.md).
+For the full design, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).

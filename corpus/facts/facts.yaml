@@ -675,6 +675,7 @@ people:
   team: team:research
   started_at: '2025-05-15'
   last_active: '2025-09-18'
+  ended_at: '2025-10-10'
   twitter: null
   blog_url: null
   bio: Mathematician
@@ -762,6 +763,7 @@ people:
   team: team:bridge
   started_at: '2025-11-14'
   last_active: '2025-12-15'
+  ended_at: '2026-01-16'
   twitter: null
   blog_url: null
   bio: ''
@@ -833,6 +835,7 @@ people:
   team: team:devrel
   started_at: '2024-10-01'
   last_active: '2025-08-19'
+  ended_at: '2025-09-05'
   twitter: null
   blog_url: https://www.lightco.in
   bio: ''
@@ -851,6 +854,7 @@ people:
   team: team:research
   started_at: '2025-06-13'
   last_active: '2025-10-03'
+  ended_at: '2025-10-17'
   twitter: null
   blog_url: null
   bio: ''
@@ -866,6 +870,7 @@ people:
   team: team:research
   started_at: '2025-07-02'
   last_active: '2025-10-03'
+  ended_at: '2025-10-24'
   twitter: cypherserpent
   blog_url: null
   bio: '🦀 ProgCrypto Developer '
@@ -916,6 +921,7 @@ people:
   team: team:research
   started_at: '2025-06-10'
   last_active: '2025-06-10'
+  ended_at: '2025-06-24'
   twitter: ceyhusen
   blog_url: null
   bio: Low level software engineer
@@ -931,6 +937,7 @@ people:
   team: team:ops
   started_at: '2025-05-05'
   last_active: '2025-08-14'
+  ended_at: '2025-08-29'
   twitter: null
   blog_url: null
   bio: ''
@@ -981,6 +988,7 @@ people:
   team: team:protocol
   started_at: '2025-09-04'
   last_active: '2025-09-29'
+  ended_at: '2025-10-10'
   twitter: null
   blog_url: null
   bio: 'Write code for rockets to bomb russian federation '
@@ -1013,6 +1021,7 @@ people:
   team: team:protocol
   started_at: '2025-06-11'
   last_active: '2025-07-21'
+  ended_at: '2025-08-01'
   twitter: null
   blog_url: null
   bio: ''
@@ -1028,6 +1037,7 @@ people:
   team: team:infra
   started_at: '2025-06-10'
   last_active: '2025-12-23'
+  ended_at: '2026-01-12'
   twitter: arminsdev
   blog_url: https://arminsabouri.com/
   bio: Bitcoin engineer and researcher | Co-Host of Boston Bitdevs | Embedded Systems Enthusiast
@@ -1043,6 +1053,7 @@ people:
   team: team:protocol
   started_at: '2025-09-04'
   last_active: '2025-10-01'
+  ended_at: '2025-10-10'
   twitter: null
   blog_url: null
   bio: ''

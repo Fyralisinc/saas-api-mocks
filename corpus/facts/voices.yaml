@@ -2555,3 +2555,321 @@ voices:
       - good signal if they ask about failure modes
       - less trivia, more reasoning through state
       - they should be comfortable reading protocol code
+  person:simanta-gautam:
+    person: person:simanta-gautam
+    voice:
+      style: warm
+      characteristics:
+      - founder voice, direct but optimistic
+      - connects product narrative to concrete blockers
+      - asks for crisp owner/date pairs
+      - keeps external messaging calm during incidents
+      typical_concerns:
+      - investor confidence
+      - product narrative
+      - launch readiness
+      - partner commitments
+      reaction_to_bad_news: escalates
+      active_hours: normal
+    snippets:
+      kickoff:
+      - can we turn this into a clear owner/date plan
+      - good direction, let's make the next milestone legible
+      - i want the user story and the risk in the same doc
+      design:
+      - the technical shape is strong, the narrative is still fuzzy
+      - let's not promise more than we can show
+      - what would make this credible to a skeptical partner
+      impl:
+      - i'll unblock the partner side while you all finish the fix
+      - please call out anything that threatens the launch date
+      - this is good progress, need a tighter status note
+      review:
+      - can we make the external claim narrower
+      - approved from messaging side after the caveat lands
+      - this reads well, but the risk needs one plain sentence
+      audit:
+      - keep the board updated, no surprises
+      - i need the customer-impact version by end of day
+      - let's separate real risk from scary wording
+      ship:
+      - great, ship it with the narrower copy
+      - launch note is ready once metrics are green
+      - i'll handle partner comms during rollout
+      postmortem:
+      - i care most about what changes next week
+      - good rca, let's make the owner list sharper
+      - please add the external-facing summary
+      retro:
+      - we moved fast, but some context stayed private too long
+      - launch was a win, reliability work still owns the next month
+      - next phase needs fewer implicit handoffs
+      hiring:
+      - strong if they can explain the product stakes without hype
+      - i want people who can handle ambiguity and still write things down
+      - good candidate, let's check how they communicate under pressure
+  person:chandansharmasubedi:
+    person: person:chandansharmasubedi
+    voice:
+      style: warm
+      characteristics:
+      - thoughtful operator-founder cadence
+      - connects partner asks to product details
+      - prefers written context before meetings
+      - careful with roadmap promises
+      typical_concerns:
+      - partnerships
+      - hiring shape
+      - developer experience
+      - roadmap clarity
+      reaction_to_bad_news: escalates
+      active_hours: normal
+    snippets:
+      kickoff:
+      - i'll write the partner-facing context first
+      - let's make sure the ask is clear before the call
+      - good thread, i'll pull this into the planning doc
+      design:
+      - partner story works if the boundary is explicit
+      - docs need the same caveat as the protocol note
+      - i would avoid making this sound more settled than it is
+      impl:
+      - drafted the external version, please sanity check
+      - moving the partner follow-up after the test passes
+      - i can cover the docs side while eng finishes
+      review:
+      - this is almost there, wording needs less certainty
+      - can we add one sentence for developers
+      - approved after the partner caveat goes in
+      audit:
+      - i'll keep partner messaging boring until we know impact
+      - need one crisp risk sentence for non-engineers
+      - let's avoid speculation in the update
+      ship:
+      - docs are ready from my side
+      - partner note is queued
+      - ship it once the final caveat lands
+      postmortem:
+      - partner impact was smaller than expected, but handoff was thin
+      - let's add the communication gap as an action item
+      - the docs lag is real, not just a launch artifact
+      retro:
+      - the written context helped once it existed
+      - we need earlier docs ownership next time
+      - partner pressure should be visible in planning sooner
+      hiring:
+      - strong if they can make hard technical work readable
+      - i'd like one more reference on follow-through
+      - good candidate for the messy middle between product and protocol
+  person:sabin-thapa:
+    person: person:sabin-thapa
+    voice:
+      style: technical
+      characteristics:
+      - new-hire careful, asks grounding questions
+      - writes short status notes
+      - prefers existing patterns before new abstractions
+      - comfortable saying when context is missing
+      typical_concerns:
+      - protocol interfaces
+      - test fixtures
+      - onboarding docs
+      - review expectations
+      reaction_to_bad_news: owns_and_debugs
+      active_hours: evenings
+    snippets:
+      kickoff:
+      - i'll read the old thread first, then take the small slice
+      - can someone point me at the current invariant doc
+      - i can start with the fixture cleanup
+      design:
+      - this matches the old doc except for the event boundary
+      - i'd like to keep my first change boring
+      - is this protocol state or caller state
+      impl:
+      - pushed a small version, mostly following existing shape
+      - found one stale assumption in the fixture
+      - tests are green locally, waiting on ci
+      review:
+      - left one question, might be missing context
+      - looks right to me, but i'd like a senior pass
+      - naming confused me until i read the older rfc
+      audit:
+      - reading the finding now, checking if my path touches it
+      - i'll add the regression if this is in my slice
+      - impact seems local, confirming
+      ship:
+      - merged the small cleanup
+      - shipped after the fixture update
+      - i'll watch the first run
+      postmortem:
+      - i missed the old assumption, adding it to notes
+      - onboarding doc should mention this edge
+      - fix is small, context gap was bigger
+      retro:
+      - pairing helped more than the docs here
+      - next time i'll ask earlier for the old decision link
+      - small slices made review easier
+      hiring:
+      - ask them how they ramp on unfamiliar protocol code
+      - good if they admit uncertainty cleanly
+      - debugging habits matter more than memorized rust
+  person:nisha-maharjan:
+    person: person:nisha-maharjan
+    voice:
+      style: technical
+      characteristics:
+      - senior bridge engineer, calm and crisp
+      - turns vague handoffs into checklists
+      - pushes for restart and reorg cases
+      - polite but firm when ownership is muddy
+      typical_concerns:
+      - bridge safety
+      - handover quality
+      - state recovery
+      - operator runbooks
+      reaction_to_bad_news: owns_and_debugs
+      active_hours: normal
+    snippets:
+      kickoff:
+      - i'll start by untangling the handoff notes
+      - can we list what is code, doc, and tribal knowledge
+      - bridge side can own the recovery checklist
+      design:
+      - this needs to say who acts after restart
+      - the state transition is fine, the operator step is vague
+      - i'd rather make the handoff explicit now
+      impl:
+      - converted the handoff note into tickets
+      - restart path is less spooky now
+      - found the missing operator step, fixing
+      review:
+      - logic looks good, runbook still needs the command
+      - please add the reorg plus restart case
+      - approved after the owner note moves into the doc
+      audit:
+      - this is a handoff risk as much as a code risk
+      - checking whether the operator can recover without us
+      - need a negative test for stale state
+      ship:
+      - bridge recovery checklist is ready
+      - shipped the restart fix
+      - operator runbook updated
+      postmortem:
+      - root cause was incomplete ownership transfer
+      - we had code context, not runbook context
+      - next time handoff needs a dry run
+      retro:
+      - good recovery, but too much context was private
+      - ownership map helped once we wrote it
+      - bridge handoff is now less fragile
+      hiring:
+      - strong if they ask who owns recovery
+      - i'd give them a state-machine handoff exercise
+      - good signal if they write the runbook while coding
+  person:roshan-kc:
+    person: person:roshan-kc
+    voice:
+      style: technical
+      characteristics:
+      - research-heavy, cautious with claims
+      - asks for definitions and proof boundaries
+      - slower to ship until assumptions are explicit
+      - precise but friendly in reviews
+      typical_concerns:
+      - garbled circuits
+      - proof assumptions
+      - reproducibility
+      - benchmark validity
+      reaction_to_bad_news: owns_and_debugs
+      active_hours: evenings
+    snippets:
+      kickoff:
+      - i'll reconstruct the proof assumptions first
+      - can someone link the latest mosaic notes
+      - happy to take the reproducibility slice
+      design:
+      - the demo claim needs a sharper definition
+      - this proof boundary is doing more work than the text says
+      - benchmark is useful only if setup is identical
+      impl:
+      - reproduced the small case, large case still flaky
+      - adding the exact parameters to the notes
+      - found a mismatch between demo and operator setup
+      review:
+      - math looks fine, wording overclaims a bit
+      - can we name the setup assumption here
+      - approved after reproducibility note lands
+      audit:
+      - checking the edge case against the paper
+      - not convinced this is exploitable, but it is underspecified
+      - need a deterministic vector before i call it done
+      ship:
+      - reproducibility note is in
+      - demo vectors are stable now
+      - shipping the conservative version
+      postmortem:
+      - root cause was environment drift, not the proof
+      - we trusted the laptop setup too much
+      - next time demo needs operator parity earlier
+      retro:
+      - definitions got clearer after infra joined
+      - good cycle, but benchmark setup came late
+      - onboarding into mosaic needs a map
+      hiring:
+      - strong if they separate proof and environment issues
+      - ask about reproducibility, not just theory
+      - good candidate if they write assumptions down
+  person:lena-fischer:
+    person: person:lena-fischer
+    voice:
+      style: technical
+      characteristics:
+      - SRE voice, practical and calm
+      - asks for logs, ownership, and rollback path
+      - dislikes magical readiness states
+      - turns incidents into runbooks
+      typical_concerns:
+      - observability
+      - deploy safety
+      - reconnection behavior
+      - on-call fatigue
+      reaction_to_bad_news: owns_and_debugs
+      active_hours: mornings
+    snippets:
+      kickoff:
+      - i'll start with logs and the current runbook
+      - who owns rollback if this wedges
+      - give me the noisy case first
+      design:
+      - readiness should be a state, not a vibe
+      - can we expose the reconnect reason directly
+      - this needs one alert and one runbook step
+      impl:
+      - added the readiness state, wiring metrics now
+      - reconnection path is visible in logs
+      - deploy is boring locally, waiting on staging
+      review:
+      - looks good, but alert text needs the action
+      - can we move the retry budget into config
+      - approved after rollback note lands
+      audit:
+      - checking whether this pages humans too often
+      - impact is operational, but still real
+      - need to see the failed reconnect log
+      ship:
+      - rolled out to staging, metrics look clean
+      - production deploy is green
+      - i'll watch the first on-call window
+      postmortem:
+      - root cause was hidden reconnect state
+      - runbook did not tell the operator what to do
+      - alert fired correctly, message was useless
+      retro:
+      - better logs changed the conversation
+      - handoff was fine, tacit debugging wasn't
+      - next cycle needs on-call review earlier
+      hiring:
+      - strong if they ask what the operator sees
+      - i'd test them on a boring outage
+      - good SREs make the next page less mysterious

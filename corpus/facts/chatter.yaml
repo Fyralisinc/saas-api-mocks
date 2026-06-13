@@ -1930,3 +1930,199 @@ chatter_by_person:
     - 'weekend reading list got longer: yc essays + a bitcoin paper'
     - 'sat: errands + reviewing the planning doc'
     - 'sunday morning is doc-writing time, kettle is on'
+  person:sabin-thapa:
+    reactions:
+    - ack
+    - nice
+    - makes sense
+    - oof
+    - sgtm
+    - wait
+    - fair
+    - thanks
+    random:
+    - still finding old decision docs in surprising places
+    - coffee helped, rust did not
+    - onboarding map is now mostly a graph
+    - lunch queue had worse ordering than ci
+    - found a stale note, not sure if archaeology or bug
+    - first month lesson: ask for the old thread early
+    - my dev env finally stopped arguing
+    - evening brain is useful but suspicious
+    pto_announce:
+    - out friday, nothing blocking from my side
+    - taking a long weekend, will leave notes first
+    - offline tomorrow afternoon, back monday
+    - pto next week, small threads only please
+    return_from_pto:
+    - back, reading mentions first
+    - back online, catching up in dependency order
+    - returned, may ask one redundant question
+    - back from pto, context loading
+    conference_post:
+    - at btc++ today, mostly listening
+    - hallway track is more useful than expected
+    - anyone else near the protocol talks
+    - grabbing coffee before the bitcoin session
+    incident_reaction:
+    - reading now, checking if my slice touches it
+    - i can add the regression if needed
+    - not sure yet, tracing the small case
+    - ack, pulling logs
+    news_take:
+    - paper looks good, need to read assumptions slowly
+    - release notes answered half my question
+    - interesting benchmark, setup matters a lot
+    - bitcoin thread is useful, comments less so
+    weekend_chatter:
+    - weekend plan is sleep and one hike
+    - fixing my home wifi, probably a mistake
+    - trying the new ramen place later
+    - no laptop after dinner, allegedly
+  person:nisha-maharjan:
+    reactions:
+    - ack
+    - sharp
+    - agreed
+    - nice
+    - no
+    - fair
+    - yep
+    - ship it
+    random:
+    - handoff docs should come with expiration dates
+    - coffee machine needs an owner
+    - the office whiteboard has stale state again
+    - found the missing command, it was in someone's notes
+    - lunch order has no rollback plan
+    - my calendar has become a queue
+    - bridge brain online after tea
+    - today's runbook title: trust but verify
+    pto_announce:
+    - out tomorrow, handoff notes are current
+    - taking friday off, ping only if bridge is blocked
+    - pto next week, checklist is in the doc
+    - offline this afternoon, back normal tomorrow
+    return_from_pto:
+    - back, checking bridge mentions first
+    - back online, reading the handoff thread
+    - returned, will clear reviews today
+    - back from pto, runbook still looks current
+    conference_post:
+    - at the bitcoin meetup, ping if nearby
+    - bridge questions in the hallway are good today
+    - zk side event has useful operator questions
+    - around after lunch if anyone wants to sync
+    incident_reaction:
+    - checking restart behavior first
+    - let's separate code bug from operator gap
+    - i can own the runbook update
+    - need exact state before and after restart
+    news_take:
+    - nice post, but operator assumptions are thin
+    - release notes need a recovery section
+    - bridge framing is better when responsibility is explicit
+    - paper is fine, runbook still matters
+    weekend_chatter:
+    - weekend plan is no incident tabs
+    - trying a new momo place tomorrow
+    - home router is testing my patience
+    - hike if weather stops being weird
+  person:roshan-kc:
+    reactions:
+    - hm
+    - nice
+    - fair
+    - ack
+    - wait
+    - good catch
+    - maybe
+    - yes
+    random:
+    - proof notes are clearer after tea
+    - my desk has too many notebooks now
+    - benchmark setup was hiding in plain sight
+    - lunch was reproducible, barely
+    - reading old mosaic notes like field archaeology
+    - found three definitions for the same thing
+    - evening math brain is dangerous
+    - demo env and laptop env are not the same universe
+    pto_announce:
+    - out friday, will leave benchmark notes
+    - pto next week, vectors are in the doc
+    - offline tomorrow afternoon, back monday
+    - taking two days off, no proof claims from me
+    return_from_pto:
+    - back, checking vectors first
+    - returned, reading mosaic backlog
+    - back online, will re-run the large case
+    - back from pto, setup assumptions still matter
+    conference_post:
+    - at zk summit, mostly in the proof talks
+    - hallway track has better questions than the panel
+    - anyone else at the garbling session
+    - grabbing coffee before the benchmark talk
+    incident_reaction:
+    - checking if this is proof or environment
+    - need exact parameters before guessing
+    - i can reproduce the small case
+    - not sure yet, reading the trace
+    news_take:
+    - paper is interesting, setup section is the real part
+    - benchmark numbers need the environment attached
+    - nice result, claims should stay narrow
+    - proof thread is good but skips reproducibility
+    weekend_chatter:
+    - weekend reading is accidentally all papers
+    - trying to not open latex today
+    - coffee and a long walk, then maybe notes
+    - no benchmarks this weekend, probably
+  person:lena-fischer:
+    reactions:
+    - ack
+    - yep
+    - good
+    - oof
+    - nice
+    - please no
+    - ship it
+    - logs?
+    random:
+    - today's dashboard is telling a very vague story
+    - coffee first, rollback plans second
+    - my first week note: names are harder than systems
+    - found an alert with no action, my nemesis
+    - office wifi is practicing partial outage
+    - runbook archaeology continues
+    - logs were honest, humans less so
+    - morning brain likes boring deploys
+    pto_announce:
+    - out friday, on-call notes are updated
+    - pto next week, pager handoff is in the doc
+    - offline tomorrow morning, back after lunch
+    - taking a long weekend, no deploys please
+    return_from_pto:
+    - back, checking alerts first
+    - back online, reading incident notes
+    - returned, pager state looks sane
+    - back from pto, logs first
+    conference_post:
+    - at the sre meetup, strangely relevant
+    - anyone else near the infra track
+    - hallway chat about alert fatigue was useful
+    - grabbing coffee before the reliability talk
+    incident_reaction:
+    - send logs, then theories
+    - checking reconnect state now
+    - i can own the runbook patch
+    - alert fired, message is not useful
+    news_take:
+    - release notes have no rollback section, naturally
+    - good post, but where are the operator steps
+    - benchmark is fine, observability is thin
+    - nice outage writeup, action items are better
+    weekend_chatter:
+    - weekend plan is bakery and no pager
+    - fixing my bike, rollback unclear
+    - reading a novel instead of logs
+    - hike tomorrow if the weather behaves

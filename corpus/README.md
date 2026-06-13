@@ -7,7 +7,7 @@ testing.
 
 ## Layers
 
-- `facts/` — L1: hand-curated YAML (people, products, milestones, voices, patterns, office_life, chatter)
+- `facts/` — L1: hand-curated YAML (people, products, milestones, voices, patterns, office_life, chatter, company_truth)
 - `raw/` — scraped real data (blog HTML, docs; `raw/github/` is gitignored, regenerable via `make scrape-github`)
 - `threads/` — L3: per-initiative story arcs (LLM-generated, cached)
 - `artifacts/` — high-signal LLM prose (RFCs, postmortems, design docs)
@@ -22,6 +22,13 @@ make render        # just re-render events.jsonl from existing inputs
 
 The L4 artifact `build/events.jsonl` is committed (~10 MB). Anything else
 in `build/` is gitignored — re-derivable from facts + threads + artifacts.
+
+`facts/company_truth.yaml` is the answer-key layer for model-layer tests:
+belief changes, hidden/opaque work causes, handovers, conflicts, and side
+quests. The rendered provider events intentionally spread that truth across
+Slack, Calendar, Notion, Drive, Jira, and org departure events. See
+`../docs/alpen/ALPEN_LABS_MODEL_LAYER_GROUND_TRUTH.md` for the detailed
+reference.
 
 ## Replay
 

@@ -1,6 +1,6 @@
 """Spammer apps — drop-in replicas of Slack/Discord/GitHub/Gmail.
 
-See ARCHITECTURE.md for the full design. Top-level packages:
+See docs/ARCHITECTURE.md for the full design. Top-level packages:
 
 - ``spammers.common``  shared utilities (signing, rate-limit, clock, db)
 - ``spammers.orggen``  deterministic organization timeline generator

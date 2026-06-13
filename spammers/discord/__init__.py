@@ -1,6 +1,6 @@
 """Discord mock (:7002 HTTP + WS).
 
-Surfaces (ARCHITECTURE.md §5.2):
+Surfaces (docs/ARCHITECTURE.md §5.2):
 
 - **Install**: ``GET /oauth2/authorize``, ``POST /api/v10/oauth2/token``.
 - **REST** (``Authorization: Bot <token>``): ``users/@me``, ``users/{id}``,

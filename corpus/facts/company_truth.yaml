@@ -1,0 +1,248 @@
+_meta:
+  purpose: >
+    Ground truth for the Alpen company simulation. The renderer turns these
+    arcs into ordinary Slack, Calendar, Notion, Drive, Jira, and org events so
+    Fyralis can infer belief changes, hidden causes, handovers, and side quests
+    from messy evidence rather than from a single synthetic summary.
+  as_of: '2026-06-11'
+
+phases:
+- id: phase:founding-seed
+  window: {start: '2024-02-01', end: '2024-04-30'}
+  label: Founding, seed, and public thesis
+  aim: Prove that Alpen is a Bitcoin-native financial system company, not just a research lab.
+  obstacles:
+  - founders still deciding how much to say publicly about rollup architecture
+  - early investor diligence wants concrete proof and bridge answers
+  - company tooling is new, so decisions live in founder DMs and email
+  belief_changes:
+  - fundraising narrative moved from "Bitcoin ZK rollup" to "Bitcoin's own financial system"
+- id: phase:strata-node-skeleton
+  window: {start: '2024-05-01', end: '2024-09-30'}
+  label: Strata node skeleton and checkpoint interface
+  aim: Turn the public thesis into an internal node that can import blocks and reason about checkpoints.
+  obstacles:
+  - common types are owned by no single team
+  - bridge-facing fields need stability before protocol internals feel stable
+  - CI is too slow for repeated long-running sync tests
+  belief_changes:
+  - checkpoint data must be explicit, versioned, and bridge-observable
+- id: phase:common-types-and-dogfood
+  window: {start: '2024-10-01', end: '2025-03-31'}
+  label: Common types, dogfood, and strategic round pressure
+  aim: Make the Strata node repeatable enough for dogfood while closing the strategic round.
+  obstacles:
+  - holiday availability makes review queues brittle
+  - investor diligence creates hidden urgency around benchmark and testnet dates
+  - dogfood runbooks depend on a few people
+  belief_changes:
+  - node work needs separate sync, execution, and checkpoint tasks
+  - rich explorer streams are less important than finalized, stable summaries
+- id: phase:bridge-and-testnet
+  window: {start: '2025-04-01', end: '2025-09-30'}
+  label: Bridge hardening, public testnet, and Glock release
+  aim: Ship a public testnet and bridge devnet path without overstating safety.
+  obstacles:
+  - bridge safety claims are ahead of implementation
+  - ProofOfKeags owns withdrawal construction but leaves during the critical window
+  - testnet incidents expose restart and observability gaps
+  belief_changes:
+  - testnet success does not imply mainnet readiness
+  - release claims must stay narrower than internal ambition
+- id: phase:starknet-prague-mosaic
+  window: {start: '2025-10-01', end: '2026-05-29'}
+  label: Starknet collaboration, Prague support, and Mosaic launch
+  aim: Turn Glock and Mosaic into credible shared infrastructure with operator-grade demos.
+  obstacles:
+  - partner timelines create private priority shifts
+  - research demos work on laptops before they work in repeatable operator environments
+  - infra knowledge transfers after Armin leaves
+  belief_changes:
+  - Mosaic needs manifest/retrieval reliability, not only cryptographic correctness
+  - bitcoind reconnection behavior is part of product reliability, not library polish
+
+belief_arcs:
+- id: belief:checkpoint-feed-scope
+  topic: checkpoint explorer feed scope
+  initial_date: '2025-01-20'
+  change_date: '2025-02-12'
+  owners: [person:prajwolrg, person:Rajil1213, person:krsnapaudel]
+  from_belief: The checkpoint explorer should stream rich intermediate node events because it helps debugging.
+  to_belief: The explorer feed should expose finalized summaries first; intermediate node events stay internal until contracts are versioned.
+  why_it_changed: A hallway sync after a noisy CI run made it clear that bridge and explorer consumers would bake in unstable event names.
+  hidden_context: The decisive conversation happened after all-hands and only shows up as a vague calendar sync plus downstream tickets.
+  visible_symptoms:
+  - a new Drive decision note appears without a long Slack debate
+  - two Jira follow-ups are filed under protocol and infra
+  - the public channel only gets a short "narrowing scope" message
+  expected_fyralis_belief_delta: >
+    Fyralis should stop believing the company is optimizing for rich explorer
+    visibility and update toward stable finalized checkpoint summaries.
+- id: belief:bridge-mocks-vs-events
+  topic: bridge integration contract
+  initial_date: '2025-02-24'
+  change_date: '2025-03-07'
+  owners: [person:Rajil1213, person:prajwolrg, person:MdTeach]
+  from_belief: The bridge can keep integrating against mocked Strata checkpoint reads until devnet.
+  to_belief: The bridge needs an explicit Strata event subscription boundary before further feature work.
+  why_it_changed: Prajwol's review found that mocked reads hid reorg and cancellation semantics.
+  hidden_context: Most debate is in review and DM pings, not the main bridge channel.
+  visible_symptoms:
+  - branch churn and reassignment on bridge follow-ups
+  - a Notion decision page arrives after work has already started
+  - bridge UI/explorer work slips behind state-machine recovery
+  expected_fyralis_belief_delta: >
+    Fyralis should connect review pressure, follow-up churn, and slips to an
+    interface-contract problem rather than to simple underperformance.
+- id: belief:testnet-mainnet-readiness
+  topic: testnet launch confidence
+  initial_date: '2025-08-04'
+  change_date: '2025-09-03'
+  owners: [person:simanta-gautam, person:pramodkandel, person:Rajil1213, person:krsnapaudel]
+  from_belief: A stable public testnet is strong evidence that mainnet sequencing and bridge operation are close.
+  to_belief: Testnet launch proved user demand, but mainnet readiness depends on restart, reorg, operator, and dashboard work.
+  why_it_changed: First-week incidents and restart lag showed that the failure paths were more operational than cryptographic.
+  hidden_context: Founder/investor pressure kept public messaging optimistic while internal Jira shifted toward reliability.
+  visible_symptoms:
+  - investor updates stay positive
+  - Jira and Grafana hotfixes spike
+  - Krsna starts dashboard side quests that were not in the original launch plan
+  expected_fyralis_belief_delta: >
+    Fyralis should preserve optimism about demand while lowering confidence in
+    near-term mainnet readiness.
+- id: belief:glock-claims-boundary
+  topic: public Glock claims
+  initial_date: '2025-08-12'
+  change_date: '2025-08-18'
+  owners: [person:AaronFeickert, person:pramodkandel, person:simanta-gautam]
+  from_belief: Alpen can publish broad performance and verifier-readiness claims around Glock.
+  to_belief: Public claims must be limited to measured verifier behavior, reproducible benchmarks, and clearly named assumptions.
+  why_it_changed: Research review caught that the draft mixed benchmark facts with product-readiness language.
+  hidden_context: The disagreement is mostly in a private prep sync and an edited launch brief.
+  visible_symptoms:
+  - release copy shrinks
+  - benchmark workflow docs get extra review
+  - Aaron becomes a recurring claim-boundary reviewer
+  expected_fyralis_belief_delta: Fyralis should learn that Aaron is a claims-risk governor, not a blocker.
+- id: belief:mosaic-demo-to-operator
+  topic: Mosaic launch readiness
+  initial_date: '2026-01-15'
+  change_date: '2026-04-21'
+  owners: [person:delbonis, person:storopoli, person:Zk2u, person:roshan-kc, person:lena-fischer]
+  from_belief: A research-laptop Mosaic demo is enough to support a public launch narrative.
+  to_belief: Mosaic needs operator-grade manifests, retrieval fault injection, and reproducible demo environments before launch.
+  why_it_changed: Partner demo rehearsal failed outside the research setup; infra had to own reliability before launch.
+  hidden_context: The root cause starts in a partner prep call, then appears later as infra tickets and a reliability cycle.
+  visible_symptoms:
+  - Mosaic side quests appear in infra and Drive before the public announcement
+  - Roshan asks repeated clarifying questions during onboarding
+  - Lena becomes visible only late, after reliability ownership moves to infra
+  expected_fyralis_belief_delta: >
+    Fyralis should revise "Mosaic is research-complete" into "Mosaic is
+    launchable only after operator reliability catches up."
+
+handover_arcs:
+- id: handover:proofofkeags-bridge-exit
+  person: person:ProofOfKeags
+  notice_date: '2025-08-21'
+  end_date: '2025-09-15'
+  previous_owner_of: withdrawal transaction construction and peg-out builder helpers
+  new_owners: [person:Rajil1213, person:krsnapaudel, person:nisha-maharjan]
+  lag_signal: key rotation and peg-out cleanup slip by roughly three weeks after departure.
+  handover_quality: partial; good code context, weak runbook and ownership map
+  expected_fyralis_belief_delta: >
+    Fyralis should attribute part of the bridge delay to ownership transfer,
+    not just to Rajil's delivery pattern.
+- id: handover:john-light-devrel-exit
+  person: person:john-light
+  notice_date: '2025-08-19'
+  end_date: '2025-09-05'
+  previous_owner_of: public docs, quickstart language, and launch community replies
+  new_owners: [person:chhetri22, person:simanta-gautam]
+  lag_signal: docs fixes move into ops/founder queues and quickstart updates become slower after testnet week.
+  handover_quality: thin; docs are in Drive/Notion but community context is mostly in DMs
+  expected_fyralis_belief_delta: >
+    Fyralis should detect a single-person DevRel bus factor and lower confidence
+    in docs freshness after public launches.
+- id: handover:armin-bitcoind-exit
+  person: person:arminsabouri
+  notice_date: '2025-12-23'
+  end_date: '2026-01-12'
+  previous_owner_of: bitcoind-async-client reconnection behavior and RPC failure fixtures
+  new_owners: [person:krsnapaudel, person:lena-fischer, person:Rajil1213]
+  lag_signal: cancelled-checkpoint and reconnection tickets reopen in January, then stabilize after Lena joins in April.
+  handover_quality: good notes, but tacit debugging knowledge missing
+  expected_fyralis_belief_delta: >
+    Fyralis should see that infra reliability improves only after the new SRE
+    has enough context, not immediately at handover.
+
+opaque_work_arcs:
+- id: opaque:hallway-checkpoint-api
+  date: '2025-02-06'
+  participants: [person:prajwolrg, person:Rajil1213, person:krsnapaudel]
+  calendar_summary: Coffee sync
+  downstream_work:
+  - narrow checkpoint explorer feed
+  - add compatibility note for bridge consumers
+  - create dashboard probe for finalized checkpoint delay
+  no_clear_ingestion_reason: The original decision is not in public Slack; only a generic calendar event and follow-up work exist.
+- id: opaque:partner-demo-pressure
+  date: '2026-03-18'
+  participants: [person:simanta-gautam, person:delbonis, person:storopoli, person:Zk2u]
+  calendar_summary: Partner demo prep
+  downstream_work:
+  - Mosaic demo manifest becomes a launch blocker
+  - infra joins a research-owned thread
+  - Drive gets a demo environment checklist
+  no_clear_ingestion_reason: The partner's pressure is external and the internal channel only shows the resulting tasks.
+- id: opaque:cost-freeze-ci-side-effect
+  date: '2025-11-06'
+  participants: [person:chhetri22, person:krsnapaudel, person:delbonis]
+  calendar_summary: Infra spend review
+  downstream_work:
+  - CI runner class changes
+  - flaky long-running tests increase
+  - bridge release managers complain about retry time
+  no_clear_ingestion_reason: Finance pressure is visible in QuickBooks, but the CI behavior change is visible in engineering systems.
+
+conflicts:
+- id: conflict:protocol-vs-bridge-api
+  window: {start: '2025-02-24', end: '2025-04-04'}
+  sides:
+  - {name: protocol, view: keep internals moving until checkpoint abstractions settle}
+  - {name: bridge, view: freeze event names early so bridge safety can be tested}
+  resolution: explicit event subscription boundary plus compatibility note
+- id: conflict:research-vs-marketing-claims
+  window: {start: '2025-08-12', end: '2025-08-19'}
+  sides:
+  - {name: research, view: publish only measured claims and assumptions}
+  - {name: founders, view: make Glock legible as a launch milestone}
+  resolution: narrower release copy, benchmark workflow, Aaron as claims reviewer
+- id: conflict:research-vs-infra-mosaic
+  window: {start: '2026-03-18', end: '2026-05-07'}
+  sides:
+  - {name: research, view: protocol demo proves the important thing}
+  - {name: infra, view: launch demos need repeatable operator behavior}
+  resolution: manifest, retrieval reliability, demo checklist, and fault-injection harness
+
+side_quests:
+- id: sidequest:dashboard-probes
+  window: {start: '2025-06-20', end: '2025-09-10'}
+  owner: person:krsnapaudel
+  why: devnet-only bridge failures were invisible in existing dashboards
+  payoff: public testnet incident response becomes faster
+- id: sidequest:docs-after-devrel
+  window: {start: '2025-09-05', end: '2025-10-10'}
+  owner: person:chhetri22
+  why: John Light's departure leaves launch docs without a clear owner
+  payoff: quickstart becomes stable but founder time is consumed
+- id: sidequest:bitcoind-reconnect
+  window: {start: '2026-01-12', end: '2026-04-30'}
+  owner: person:lena-fischer
+  why: Armin's departure leaves reconnection debugging knowledge behind the code
+  payoff: readiness states and reconnection supervisor reduce false incident pages
+- id: sidequest:mosaic-demo-env
+  window: {start: '2026-03-18', end: '2026-05-07'}
+  owner: person:Zk2u
+  why: Mosaic demo works on research laptops but fails in operator-like environments
+  payoff: demo manifest and retrieval fault injection become launch criteria

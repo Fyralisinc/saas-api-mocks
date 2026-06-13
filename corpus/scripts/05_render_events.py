@@ -39,6 +39,7 @@ VOICES = ROOT / "facts" / "voices.yaml"
 PATTERNS = ROOT / "facts" / "patterns.yaml"
 OFFICE_LIFE = ROOT / "facts" / "office_life.yaml"
 CHATTER = ROOT / "facts" / "chatter.yaml"
+COMPANY_TRUTH = ROOT / "facts" / "company_truth.yaml"
 THREADS = ROOT / "threads"
 ARTIFACTS = ROOT / "artifacts"
 GH_RAW = ROOT / "raw" / "github"
@@ -601,7 +602,7 @@ def _synthetic_pr_reviews(*, repo_id: str, pr_number: int, author_pid: str,
         t_review = t_open + timedelta(hours=lag_hours + i * 18)
         if t_close and t_review > t_close:
             t_review = t_close - timedelta(minutes=10)
-        if _is_on_pto(reviewer, t_review) or _is_departed(reviewer, t_review, facts):
+        if _is_on_pto(reviewer, t_review) or not _has_started(reviewer, t_review, facts):
             continue
         state_roll = _hash_int(seed, "state", str(i), n=100) / 100.0
         state_roll *= (1.4 - thoroughness)  # thorough reviewers shift toward changes_requested
@@ -653,6 +654,12 @@ def _load_chatter() -> dict[str, dict]:
         return {}
     data = yaml.safe_load(CHATTER.read_text()) or {}
     return data.get("chatter_by_person") or {}
+
+
+def _load_company_truth() -> dict:
+    if not COMPANY_TRUTH.exists():
+        return {}
+    return yaml.safe_load(COMPANY_TRUTH.read_text()) or {}
 
 
 def _is_on_pto(person_id: str | None, when: datetime) -> bool:
@@ -889,7 +896,7 @@ def thread_events(thread: dict, facts: dict) -> Iterator[dict]:
 
             # Skip work messages while the actor is on PTO / at conference,
             # or already departed, or in their pre-departure decline window.
-            if _is_on_pto(actor, when) or _is_departed(actor, when, facts):
+            if _is_on_pto(actor, when) or not _has_started(actor, when, facts):
                 continue
             pre_dep = _pre_departure_factor(actor, when, facts)
             if pre_dep < 1.0 and _det01(actor, when.toordinal(), m, "predep") > pre_dep:
@@ -1008,7 +1015,9 @@ def chatter_events(facts: dict, start: str, end: str) -> Iterator[dict]:
         count = 2 + _hash_int("count", cur.toordinal(), n=4)
         for p in picks[:count]:
             pid = p["id"]
-            if _is_on_pto(pid, cur):
+            if (not _has_started(pid, cur, facts)
+                    or _is_on_pto(pid, cur)
+                    or _is_departed(pid, cur, facts)):
                 continue
             ch = _CHATTER.get(pid, {})
             # Mix sources by day-of-week: weekend → weekend_chatter, etc.
@@ -1036,7 +1045,9 @@ def chatter_events(facts: dict, start: str, end: str) -> Iterator[dict]:
         reacting = sorted(people, key=lambda p: _hash_int(p["id"], cur.toordinal(), "react"))
         for p in reacting[: 1 + _hash_int("rn", cur.toordinal(), n=3)]:
             pid = p["id"]
-            if _is_on_pto(pid, cur):
+            if (not _has_started(pid, cur, facts)
+                    or _is_on_pto(pid, cur)
+                    or _is_departed(pid, cur, facts)):
                 continue
             pool = _CHATTER.get(pid, {}).get("reactions") or []
             if not pool: continue
@@ -1062,6 +1073,8 @@ def chatter_events(facts: dict, start: str, end: str) -> Iterator[dict]:
             except Exception:
                 continue
             if s < d0 or e > d1:
+                continue
+            if _is_departed(pid, s, facts):
                 continue
             # Announce 2-3 days before
             when_a = _skew_to_peak(s - timedelta(days=2 + _hash_int(pid, w["start"], n=2)),
@@ -1108,7 +1121,9 @@ def chatter_events(facts: dict, start: str, end: str) -> Iterator[dict]:
             reactors = sorted(people, key=lambda p: _hash_int(p["id"], ev["date"], "ext"))
             for p in reactors[: 4 + _hash_int("rxc", ev["date"], n=5)]:
                 pid = p["id"]
-                if _is_on_pto(pid, when_day):
+                if (not _has_started(pid, when_day, facts)
+                        or _is_on_pto(pid, when_day)
+                        or _is_departed(pid, when_day, facts)):
                     continue
                 # Conference posts only from travelers
                 if kind == "conference":
@@ -1145,7 +1160,10 @@ def ritual_events(facts: dict, start: str, end: str) -> Iterator[dict]:
     while cur < d1:
         if cur.weekday() == 0:  # Monday
             for team in teams:
-                members = people_by_team.get(team["id"], [])[:8]
+                members = [
+                    pid for pid in people_by_team.get(team["id"], [])[:8]
+                    if _has_started(pid, cur, facts)
+                ]
                 if not members:
                     continue
                 attending = [
@@ -1170,7 +1188,8 @@ def ritual_events(facts: dict, start: str, end: str) -> Iterator[dict]:
     cur = d0
     while cur < d1:
         if cur.weekday() == 4 and cur.day <= 7:
-            attendees = [p["id"] for p in facts["people"]]
+            attendees = [p["id"] for p in facts["people"]
+                         if _has_started(p["id"], cur, facts)]
             when = cur.replace(hour=16, minute=0)
             yield {"t": _iso(when), "provider": "calendar", "kind": "event.create",
                    "payload": {"id": f"cal:allhands:{cur.date()}",
@@ -1506,6 +1525,10 @@ def dm_events(facts: dict, start: str, end: str) -> Iterator[dict]:
         cur = dm_start
         while cur < d1:
             if cur.weekday() in (0, 2, 4):
+                if (not _has_started(manager, cur, facts)
+                        or not _has_started(report, cur, facts)):
+                    cur += timedelta(days=1)
+                    continue
                 if _det01(manager, report, cur.toordinal(), "skip") < 0.30:
                     cur += timedelta(days=1)
                     continue
@@ -1513,8 +1536,7 @@ def dm_events(facts: dict, start: str, end: str) -> Iterator[dict]:
                 actor = manager if m_to_r else report
                 other = report if m_to_r else manager
                 pool = MANAGER_PING_LINES if m_to_r else REPORT_PING_LINES
-                if (_is_on_pto(actor, cur)
-                        or _is_departed(actor, cur, facts)):
+                if _is_on_pto(actor, cur):
                     cur += timedelta(days=1)
                     continue
                 line = pool[_hash_int(manager, report, cur.toordinal(),
@@ -1552,13 +1574,16 @@ def dm_events(facts: dict, start: str, end: str) -> Iterator[dict]:
         cur = dm_start
         while cur < d1:
             if cur.weekday() in (1, 3):
+                if (not _has_started(a, cur, facts)
+                        or not _has_started(b, cur, facts)):
+                    cur += timedelta(days=1)
+                    continue
                 if _det01(a, b, cur.toordinal(), "fr_skip") < 0.40:
                     cur += timedelta(days=1)
                     continue
                 first = a if _det01(a, b, cur.toordinal(), "fr_who") < 0.5 else b
                 other = b if first == a else a
-                if (_is_on_pto(first, cur)
-                        or _is_departed(first, cur, facts)):
+                if _is_on_pto(first, cur):
                     cur += timedelta(days=1)
                     continue
                 line = FRIEND_DM_LINES[_hash_int(
@@ -1576,8 +1601,7 @@ def dm_events(facts: dict, start: str, end: str) -> Iterator[dict]:
                 }
                 # 40% chance of a near-immediate reply from the other party.
                 if (_det01(a, b, cur.toordinal(), "fr_reply") < 0.40
-                        and not _is_on_pto(other, cur)
-                        and not _is_departed(other, cur, facts)):
+                        and not _is_on_pto(other, cur)):
                     reply_when = when + timedelta(
                         minutes=3 + _hash_int(a, b, cur.toordinal(),
                                               "fr_rm", n=25))
@@ -1682,7 +1706,9 @@ def ci_flake_events(facts: dict, start: str, end: str) -> Iterator[dict]:
             n_msgs = 2 + _hash_int("flake_n", week, n=4)
             for i in range(n_msgs):
                 actor = posters[_hash_int("flake", week, str(i), n=len(posters))]
-                if _is_on_pto(actor, cur) or _is_departed(actor, cur, facts):
+                if (not _has_started(actor, cur, facts)
+                        or _is_on_pto(actor, cur)
+                        or _is_departed(actor, cur, facts)):
                     continue
                 tpl = CI_FLAKE_PATTERNS[_hash_int("flake_t", week, str(i),
                                                   n=len(CI_FLAKE_PATTERNS))]
@@ -2813,7 +2839,9 @@ def discord_events(facts: dict, start: str, end: str) -> Iterator[dict]:
                 if when >= d1:
                     continue
                 # Same active-window guards we use on Slack messages.
-                if _is_on_pto(actor, when) or _is_departed(actor, when, facts):
+                if (not _has_started(actor, when, facts)
+                        or _is_on_pto(actor, when)
+                        or _is_departed(actor, when, facts)):
                     continue
                 yield {"t": _iso(when), "provider": "discord", "kind": "message",
                        "actor": actor,
@@ -3101,6 +3129,550 @@ def drive_events(facts: dict, start: str, end: str) -> Iterator[dict]:
         if ev: yield ev
 
 
+# -----------------------------------------------------------------------------
+# Company truth events: belief changes, handovers, opaque causes
+# -----------------------------------------------------------------------------
+
+TRUTH_CHANNEL = "channel:company-memory"
+
+
+def _truth_dt(value: str, hour: int = 10) -> datetime:
+    return datetime.fromisoformat(str(value)).replace(
+        tzinfo=timezone.utc, hour=hour, minute=0, second=0, microsecond=0)
+
+
+def _in_range(when: datetime, d0: datetime, d1: datetime) -> bool:
+    return d0 <= when < d1
+
+
+def _truth_body(title: str, lines: list[str]) -> str:
+    body = f"# {title}\n\n"
+    body += "\n".join(f"- {line}" for line in lines if line)
+    return body
+
+
+def departure_events(facts: dict) -> Iterator[dict]:
+    """Emit org.person.depart events for people with an ended_at in facts.
+
+    Renderers already use ended_at to stop future messages. This event makes
+    the same fact visible to the replayed org/HR state instead of leaving it as
+    an offline generation-only filter.
+    """
+    for p in facts.get("people", []):
+        if not p.get("ended_at"):
+            continue
+        when = _truth_dt(p["ended_at"], hour=17)
+        yield {
+            "t": _iso(when),
+            "provider": "org",
+            "kind": "person.depart",
+            "actor": p["id"],
+            "payload": {
+                "id": p["id"],
+                "ended_at": _iso(when),
+                "reason": "offboarded",
+                "last_active": p.get("last_active"),
+            },
+        }
+
+
+def company_truth_events(facts: dict, truth: dict, start: str, end: str) -> Iterator[dict]:
+    """Render company_truth.yaml into normal provider events.
+
+    The goal is not to create a single omniscient artifact. The same truth is
+    deliberately split across vague meetings, private notes, Drive packets, and
+    Jira work so Fyralis has to model changed beliefs and hidden causes.
+    """
+    if not truth:
+        return
+
+    d0 = datetime.fromisoformat(start).replace(tzinfo=timezone.utc)
+    d1 = datetime.fromisoformat(end).replace(tzinfo=timezone.utc)
+    seq = 0
+
+    def next_key() -> str:
+        nonlocal seq
+        seq += 1
+        return f"STR-{60000 + seq}"
+
+    memory_participants = sorted({
+        pid
+        for arc in truth.get("belief_arcs", [])
+        for pid in arc.get("owners", [])
+    } | {
+        pid
+        for arc in truth.get("handover_arcs", [])
+        for pid in ([arc.get("person")] + (arc.get("new_owners") or []))
+        if pid
+    })[:20]
+
+    belief_start_dates = [
+        _truth_dt(arc["initial_date"], hour=9)
+        for arc in truth.get("belief_arcs", [])
+        if arc.get("initial_date")
+    ]
+    channel_when = (min(belief_start_dates) - timedelta(days=7)
+                    if belief_start_dates else _midday(d0.date(), hour=9))
+    memory_participants_at_create = [
+        pid for pid in memory_participants
+        if _has_started(pid, channel_when, facts)
+    ]
+    if _in_range(channel_when, d0, d1):
+        yield {
+            "t": _iso(channel_when),
+            "provider": "slack",
+            "kind": "channel.create",
+            "actor": "person:simanta-gautam",
+            "payload": {
+                "id": TRUTH_CHANNEL,
+                "name": "company-memory",
+                "is_private": True,
+                "participants": memory_participants_at_create,
+            },
+        }
+
+    for arc in truth.get("belief_arcs", []):
+        owners = arc.get("owners") or []
+        actor = owners[0] if owners else "person:simanta-gautam"
+        topic = arc.get("topic", arc.get("id", "belief")).strip()
+        init_when = _truth_dt(arc["initial_date"], hour=11)
+        change_when = _truth_dt(arc["change_date"], hour=13)
+        slug = _slug(arc.get("id", topic))
+
+        if _in_range(init_when, d0, d1):
+            yield {
+                "t": _iso(_skew_to_peak(init_when, actor)),
+                "provider": "slack",
+                "kind": "message",
+                "actor": actor,
+                "payload": {
+                    "channel": TRUTH_CHANNEL,
+                    "text": f"assumption for {topic}: {arc.get('from_belief')}",
+                    "category": "truth:belief_initial",
+                },
+            }
+            yield {
+                "t": _iso(init_when + timedelta(hours=2)),
+                "provider": "notion",
+                "kind": "page.create",
+                "actor": actor,
+                "payload": {
+                    "id": f"notion:truth:{slug}:initial",
+                    "title": f"Assumption log - {topic}",
+                    "kind": "assumption_log",
+                    "body_md": _truth_body(f"Assumption log - {topic}", [
+                        f"Current belief: {arc.get('from_belief')}",
+                        f"Falsifier to watch: {arc.get('why_it_changed')}",
+                        f"Expected model update: {arc.get('expected_fyralis_belief_delta')}",
+                    ]),
+                    "is_private": True,
+                    "audience": owners,
+                },
+            }
+
+        if _in_range(change_when, d0, d1):
+            yield {
+                "t": _iso(change_when - timedelta(hours=3)),
+                "provider": "calendar",
+                "kind": "event.create",
+                "actor": actor,
+                "payload": {
+                    "id": f"cal:truth:{slug}:sync",
+                    "summary": f"Short sync - {topic}",
+                    "start": _iso(change_when - timedelta(hours=3)),
+                    "end": _iso(change_when - timedelta(hours=2, minutes=30)),
+                    "attendees": owners,
+                    "category": "belief_sync",
+                },
+            }
+            yield {
+                "t": _iso(_skew_to_peak(change_when, actor)),
+                "provider": "slack",
+                "kind": "message",
+                "actor": actor,
+                "payload": {
+                    "channel": TRUTH_CHANNEL,
+                    "text": f"updating {topic}: {arc.get('to_belief')}",
+                    "category": "truth:belief_update",
+                },
+            }
+            yield {
+                "t": _iso(change_when + timedelta(hours=1)),
+                "provider": "notion",
+                "kind": "page.create",
+                "actor": actor,
+                "payload": {
+                    "id": f"notion:truth:{slug}:change",
+                    "title": f"Belief update - {topic}",
+                    "kind": "belief_update",
+                    "body_md": _truth_body(f"Belief update - {topic}", [
+                        f"Old belief: {arc.get('from_belief')}",
+                        f"New belief: {arc.get('to_belief')}",
+                        f"Why changed: {arc.get('why_it_changed')}",
+                        f"Hidden context: {arc.get('hidden_context')}",
+                        "Visible symptoms: " + "; ".join(arc.get("visible_symptoms") or []),
+                    ]),
+                    "is_private": True,
+                    "audience": owners,
+                },
+            }
+            yield {
+                "t": _iso(change_when + timedelta(hours=2)),
+                "provider": "drive",
+                "kind": "file.create",
+                "actor": actor,
+                "payload": {
+                    "id": f"drive:truth:{slug}:decision",
+                    "name": f"Decision Memo - {topic}",
+                    "mime_type": _GDOC,
+                    "body": (
+                        f"Decision memo for {topic}.\n"
+                        f"Old: {arc.get('from_belief')}\n"
+                        f"New: {arc.get('to_belief')}\n"
+                        f"Why: {arc.get('why_it_changed')}\n"
+                    ),
+                    "category": "belief-change",
+                },
+            }
+
+            for i, symptom in enumerate((arc.get("visible_symptoms") or [])[:2]):
+                assignee = owners[i % len(owners)] if owners else actor
+                key = next_key()
+                issue_when = change_when + timedelta(days=1 + i)
+                yield {
+                    "t": _iso(_skew_to_peak(issue_when, assignee)),
+                    "provider": "jira",
+                    "kind": "issue.create",
+                    "actor": assignee,
+                    "payload": {
+                        "key": key,
+                        "project": "STR",
+                        "type": "Task",
+                        "summary": f"Follow-up from belief update: {symptom}"[:200],
+                        "reporter": actor,
+                        "assignee": assignee,
+                        "story_points": 2,
+                        "labels": ["belief-update", slug],
+                    },
+                }
+                yield {
+                    "t": _iso(issue_when + timedelta(days=2)),
+                    "provider": "jira",
+                    "kind": "issue.transition",
+                    "actor": assignee,
+                    "payload": {"key": key, "from_status": "To Do", "to_status": "In Progress"},
+                }
+                yield {
+                    "t": _iso(issue_when + timedelta(days=8 + i * 3)),
+                    "provider": "jira",
+                    "kind": "issue.transition",
+                    "actor": assignee,
+                    "payload": {"key": key, "from_status": "In Progress", "to_status": "Done"},
+                }
+
+    for arc in truth.get("opaque_work_arcs", []):
+        participants = arc.get("participants") or []
+        if not participants:
+            continue
+        actor = participants[0]
+        when = _truth_dt(arc["date"], hour=15)
+        slug = _slug(arc["id"])
+        if not _in_range(when, d0, d1):
+            continue
+        mpim_id = _mpim_id(f"opaque-{slug}")
+        yield {
+            "t": _iso(when - timedelta(minutes=30)),
+            "provider": "calendar",
+            "kind": "event.create",
+            "actor": actor,
+            "payload": {
+                "id": f"cal:opaque:{slug}",
+                "summary": arc.get("calendar_summary", "Quick sync"),
+                "start": _iso(when - timedelta(minutes=30)),
+                "end": _iso(when),
+                "attendees": participants,
+                "category": "opaque_work",
+            },
+        }
+        yield {
+            "t": _iso(when),
+            "provider": "slack",
+            "kind": "channel.create",
+            "actor": actor,
+            "payload": {
+                "id": mpim_id,
+                "name": mpim_id,
+                "is_mpim": True,
+                "is_private": True,
+                "participants": participants,
+            },
+        }
+        yield {
+            "t": _iso(_skew_to_peak(when + timedelta(minutes=20), actor)),
+            "provider": "slack",
+            "kind": "message",
+            "actor": actor,
+            "payload": {
+                "channel": mpim_id,
+                "text": "let's just file the follow-ups and keep the main channel quiet until the shape is real",
+                "category": "truth:opaque_work",
+            },
+        }
+        for i, work in enumerate(arc.get("downstream_work") or []):
+            assignee = participants[i % len(participants)]
+            key = next_key()
+            issue_when = when + timedelta(days=1 + i)
+            yield {
+                "t": _iso(_skew_to_peak(issue_when, assignee)),
+                "provider": "jira",
+                "kind": "issue.create",
+                "actor": assignee,
+                "payload": {
+                    "key": key,
+                    "project": "STR",
+                    "type": "Task",
+                    "summary": work[:200],
+                    "reporter": actor,
+                    "assignee": assignee,
+                    "story_points": 2 + (i % 3),
+                    "labels": ["unplanned", "follow-up"],
+                },
+            }
+            if i == 0:
+                yield {
+                    "t": _iso(issue_when + timedelta(days=7)),
+                    "provider": "drive",
+                    "kind": "file.create",
+                    "actor": assignee,
+                    "payload": {
+                        "id": f"drive:opaque:{slug}:notes",
+                        "name": f"Working Notes - {arc.get('calendar_summary', 'Quick sync')}",
+                        "mime_type": _GDOC,
+                        "body": (
+                            f"Notes after {arc.get('calendar_summary', 'quick sync')}.\n"
+                            f"Reason is intentionally sparse in public systems: "
+                            f"{arc.get('no_clear_ingestion_reason')}\n"
+                        ),
+                        "category": "working-notes",
+                    },
+                }
+
+    for arc in truth.get("handover_arcs", []):
+        leaver = arc.get("person")
+        new_owners = arc.get("new_owners") or []
+        if not leaver or not new_owners:
+            continue
+        notice = _truth_dt(arc["notice_date"], hour=12)
+        end_when = _truth_dt(arc["end_date"], hour=17)
+        slug = _slug(arc["id"])
+        primary = new_owners[0]
+        if _in_range(notice, d0, d1):
+            yield {
+                "t": _iso(notice),
+                "provider": "calendar",
+                "kind": "event.create",
+                "actor": leaver,
+                "payload": {
+                    "id": f"cal:handover:{slug}",
+                    "summary": f"Handover - {_resolve_handle(leaver, facts)}",
+                    "start": _iso(notice),
+                    "end": _iso(notice + timedelta(minutes=45)),
+                    "attendees": [leaver] + new_owners,
+                    "category": "handover",
+                },
+            }
+            yield {
+                "t": _iso(_skew_to_peak(notice + timedelta(hours=1), leaver)),
+                "provider": "slack",
+                "kind": "message",
+                "actor": leaver,
+                "payload": {
+                    "channel": TRUTH_CHANNEL,
+                    "text": (
+                        f"handover note: {arc.get('previous_owner_of')} is mostly "
+                        f"written down, but there are a few sharp edges"
+                    ),
+                    "category": "truth:handover_notice",
+                },
+            }
+            yield {
+                "t": _iso(notice + timedelta(hours=2)),
+                "provider": "notion",
+                "kind": "page.create",
+                "actor": leaver,
+                "payload": {
+                    "id": f"notion:handover:{slug}",
+                    "title": f"Handover - {_resolve_handle(leaver, facts)}",
+                    "kind": "handover_note",
+                    "body_md": _truth_body(f"Handover - {_resolve_handle(leaver, facts)}", [
+                        f"Owned area: {arc.get('previous_owner_of')}",
+                        f"New owners: {', '.join(_resolve_handle(o, facts) for o in new_owners)}",
+                        f"Handover quality: {arc.get('handover_quality')}",
+                        f"Lag signal: {arc.get('lag_signal')}",
+                        f"Expected model update: {arc.get('expected_fyralis_belief_delta')}",
+                    ]),
+                    "is_private": True,
+                    "audience": [leaver] + new_owners,
+                },
+            }
+            yield {
+                "t": _iso(notice + timedelta(hours=3)),
+                "provider": "drive",
+                "kind": "file.create",
+                "actor": leaver,
+                "payload": {
+                    "id": f"drive:handover:{slug}",
+                    "name": f"Handover Packet - {_resolve_handle(leaver, facts)}",
+                    "mime_type": _GDOC,
+                    "body": (
+                        f"Area: {arc.get('previous_owner_of')}\n"
+                        f"Quality: {arc.get('handover_quality')}\n"
+                        f"Lag to watch: {arc.get('lag_signal')}\n"
+                    ),
+                    "category": "handover",
+                },
+            }
+            key = next_key()
+            yield {
+                "t": _iso(notice + timedelta(days=1)),
+                "provider": "jira",
+                "kind": "issue.create",
+                "actor": leaver,
+                "payload": {
+                    "key": key,
+                    "project": "STR",
+                    "type": "Task",
+                    "summary": f"Handover follow-up: {arc.get('previous_owner_of')}"[:200],
+                    "reporter": leaver,
+                    "assignee": leaver,
+                    "story_points": 3,
+                    "labels": ["handover", slug],
+                },
+            }
+            yield {
+                "t": _iso(notice + timedelta(days=2)),
+                "provider": "jira",
+                "kind": "issue.transition",
+                "actor": leaver,
+                "payload": {"key": key, "from_status": "To Do", "to_status": "In Progress"},
+            }
+            yield {
+                "t": _iso(end_when + timedelta(days=1)),
+                "provider": "jira",
+                "kind": "issue.assign",
+                "actor": primary,
+                "payload": {
+                    "key": key,
+                    "from_assignee": leaver,
+                    "to_assignee": primary,
+                },
+            }
+            yield {
+                "t": _iso(end_when + timedelta(days=14)),
+                "provider": "jira",
+                "kind": "issue.transition",
+                "actor": primary,
+                "payload": {
+                    "key": key,
+                    "from_status": "In Progress",
+                    "to_status": "Done",
+                    "handover_lag_days": 14,
+                },
+            }
+
+    for arc in truth.get("conflicts", []):
+        end_date = (arc.get("window") or {}).get("end")
+        if not end_date:
+            continue
+        when = _truth_dt(end_date, hour=16)
+        slug = _slug(arc["id"])
+        if not _in_range(when, d0, d1):
+            continue
+        actor = "person:prajwolrg"
+        sides = "; ".join(f"{s.get('name')}: {s.get('view')}" for s in arc.get("sides") or [])
+        yield {
+            "t": _iso(when),
+            "provider": "notion",
+            "kind": "page.create",
+            "actor": actor,
+            "payload": {
+                "id": f"notion:conflict:{slug}",
+                "title": f"Decision record - {slug}",
+                "kind": "decision_record",
+                "body_md": _truth_body(f"Decision record - {slug}", [
+                    f"Sides: {sides}",
+                    f"Resolution: {arc.get('resolution')}",
+                ]),
+            },
+        }
+        yield {
+            "t": _iso(_skew_to_peak(when + timedelta(hours=1), actor)),
+            "provider": "slack",
+            "kind": "message",
+            "actor": actor,
+            "payload": {
+                "channel": TRUTH_CHANNEL,
+                "text": f"decision recorded for {slug}: {arc.get('resolution')}",
+                "category": "truth:conflict_resolution",
+            },
+        }
+
+    for arc in truth.get("side_quests", []):
+        window = arc.get("window") or {}
+        if not window.get("start") or not window.get("end"):
+            continue
+        start_when = _truth_dt(window["start"], hour=10)
+        end_when = _truth_dt(window["end"], hour=15)
+        owner = arc.get("owner") or "person:krsnapaudel"
+        slug = _slug(arc["id"])
+        key = next_key()
+        if _in_range(start_when, d0, d1):
+            yield {
+                "t": _iso(_skew_to_peak(start_when, owner)),
+                "provider": "jira",
+                "kind": "issue.create",
+                "actor": owner,
+                "payload": {
+                    "key": key,
+                    "project": "STR",
+                    "type": "Task",
+                    "summary": f"Side quest: {arc.get('why')}"[:200],
+                    "reporter": owner,
+                    "assignee": owner,
+                    "story_points": 5,
+                    "labels": ["side-quest", slug],
+                },
+            }
+            yield {
+                "t": _iso(start_when + timedelta(days=3)),
+                "provider": "jira",
+                "kind": "issue.transition",
+                "actor": owner,
+                "payload": {"key": key, "from_status": "To Do", "to_status": "In Progress"},
+            }
+        if _in_range(end_when, d0, d1):
+            yield {
+                "t": _iso(end_when),
+                "provider": "drive",
+                "kind": "file.create",
+                "actor": owner,
+                "payload": {
+                    "id": f"drive:sidequest:{slug}",
+                    "name": f"Side Quest Recap - {slug}",
+                    "mime_type": _GDOC,
+                    "body": f"Why: {arc.get('why')}\nPayoff: {arc.get('payoff')}\n",
+                    "category": "side-quest",
+                },
+            }
+            yield {
+                "t": _iso(end_when + timedelta(days=1)),
+                "provider": "jira",
+                "kind": "issue.transition",
+                "actor": owner,
+                "payload": {"key": key, "from_status": "In Progress", "to_status": "Done"},
+            }
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--include-mirror", action="store_true",
@@ -3144,16 +3716,20 @@ def main() -> None:
     _PATTERNS = _load_patterns()
     _CHATTER = _load_chatter()
     _OFFICE = _load_office_life()
+    truth = _load_company_truth()
     _build_manager_map(facts)
     pto_n = sum(len(v) for v in (_OFFICE.get("pto") or {}).values())
     print(f"facts: {len(facts['people'])} people, {len(facts['repos'])} repos, "
           f"{len(thread_files)} threads, {len(_VOICES)} voices, "
           f"{len(_PATTERNS)} patterns, {len(_CHATTER)} chatter banks, "
-          f"{pto_n} pto windows, {len(_MANAGER_OF)} mgr pairs",
+          f"{pto_n} pto windows, {len(_MANAGER_OF)} mgr pairs, "
+          f"{len(truth.get('belief_arcs', []))} belief arcs",
           file=sys.stderr)
 
     events: list[dict] = []
     events.extend(bootstrap_events(facts))
+    events.extend(departure_events(facts))
+    events.extend(company_truth_events(facts, truth, facts["company"]["founded"], args.end))
     for tfp in thread_files:
         thread = yaml.safe_load(tfp.read_text())
         events.extend(thread_events(thread, facts))

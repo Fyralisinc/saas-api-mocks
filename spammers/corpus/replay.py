@@ -111,6 +111,19 @@ async def _org_person_create(ctx: ReplayContext, event: Event) -> None:
     await ctx.idmap.put(p["id"], "person", pk)
 
 
+@register("org", "person.depart")
+async def _org_person_depart(ctx: ReplayContext, event: Event) -> None:
+    p = event["payload"]
+    person_pk = await ctx.idmap.get(p["id"])
+    if person_pk is None:
+        return
+    ended_at = _parse_ts(p.get("ended_at") or event["t"])
+    await ctx.pool.execute(
+        "UPDATE org.people SET ended_at = $2 WHERE id = $1",
+        person_pk, ended_at,
+    )
+
+
 # =============================================================================
 # Lazy bootstraps — per-provider workspace/installation/account state
 # =============================================================================

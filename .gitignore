@@ -13,6 +13,7 @@ env/
 *.egg-info/
 dist/
 /build/
+model_layer_run_artifacts/
 
 .env
 .env.*

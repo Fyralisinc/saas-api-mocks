@@ -124,7 +124,29 @@ cmd_test() {
 
 cmd_prepare() {
     require_setup; load_env
-    local corpus="${CORPUS_PATH:-./corpus/build/events.jsonl}"
+    local profile="${SPAMMER_CAPACITY_PROFILE:-fit}"
+    local corpus="${CORPUS_PATH:-}"
+    if [ -z "$corpus" ]; then
+        case "$profile" in
+            full|x)
+                corpus="./corpus/build/events.jsonl"
+                ;;
+            fit|capacity-fit|y)
+                local source="./corpus/build/events.jsonl"
+                local fitted="./corpus/build/events.capacity_fit.jsonl"
+                local fitter="./corpus/scripts/11_capacity_fit_events.py"
+                if [ ! -f "$fitted" ] || [ "$source" -nt "$fitted" ] || [ "$fitter" -nt "$fitted" ]; then
+                    echo "Building Fyralis capacity-fit corpus: $fitted"
+                    "$PY" "$fitter" --input "$source" --output "$fitted"
+                fi
+                corpus="$fitted"
+                ;;
+            *)
+                c_red "unknown SPAMMER_CAPACITY_PROFILE=$profile (use full|x|fit|capacity-fit|y)"
+                exit 1
+                ;;
+        esac
+    fi
     local as_of="${AS_OF:-2023-07-01}"      # default: first 18 months of the corpus (2022-01 → 2023-07); forward-replay lands the rest
     if [ ! -f "$corpus" ]; then
         c_red "corpus file not found: $corpus"
@@ -134,6 +156,7 @@ cmd_prepare() {
     fi
     local tid; tid="$("$PY" -c 'import uuid; print(uuid.uuid4())')"
     echo "Preparing Gharelu-Alpen run (as-of=$as_of, tenant=$tid)..."
+    echo "  capacity profile: $profile"
     echo "  corpus: $corpus"
     "$SPAMMER" prepare \
         --tenant-id="$tid" --fyralis-base=http://localhost:8000 \

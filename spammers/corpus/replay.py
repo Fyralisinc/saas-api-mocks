@@ -353,7 +353,7 @@ async def _gh_commit(ctx: ReplayContext, event: Event) -> None:
             "author_email, committed_at, parents) "
             "VALUES ($1,$2,$3,$4,$5,$6,$7,'[]'::jsonb) "
             "ON CONFLICT (repo_pk, sha) DO NOTHING",
-            uuid4(), repo_pk, p["sha"], p.get("message", "")[:1000],
+            uuid4(), repo_pk, p["sha"], p.get("message", ""),
             login, f"{login}@users.noreply.github.com", _parse_ts(event["t"]),
         )
     except asyncpg.exceptions.UniqueViolationError:
@@ -475,7 +475,7 @@ async def _gh_review_submit(ctx: ReplayContext, event: Event) -> None:
             "INSERT INTO app_github.reviews (id, pr_pk, user_login, state, body, "
             "submitted_at) VALUES ($1,$2,$3,$4,$5,$6)",
             uuid4(), pr_pk, login, p.get("state", "commented"),
-            p.get("body", "")[:1000], when,
+            p.get("body", ""), when,
         )
     except asyncpg.exceptions.UniqueViolationError:
         pass
@@ -565,7 +565,7 @@ async def _slack_message(ctx: ReplayContext, event: Event) -> None:
             "INSERT INTO app_slack.messages (id, channel_pk, user_pk, ts, thread_ts, "
             "text, reactions) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb)",
             uuid4(), channel_pk, user_pk, ts, thread_ts,
-            p.get("text", "")[:2000], json.dumps(reactions),
+            p.get("text", ""), json.dumps(reactions),
         )
     except asyncpg.exceptions.UniqueViolationError:
         pass
@@ -821,7 +821,7 @@ async def _gmail_message(ctx: ReplayContext, event: Event) -> None:
                 uuid4(), thread_pk, gmid, history_id, rfc_id,
                 json.dumps(headers),
                 (p.get("body", "")[:200]),
-                p.get("body", "")[:5000], when,
+                p.get("body", ""), when,
             )
         except asyncpg.exceptions.UniqueViolationError:
             pass
@@ -833,6 +833,52 @@ def _notion_rt(content: str) -> list:
              "annotations": {"bold": False, "italic": False, "strikethrough": False,
                              "underline": False, "code": False, "color": "default"},
              "plain_text": content, "href": None}]
+
+
+_NOTION_BLOCK_CHARS = 1800
+
+
+def _notion_body_blocks(payload: dict[str, Any]) -> list[str]:
+    """Return body blocks for a Notion page without dropping text.
+
+    Full corpus pages use ``body_md`` and are chunked into multiple Notion
+    paragraph blocks. Capacity-fit pages may carry explicit ``body_blocks``:
+    short summary bullets that fit Fyralis's current per-block visible text.
+    """
+    explicit = payload.get("body_blocks")
+    if isinstance(explicit, list):
+        blocks = [str(x).strip() for x in explicit if str(x).strip()]
+        if blocks:
+            return blocks
+    body = (payload.get("body_md") or "").strip()
+    if not body:
+        return []
+    return _chunk_notion_text(body, _NOTION_BLOCK_CHARS)
+
+
+def _chunk_notion_text(text: str, limit: int) -> list[str]:
+    """Split markdown-ish text at natural boundaries, never blind-truncate."""
+    text = text.strip()
+    if not text:
+        return []
+    chunks: list[str] = []
+    rest = text
+    while len(rest) > limit:
+        cut = max(
+            rest.rfind("\n\n", 0, limit),
+            rest.rfind("\n", 0, limit),
+            rest.rfind(". ", 0, limit),
+            rest.rfind("; ", 0, limit),
+        )
+        if cut < max(200, limit // 3):
+            cut = limit
+        chunk = rest[:cut].strip()
+        if chunk:
+            chunks.append(chunk)
+        rest = rest[cut:].strip()
+    if rest:
+        chunks.append(rest)
+    return chunks
 
 
 # Structured page kinds live in real Notion *databases* (so each is a DB row with
@@ -929,17 +975,18 @@ async def _notion_page_create(ctx: ReplayContext, event: Event) -> None:
         await ctx.idmap.put(p["id"], "notion_page", pk)
     except asyncpg.exceptions.UniqueViolationError:
         return
-    # Body becomes a single paragraph block so the page has real, hydratable
-    # content (GET /v1/blocks/{id}/children), mirroring how Notion stores text.
-    body = (p.get("body_md") or "").strip()
-    if body:
+    # Body becomes paragraph blocks so the page has real, hydratable content
+    # (GET /v1/blocks/{id}/children), mirroring how Notion stores text without
+    # dropping the tail. Capacity-fit corpora may provide explicit summary
+    # blocks; full corpora are chunked at natural markdown boundaries.
+    for position, body in enumerate(_notion_body_blocks(p)):
         await ctx.pool.execute(
             "INSERT INTO app_notion.blocks (id, page_pk, block_id, parent_block_id, "
             "type, content, has_children, position, created_by, created_time, last_edited_time) "
-            "VALUES ($1,$2,$3,NULL,'paragraph',$4::jsonb,FALSE,0,$5,$6,$6)",
+            "VALUES ($1,$2,$3,NULL,'paragraph',$4::jsonb,FALSE,$5,$6,$7,$7)",
             uuid4(), pk, notion_id(),
-            json.dumps({"rich_text": _notion_rt(body[:1800]), "color": "default"}),
-            bot_user_id, when,
+            json.dumps({"rich_text": _notion_rt(body), "color": "default"}),
+            position, bot_user_id, when,
         )
 
 

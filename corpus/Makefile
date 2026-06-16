@@ -1,8 +1,8 @@
 .PHONY: setup scrape scrape-github scrape-blog scrape-docs \
         facts enrich timeline threads artifacts voices patterns \
-        office-life chatter render corpus clean-build clean-cache
+        office-life chatter render capacity-fit corpus clean-build clean-cache
 
-PY := .venv/bin/python
+PY := $(shell if [ -x .venv/bin/python ]; then echo .venv/bin/python; elif [ -x ../.venv/bin/python ]; then echo ../.venv/bin/python; else echo python3; fi)
 LOAD_ENV := set -a; . ./.env; set +a;
 
 setup:
@@ -61,6 +61,11 @@ chatter:
 # external comms, notion edit history.
 render:
 	$(LOAD_ENV) $(PY) scripts/05_render_events.py --include-all
+
+# Reversible Fyralis-capacity-fit derivative. Leaves build/events.jsonl (x)
+# untouched and writes build/events.capacity_fit.jsonl (y).
+capacity-fit:
+	$(PY) scripts/11_capacity_fit_events.py
 
 # Full pipeline.
 corpus: scrape facts timeline threads artifacts voices patterns office-life chatter render

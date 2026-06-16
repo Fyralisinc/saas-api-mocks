@@ -18,6 +18,7 @@ testing.
 ```
 make corpus        # full pipeline: scrape → facts → timeline → threads → artifacts → voices → patterns → office-life → chatter → render
 make render        # just re-render events.jsonl from existing inputs
+make capacity-fit  # derive build/events.capacity_fit.jsonl from full events.jsonl
 ```
 
 The L4 artifact `build/events.jsonl` is committed (~10 MB). Anything else
@@ -35,7 +36,17 @@ reference.
 From the spammer repo root:
 
 ```
-./dev.sh prepare        # backfills build/events.jsonl into the mock DBs as-of 2025-11-28
+./dev.sh prepare        # y/fit: builds and backfills build/events.capacity_fit.jsonl
+SPAMMER_CAPACITY_PROFILE=full ./dev.sh prepare
+                       # x/full: backfills build/events.jsonl
 ```
 
 Override the corpus path or cutoff via `CORPUS_PATH=` and `AS_OF=` env vars.
+
+The capacity-fit profile summarizes only oversized source items. As of the
+2026-06-16 Fyralis cap audit, the committed corpus has 64 oversized Notion page
+bodies; another 483 medium Notion bodies are split into <=180-char blocks so
+Fyralis's current Notion block handler sees the full text instead of only the
+first 200 chars. Drive, Gmail, Slack/Discord, GitHub, Jira, and Fireflies seed
+data are already below the measured item caps. The full corpus stays untouched,
+so switch back with `SPAMMER_CAPACITY_PROFILE=full` when Fyralis capacity improves.

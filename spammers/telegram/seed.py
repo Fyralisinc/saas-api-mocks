@@ -90,6 +90,133 @@ _DM_LINES = [
     "wouldn't miss it",
 ]
 
+_WORKSTREAMS = [
+    {
+        "topic": "bridge withdrawal liveness",
+        "repo": "strata-bridge",
+        "service": "bridge-operator",
+        "risk": "operator restart path",
+        "artifact": "withdrawal invariant note",
+    },
+    {
+        "topic": "checkpoint explorer lag",
+        "repo": "checkpoint-explorer",
+        "service": "explorer-indexer",
+        "risk": "stale checkpoint visibility",
+        "artifact": "dashboard runbook",
+    },
+    {
+        "topic": "Glock fixture ordering",
+        "repo": "zkaleido",
+        "service": "proof-worker",
+        "risk": "transcript label ambiguity",
+        "artifact": "fixture matrix",
+    },
+    {
+        "topic": "Mosaic provider scoring",
+        "repo": "mosaic",
+        "service": "mosaic-fetcher",
+        "risk": "availability accounting",
+        "artifact": "provider scoring RFC",
+    },
+    {
+        "topic": "bitcoind reconnect supervisor",
+        "repo": "bitcoind-async-client",
+        "service": "strata-node",
+        "risk": "cancelled request retention",
+        "artifact": "rpc retry note",
+    },
+    {
+        "topic": "Prague testnet faucet abuse",
+        "repo": "alpen",
+        "service": "faucet-api",
+        "risk": "scripted drain bypass",
+        "artifact": "rate-limit postmortem",
+    },
+    {
+        "topic": "public testnet readiness",
+        "repo": "alpen",
+        "service": "public-rpc",
+        "risk": "support load after launch",
+        "artifact": "readiness checklist",
+    },
+    {
+        "topic": "audit follow-up batch",
+        "repo": "strata-bridge",
+        "service": "watchtower",
+        "risk": "finding owner drift",
+        "artifact": "audit response tracker",
+    },
+]
+
+_GROUP_TEMPLATES = [
+    "{sender}: opened a small PR in {repo} for {topic}; the weird bit is {risk}",
+    "{sender}: draft is up for {topic}. not pretty yet, but it shows the shape",
+    "can someone review {repo}? i want eyes on {risk} before this rolls forward",
+    "deploying {service} to staging after lunch; watching {topic}",
+    "{sender}: {service} is green locally, CI is the only liar left",
+    "i moved the notes from chat into the {artifact}; please argue there",
+    "blocked on {reviewer}'s review for {topic}, not urgent but it is sitting there",
+    "the {repo} patch is smaller now. deleted the clever part",
+    "heads up: {topic} slipped because {risk} was worse than expected",
+    "rebased {repo}; if CI flakes again i'm calling it a runner issue",
+    "{sender}: found the actual bug in {service}. the first fix was a decoy",
+    "pairing with {reviewer} on {topic}; will post the short version after",
+    "{service} deploy done. no victory lap until the dashboard stays boring",
+    "review notes are in. mostly assumptions around {risk}",
+    "i can take the follow-up from the {artifact} unless someone else already started",
+    "standup note: {topic} is still the thing that can bite us this week",
+    "same issue as last Friday, but now the repro points at {risk}",
+    "shipping the boring fix for {repo}; bigger cleanup can wait",
+    "if you touched {service} today, please check the alert thread",
+    "{sender}: leaving a breadcrumb here so this doesn't vanish into DMs",
+]
+
+_DM_TEMPLATES = [
+    "got five to talk through {topic}? i don't want to litigate {risk} in main chat",
+    "can you nudge the {repo} review? it is blocking tomorrow's deploy",
+    "i think {reviewer} has the missing context on {artifact}",
+    "heads up, i'm slow today. can you cover the {service} alert if it fires?",
+    "the PR is less scary than it looks; mostly tests around {risk}",
+    "if this comes up in standup, i'd frame it as {topic}, not a platform bug",
+    "thanks for catching that. i missed the {risk} angle completely",
+    "can we move the 1:1? need to finish the {repo} patch first",
+    "i'm keeping this in DM until we know whether {risk} is real",
+    "after the deploy, remind me to update the {artifact}",
+    "do you remember why we chose that path for {topic}?",
+    "quick gut check: ship the small fix or wait for the cleanup?",
+    "i can take on-call Friday if you cover the {service} handoff",
+    "the review comment was right, just badly worded",
+    "i owe you context on {topic}; sending the short version now",
+]
+
+_CHANNEL_TEMPLATES = [
+    "Release note: {service} picked up the {topic} fix. Watch the dashboard for the next hour.",
+    "Public update: {artifact} is published with the current {topic} assumptions.",
+    "Heads up: {repo} has a new release candidate; main risk is {risk}.",
+    "Testnet note: {service} rollout is complete, and the follow-up is tracked in {artifact}.",
+    "Welcome packet updated: added the {topic} debugging note for new operators.",
+    "Postmortem published for {topic}; action items are already in tracker.",
+]
+
+
+def _ctx(rng: random.Random, *, title: str, sender: str, participants: list[str],
+         when: datetime) -> dict[str, str]:
+    work = rng.choice(_WORKSTREAMS)
+    reviewer_pool = [p for p in participants if p != sender] or participants or [sender]
+    reviewer = rng.choice(reviewer_pool)
+    return {
+        **work,
+        "sender": sender,
+        "reviewer": reviewer,
+        "month": when.strftime("%b"),
+        "dialog": title,
+    }
+
+
+def _render_text(rng: random.Random, templates: list[str], ctx: dict[str, str]) -> str:
+    return rng.choice(templates).format(**ctx)
+
 
 def _uid(handle: str) -> int:
     """Stable 9-10 digit Telegram user id from a handle."""
@@ -206,19 +333,53 @@ async def seed_telegram(
                 # Channel broadcast: posted as the channel — NO from_id.
                 from_user_id = None
                 out = False
-                text = rng.choice(_CHANNEL_POSTS).format(
-                    n=rng.randint(100, 999),
-                    when=(when + timedelta(days=1)).strftime("%a %H:%M"))
+                if rng.random() < 0.65:
+                    text = _render_text(
+                        rng,
+                        _CHANNEL_TEMPLATES,
+                        _ctx(rng, title=title, sender=self_handle,
+                             participants=participants, when=when),
+                    )
+                else:
+                    text = rng.choice(_CHANNEL_POSTS).format(
+                        n=rng.randint(100, 999),
+                        when=(when + timedelta(days=1)).strftime("%a %H:%M"))
             elif kind == "user" and is_self:
                 # Self-sent 1:1 message: commonly carries NO from_id (sender implicit).
                 from_user_id = None
                 out = True
-                text = rng.choice(_DM_LINES)
+                if rng.random() < 0.75:
+                    text = _render_text(
+                        rng,
+                        _DM_TEMPLATES,
+                        _ctx(rng, title=title, sender=sender,
+                             participants=participants, when=when),
+                    )
+                else:
+                    text = rng.choice(_DM_LINES)
             else:
                 from_user_id = _uid(sender)
                 out = is_self
-                pool_lines = _DM_LINES if kind == "user" else _GROUP_LINES
-                text = rng.choice(pool_lines)
+                if kind == "user":
+                    if rng.random() < 0.75:
+                        text = _render_text(
+                            rng,
+                            _DM_TEMPLATES,
+                            _ctx(rng, title=title, sender=sender,
+                                 participants=participants, when=when),
+                        )
+                    else:
+                        text = rng.choice(_DM_LINES)
+                else:
+                    if rng.random() < 0.82:
+                        text = _render_text(
+                            rng,
+                            _GROUP_TEMPLATES,
+                            _ctx(rng, title=title, sender=sender,
+                                 participants=participants, when=when),
+                        )
+                    else:
+                        text = rng.choice(_GROUP_LINES)
 
             edit_ts = None
             if rng.random() < 0.04:  # ~4% of messages were later edited

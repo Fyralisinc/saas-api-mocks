@@ -65,9 +65,11 @@ async def _quickbooks_flows(pool: asyncpg.Pool, run_id: UUID):
     try:
         purchases = await pool.fetch(
             "SELECT p.purchase_id, p.txn_date, p.amount_cents, p.created_at, "
-            "       v.display_name AS vendor_name "
+            "       COALESCE(v.display_name, e.display_name, p.memo, 'Vendor') AS vendor_name, "
+            "       p.category, p.memo "
             "FROM app_quickbooks.purchases p "
             "LEFT JOIN app_quickbooks.vendors v ON v.id = p.vendor_pk "
+            "LEFT JOIN app_quickbooks.employees e ON e.id = p.employee_pk "
             "JOIN app_quickbooks.companies c ON c.id = p.company_pk "
             "WHERE c.run_id = $1 ORDER BY p.created_at, p.purchase_id", run_id)
         deposits = await pool.fetch(
@@ -142,12 +144,18 @@ async def seed_mercury(
         for p in purchases:
             amt = int(p["amount_cents"])
             kind = "debitCardTransaction" if amt < 50_000 else "externalTransfer"
+            counterparty = p["vendor_name"] or "Vendor"
+            category = (p["category"] or "purchase").replace("_", " ")
+            memo = (p["memo"] or "").strip()
+            payment_memo = f"{category.title()} payment to {counterparty}"
+            if memo:
+                payment_memo = f"{payment_memo}: {memo[:100]}"
             flows.append({
                 "amount_cents": -amt,
                 "kind": kind,
-                "counterparty": p["vendor_name"] or "Vendor",
+                "counterparty": counterparty,
                 "created_at": p["created_at"],
-                "memo": f"Payment to {p['vendor_name'] or 'vendor'}",
+                "memo": payment_memo,
             })
         for d in deposits:
             lead = (d["lead"] or "").strip() or "Investor"

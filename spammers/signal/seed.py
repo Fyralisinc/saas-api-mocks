@@ -89,6 +89,103 @@ _DM_LINES = [
     "understood, let's discuss live",
 ]
 
+_WORKSTREAMS = [
+    {
+        "topic": "bridge withdrawal liveness",
+        "repo": "strata-bridge",
+        "service": "bridge-operator",
+        "risk": "operator restart path",
+        "artifact": "withdrawal invariant note",
+    },
+    {
+        "topic": "checkpoint explorer lag",
+        "repo": "checkpoint-explorer",
+        "service": "explorer-indexer",
+        "risk": "stale checkpoint visibility",
+        "artifact": "dashboard runbook",
+    },
+    {
+        "topic": "Glock fixture ordering",
+        "repo": "zkaleido",
+        "service": "proof-worker",
+        "risk": "transcript label ambiguity",
+        "artifact": "fixture matrix",
+    },
+    {
+        "topic": "Mosaic provider scoring",
+        "repo": "mosaic",
+        "service": "mosaic-fetcher",
+        "risk": "availability accounting",
+        "artifact": "provider scoring RFC",
+    },
+    {
+        "topic": "bitcoind reconnect supervisor",
+        "repo": "bitcoind-async-client",
+        "service": "strata-node",
+        "risk": "cancelled request retention",
+        "artifact": "rpc retry note",
+    },
+    {
+        "topic": "Prague testnet faucet abuse",
+        "repo": "alpen",
+        "service": "faucet-api",
+        "risk": "scripted drain bypass",
+        "artifact": "rate-limit postmortem",
+    },
+    {
+        "topic": "audit follow-up batch",
+        "repo": "strata-bridge",
+        "service": "watchtower",
+        "risk": "finding owner drift",
+        "artifact": "audit response tracker",
+    },
+]
+
+_GROUP_TEMPLATES = [
+    "{sender}: moving {topic} here because {risk} is sensitive until we verify",
+    "draft PR in {repo}; please check the bit around {risk}",
+    "not for the public channel yet: {service} is noisier after the rollout",
+    "i can own the {artifact} follow-up if {reviewer} signs off",
+    "the incident shape is the same as last month, but this time {risk} is explicit",
+    "deploying the small fix for {service}; rollback is clean if it gets loud",
+    "{sender}: i think the root cause is {risk}, not the deploy itself",
+    "can someone review the {repo} patch before the morning call?",
+    "leaving context: {topic} is blocked on review, not on implementation",
+    "we need one person to own the handoff for {service} while {reviewer} is out",
+    "i don't want this to become folklore; writing it into {artifact}",
+    "same warning as before: ship the boring version first",
+    "the dashboard symptom says {topic}, but the code path says {risk}",
+    "if this page wakes anyone up tonight, check {service} first",
+    "i'm okay shipping after the negative case lands",
+    "quick update: {repo} CI is green, staging is not",
+]
+
+_DM_TEMPLATES = [
+    "got a minute? worried the {risk} part of {topic} is being underplayed",
+    "can you cover the {service} alarm if i'm pulled into the diligence call?",
+    "please don't forward yet. i want one repro for {risk} first",
+    "the PR is up, but i'd rather you review before i put it in the big channel",
+    "if asked, say {topic} is in review and the rollback is known",
+    "thanks for the nudge. i was stuck on {risk}, not ignoring it",
+    "can you take the {artifact} notes? my brain is cooked after that incident",
+    "i'll trade you the deploy shift for the review on {repo}",
+    "this is probably fine, but probably is a bad incident word",
+    "quick read: does {topic} look like an infra issue or a protocol issue to you?",
+    "i need a second opinion before i call {risk} non-exploitable",
+    "let's discuss live; too much nuance for text",
+]
+
+
+def _ctx(rng: random.Random, *, sender: str, participants: list[str]) -> dict[str, str]:
+    work = rng.choice(_WORKSTREAMS)
+    reviewer_pool = [p for p in participants if p != sender] or participants or [sender]
+    reviewer = rng.choice(reviewer_pool)
+    return {**work, "sender": sender, "reviewer": reviewer}
+
+
+def _render_text(rng: random.Random, templates: list[str], ctx: dict[str, str]) -> str:
+    return rng.choice(templates).format(**ctx)
+
 
 def _signal_uuid(handle: str) -> str:
     """Stable Signal ACI uuid (a v4-shaped UUID) from a handle."""
@@ -200,8 +297,24 @@ async def seed_signal(
 
             sender = rng.choice(participants)
             is_self = (sender == self_handle)
-            pool_lines = _DM_LINES if kind == "direct" else _GROUP_LINES
-            body = rng.choice(pool_lines)
+            if kind == "direct":
+                if rng.random() < 0.78:
+                    body = _render_text(
+                        rng,
+                        _DM_TEMPLATES,
+                        _ctx(rng, sender=sender, participants=participants),
+                    )
+                else:
+                    body = rng.choice(_DM_LINES)
+            else:
+                if rng.random() < 0.85:
+                    body = _render_text(
+                        rng,
+                        _GROUP_TEMPLATES,
+                        _ctx(rng, sender=sender, participants=participants),
+                    )
+                else:
+                    body = rng.choice(_GROUP_LINES)
             if is_self:
                 # self-sent (own/outgoing): out=True, NO first-class sender.
                 sender_uuid = None

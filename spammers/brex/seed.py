@@ -57,9 +57,11 @@ async def _quickbooks_flows(pool: asyncpg.Pool, run_id: UUID):
     try:
         purchases = await pool.fetch(
             "SELECT p.purchase_id, p.txn_date, p.amount_cents, p.created_at, "
-            "       v.display_name AS vendor_name "
+            "       COALESCE(v.display_name, e.display_name, p.memo, 'Vendor') AS vendor_name, "
+            "       p.category, p.memo "
             "FROM app_quickbooks.purchases p "
             "LEFT JOIN app_quickbooks.vendors v ON v.id = p.vendor_pk "
+            "LEFT JOIN app_quickbooks.employees e ON e.id = p.employee_pk "
             "JOIN app_quickbooks.companies c ON c.id = p.company_pk "
             "WHERE c.run_id = $1 ORDER BY p.created_at, p.purchase_id", run_id)
         deposits = await pool.fetch(
@@ -138,8 +140,11 @@ async def seed_brex(
         for p in purchases:
             amt = int(p["amount_cents"])
             vendor = p["vendor_name"] or "Vendor"
+            category = (p["category"] or "purchase").replace("_", " ")
+            memo = (p["memo"] or "").strip()
             mcc = next((m for v, m in _FALLBACK_VENDORS if v == vendor), "5734")
-            card_rows.append((abs(amt), "PURCHASE", vendor, mcc, p["created_at"]))
+            descriptor = vendor if not memo else f"{vendor} — {category}: {memo[:80]}"
+            card_rows.append((abs(amt), "PURCHASE", descriptor, mcc, p["created_at"]))
     else:
         day = now - timedelta(days=540)
         while day < now - timedelta(days=1):

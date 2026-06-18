@@ -181,10 +181,14 @@ def github_mirror_events(facts: dict) -> Iterator[dict]:
                 opened = pr.get("created_at")
                 if not _after_founded(opened):
                     continue
+                pr_body = (pr.get("body") or "")[:1500]
                 yield {"t": opened, "provider": "github", "kind": "pr.open",
                        "actor": _ghuser_id(user),
                        "payload": {"repo": repo_id, "number": pr["number"],
                                    "title": (pr.get("title") or "")[:300],
+                                   "body": pr_body,
+                                   "draft": bool(pr.get("draft", False)),
+                                   "labels": [l.get("name") for l in (pr.get("labels") or [])],
                                    "head": (pr.get("head") or {}).get("ref"),
                                    "base": (pr.get("base") or {}).get("ref")}}
 
@@ -198,7 +202,8 @@ def github_mirror_events(facts: dict) -> Iterator[dict]:
                         repo_id=repo_id, pr_number=pr["number"],
                         author_pid=author_pid, opened_at=opened,
                         closed_at=pr.get("merged_at") or pr.get("closed_at"),
-                        repo_name=name, facts=facts,
+                        repo_name=name, pr_title=(pr.get("title") or ""),
+                        facts=facts,
                     )
 
                 if pr.get("merged_at"):
@@ -279,18 +284,33 @@ BEAT_SLACK = {
         "comment thread on the RFC — bumping it",
     ],
     "impl": [
-        "PR opened — {summary}",
-        "running into {tension} — pairing with {participant}?",
+        "pushed a first pass for {summary}; rough edges are in the tests",
+        "opened the small version so folks can argue with code",
+        "branch is up; the annoying part is {tension}",
+        "i split the risky bit out so review is not a wall of diff",
+        "draft PR is up, mostly to show the shape",
+        "put the fix behind a flag for now",
+        "this is in review; the part i distrust is {tension}",
+        "threaded notes on the PR so it is not just a drive-by diff",
+        "took the boring route, should be easier to revert",
+        "can someone sanity-check the migration path before i merge?",
+        "need another set of eyes from {participant} on the weird case",
+        "the code is not pretty yet, but the repro is finally stable",
         "rebased on main, fixed conflicts",
         "blocked on review; ping when free",
         "tests green locally; pushing",
     ],
     "review": [
-        "approved with nits",
-        "left comments — mostly questions",
-        "ok lgtm, please squash before merge",
-        "found one edge case; flagged inline",
-        "approving conditional on the typo fix",
+        "approved with nits; nothing scary",
+        "left comments, mostly me asking for the assumption to be named",
+        "lgtm after the small test lands",
+        "found one edge case and marked the exact line",
+        "approving if CI stays green after the rebase",
+        "not blocking, but the rollback note should be in the PR",
+        "reviewed twice because the diff looked harmless and then wasn't",
+        "i am okay with this shape, but please squash the noisy commits",
+        "inline comments are real, not taste police",
+        "can we leave a breadcrumb for the next person on-call?",
     ],
     "audit": [
         "audit findings batch in tracker — {tension}",
@@ -570,9 +590,58 @@ def _candidate_reviewers(facts: dict, author_pid: str) -> list[str]:
     return same[:4] + other[:3]
 
 
+REVIEW_CONTEXT_FRAGMENTS = [
+    "the risk is in the {area} path, not the happy path",
+    "i'm mostly checking {area} because that is what broke last time",
+    "this looks small, but {area} is where the test should live",
+    "please leave a note for whoever is on-call next week",
+    "can you spell out the rollback story before merge",
+    "i'd like the fixture to name the weird case directly",
+    "this is fine if the dashboard catches the failure mode",
+    "one more test around {area} and i'm good",
+    "the shape is right, just make the assumption visible",
+    "let's keep the branch boring; the clever version can wait",
+]
+
+REVIEW_AREAS_BY_REPO = {
+    "strata-bridge": ["deposit finality", "operator handoff", "withdrawal liveness", "watchtower alerting"],
+    "alpen": ["checkpoint emission", "node restart", "mempool pressure", "execution boundary"],
+    "zkaleido": ["transcript labels", "proof batching", "fixture ordering", "backend selection"],
+    "mosaic": ["provider scoring", "chunk manifests", "p2p retrieval", "availability accounting"],
+    "bitcoind-async-client": ["reconnect handling", "cancelled requests", "rpc retry budget", "broadcast path"],
+    "alpen-dashboards": ["cardinality", "alert routing", "runbook links", "checkpoint visibility"],
+}
+
+
+def _contextual_review_body(seed: str, base: str, state: str, repo_name: str,
+                            pr_title: str, reviewer: str, facts: dict) -> str:
+    """Turn a repeated reviewer phrase into a human review note with context.
+
+    The base snippet preserves the reviewer's voice; the context fragment makes
+    repeated reviews separable by repo, PR theme, and requested follow-up.
+    """
+    areas = REVIEW_AREAS_BY_REPO.get(repo_name) or ["edge case", "test path", "rollback", "operator behavior"]
+    area = areas[_hash_int(seed, reviewer, "area", n=len(areas))]
+    fragment = REVIEW_CONTEXT_FRAGMENTS[
+        _hash_int(seed, reviewer, "ctx", n=len(REVIEW_CONTEXT_FRAGMENTS))
+    ].format(area=area)
+    title_hint = re.sub(r"\s+", " ", pr_title or "").strip()
+    if len(title_hint) > 90:
+        title_hint = title_hint[:87] + "..."
+    prefix = {
+        "approved": ["lgtm", "approved", "this is good from me", "ship after the small cleanup"],
+        "commented": ["left notes", "couple questions", "not blocking yet", "reading this as a review pass"],
+        "changes_requested": ["requesting changes", "blocking on one thing", "not comfortable merging yet", "needs one more pass"],
+    }.get(state, ["reviewed"])[_hash_int(seed, reviewer, "prefix", n=4)]
+    if title_hint:
+        return f"{prefix}: {base}. On `{title_hint}`, {fragment}."
+    return f"{prefix}: {base}. {fragment}."
+
+
 def _synthetic_pr_reviews(*, repo_id: str, pr_number: int, author_pid: str,
                           opened_at: str, closed_at: str | None,
-                          repo_name: str, facts: dict) -> Iterator[dict]:
+                          repo_name: str, pr_title: str,
+                          facts: dict) -> Iterator[dict]:
     """Emit 0-2 review submissions on a PR. Deterministic from (repo, number).
 
     State distribution: approved 70%, commented 22%, changes_requested 8%.
@@ -613,6 +682,8 @@ def _synthetic_pr_reviews(*, repo_id: str, pr_number: int, author_pid: str,
                        .get("snippets", {}).get("review") or [])
         body = (review_pool[_hash_int(seed, "body", str(i), n=len(review_pool))]
                 if review_pool else "lgtm")
+        body = _contextual_review_body(seed, body, state, repo_name, pr_title,
+                                       reviewer, facts)
         yield {
             "t": _iso(t_review),
             "provider": "github", "kind": "review.submit",
@@ -1416,6 +1487,60 @@ FRIEND_DM_LINES = [
     "covering for {participant} today since they're out",
 ]
 
+DM_WORK_CONTEXTS = [
+    ("bridge handoff", "review is stuck between code and operator docs"),
+    ("checkpoint dashboards", "the alert says lag but the root cause is unclear"),
+    ("Glock fixtures", "the negative case needs a second reader"),
+    ("Mosaic rollout", "provider scoring keeps leaking into product questions"),
+    ("bitcoind reconnect", "the cancellation path is still weird"),
+    ("audit cleanup", "the finding is small but the ownership is muddy"),
+    ("testnet support", "the public answer needs to be calmer than the internal one"),
+    ("hiring loop", "panel feedback is scattered across three docs"),
+    ("monthly close", "finance needs the memo before the bank sync"),
+]
+
+MANAGER_DM_SUFFIXES = [
+    "context: {topic}; {detail}.",
+    "mostly trying to avoid a surprise in standup: {detail}.",
+    "not urgent, but this is the {topic} thread that keeps resurfacing.",
+    "i want one owner here because {detail}.",
+    "if you reply async, just tell me whether {topic} is still blocked.",
+    "putting it here so the public channel does not get noisy.",
+]
+
+FRIEND_DM_SUFFIXES = [
+    "also, the {topic} thread is still alive somehow.",
+    "i'm pretending not to think about {topic} for ten minutes.",
+    "work footnote: {detail}.",
+    "after that {topic} thread, i need air.",
+    "save me from the {topic} doc later.",
+]
+
+
+def _dm_context(actor: str, other: str, cur: datetime, salt: str) -> dict[str, str]:
+    topic, detail = DM_WORK_CONTEXTS[
+        _hash_int(actor, other, cur.toordinal(), salt, "ctx", n=len(DM_WORK_CONTEXTS))
+    ]
+    return {"topic": topic, "detail": detail}
+
+
+def _with_manager_context(text: str, actor: str, other: str,
+                          cur: datetime, salt: str) -> str:
+    ctx = _dm_context(actor, other, cur, salt)
+    suffix = MANAGER_DM_SUFFIXES[
+        _hash_int(actor, other, cur.toordinal(), salt, "suffix", n=len(MANAGER_DM_SUFFIXES))
+    ].format(**ctx)
+    return f"{text} {suffix}"
+
+
+def _with_friend_context(text: str, actor: str, other: str,
+                         cur: datetime, salt: str) -> str:
+    ctx = _dm_context(actor, other, cur, salt)
+    suffix = FRIEND_DM_SUFFIXES[
+        _hash_int(actor, other, cur.toordinal(), salt, "suffix", n=len(FRIEND_DM_SUFFIXES))
+    ].format(**ctx)
+    return f"{text} {suffix}"
+
 
 def _pick_friend_pairs(facts: dict) -> list[tuple[str, str]]:
     """Pick ~12 deterministic friend pairs: same-team, adjacent starters.
@@ -1542,6 +1667,8 @@ def dm_events(facts: dict, start: str, end: str) -> Iterator[dict]:
                 line = pool[_hash_int(manager, report, cur.toordinal(),
                                       "mp_l", n=len(pool))]
                 text = line.format(participant=_resolve_handle(other, facts))
+                if _det01(manager, report, cur.toordinal(), "mp_context") < 0.78:
+                    text = _with_manager_context(text, actor, other, cur, "mgr")
                 hr = 10 + _hash_int(manager, report, cur.toordinal(),
                                     "mp_h", n=7)
                 when = cur.replace(hour=hr, minute=_hash_int(
@@ -1589,6 +1716,8 @@ def dm_events(facts: dict, start: str, end: str) -> Iterator[dict]:
                 line = FRIEND_DM_LINES[_hash_int(
                     a, b, cur.toordinal(), "fr_l", n=len(FRIEND_DM_LINES))]
                 text = line.format(participant=_resolve_handle(other, facts))
+                if _det01(a, b, cur.toordinal(), "fr_context") < 0.45:
+                    text = _with_friend_context(text, first, other, cur, "friend")
                 hr = 11 + _hash_int(a, b, cur.toordinal(), "fr_h", n=6)
                 when = cur.replace(hour=hr, minute=_hash_int(
                     a, b, cur.toordinal(), "fr_m", n=60))
@@ -1608,12 +1737,16 @@ def dm_events(facts: dict, start: str, end: str) -> Iterator[dict]:
                     reply_line = FRIEND_DM_LINES[_hash_int(
                         a, b, cur.toordinal(), "fr_rl",
                         n=len(FRIEND_DM_LINES))]
+                    reply_text = reply_line.format(
+                        participant=_resolve_handle(first, facts))
+                    if _det01(a, b, cur.toordinal(), "fr_reply_context") < 0.35:
+                        reply_text = _with_friend_context(
+                            reply_text, other, first, cur, "friend-reply")
                     yield {
                         "t": _iso(reply_when), "provider": "slack",
                         "kind": "message", "actor": other,
                         "payload": {"channel": dm_id,
-                                    "text": reply_line.format(
-                                        participant=_resolve_handle(first, facts)),
+                                    "text": reply_text,
                                     "category": "dm:friend"},
                     }
             cur += timedelta(days=1)
@@ -2792,6 +2925,66 @@ DISCORD_MSGS_BY_KIND = {
     ],
 }
 
+DISCORD_FOLLOWUPS_BY_KIND = {
+    "general": [
+        "not a formal announcement, just leaving the breadcrumb here",
+        "happy to compare notes if anyone has a repro",
+        "will move details to an issue once i have logs",
+        "this is still half-baked, so treat it as field notes",
+        "i can share the tiny patch if that saves someone time",
+    ],
+    "bitvm": [
+        "the odd bit is transcript ordering, not the verifier itself",
+        "bench variance is hiding the real regression",
+        "i want one deterministic fixture before we call it solved",
+        "probably boring, but the boring bug cost us a day",
+        "will post the trace after i strip the local paths",
+    ],
+    "strata": [
+        "the operator-visible symptom was lag, but the cause was lower down",
+        "we are keeping the bridge rule conservative until testnet has more mileage",
+        "this came out of an internal retro, so wording may change",
+        "reorg coverage is better now, still not where i want it",
+        "the node split made this easier to reason about",
+    ],
+    "starknet-collab": [
+        "same root cause showed up in our adapter, which is a little reassuring",
+        "dm me if the fixture format is annoying",
+        "we mirrored the shape internally so the diff should be familiar",
+        "i'll review after our release branch quiets down",
+        "naming is the only thing i would not copy from our side",
+    ],
+    "announcements": [
+        "thanks to everyone who tested the awkward prerelease bits",
+        "file issues if the quickstart drifts; we are watching that repo today",
+        "this one took longer because we kept shrinking the trust surface",
+        "docs PRs are welcome, especially around operator setup",
+        "we will publish the follow-up notes after the first week of usage",
+    ],
+}
+
+DISCORD_PR_PHRASES = [
+    "opened the PR after the call",
+    "put a draft up so people can point at code",
+    "left the patch small on purpose",
+    "split the cleanup from the behavior change",
+    "moved the notes from the thread into the PR",
+    "added the repro before the fix because otherwise this gets hand-wavy",
+]
+
+
+def _discord_text(ch_name: str, actor: str, week: int, mi: int) -> str:
+    msg_bank = DISCORD_MSGS_BY_KIND.get(ch_name, DISCORD_MSGS_BY_KIND["general"])
+    base = msg_bank[_hash_int(ch_name, str(week), str(mi), "txt", n=len(msg_bank))]
+    followups = DISCORD_FOLLOWUPS_BY_KIND.get(ch_name, DISCORD_FOLLOWUPS_BY_KIND["general"])
+    follow = followups[_hash_int(ch_name, actor, str(week), str(mi), "fu", n=len(followups))]
+    if _det01(ch_name, actor, week, mi, "prish") < 0.28:
+        pr = DISCORD_PR_PHRASES[_hash_int(ch_name, actor, week, mi, "pr", n=len(DISCORD_PR_PHRASES))]
+        return f"{base} {pr}; {follow}."
+    if _det01(ch_name, actor, week, mi, "question") < 0.18:
+        return f"{base} does that match what others are seeing? {follow}."
+    return f"{base} {follow}."
+
 
 def discord_events(facts: dict, start: str, end: str) -> Iterator[dict]:
     """Sparse cross-org chatter in a small ZK / Bitcoin Discord guild.
@@ -2826,9 +3019,7 @@ def discord_events(facts: dict, start: str, end: str) -> Iterator[dict]:
             for mi in range(n_msgs):
                 actor = DISCORD_ALPEN_REGULARS[
                     _hash_int(ch_id, str(week), str(mi), n=len(DISCORD_ALPEN_REGULARS))]
-                msg_bank = DISCORD_MSGS_BY_KIND.get(ch_name, DISCORD_MSGS_BY_KIND["general"])
-                text = msg_bank[_hash_int(ch_id, str(week), str(mi), "txt",
-                                          n=len(msg_bank))]
+                text = _discord_text(ch_name, actor, week, mi)
                 # Spread within the week + skew to that person's active hours.
                 when = cur + timedelta(
                     days=(ci * 2 + mi * 3) % 6,
@@ -3673,6 +3864,281 @@ def company_truth_events(facts: dict, truth: dict, start: str, end: str) -> Iter
             }
 
 
+# -----------------------------------------------------------------------------
+# Messy reality: noncanonical, ambiguous source traces
+# -----------------------------------------------------------------------------
+
+MESSY_CHANNEL = "channel:loose-threads"
+
+MESSY_CASES = [
+    {
+        "id": "silent-bridge-retry-change",
+        "date": "2024-09-18",
+        "people": ["person:Rajil1213", "person:MdTeach", "person:storopoli"],
+        "area": "bridge retry behavior",
+        "surface": "strata-bridge",
+        "wrong_read": "this looked like routine flake cleanup from the public channel",
+        "actual_shape": "a hallway conversation changed the retry policy before the RFC caught up",
+        "stale_doc": "Bridge retry notes - old",
+        "owner_confusion": "watcher vs operator ownership kept getting renamed in comments",
+    },
+    {
+        "id": "dashboard-lag-not-prover-lag",
+        "date": "2025-02-11",
+        "people": ["person:bewakes", "person:krsnapaudel", "person:alexhui01"],
+        "area": "checkpoint visibility delay",
+        "surface": "alpen-dashboards",
+        "wrong_read": "first read said prover backlog, because the alert name was bad",
+        "actual_shape": "bridge-visible checkpoint lag was a dashboard/indexer gap",
+        "stale_doc": "Checkpoint dashboard taxonomy draft",
+        "owner_confusion": "infra owned the alert, bridge owned the symptom",
+    },
+    {
+        "id": "glock-fixture-private-detour",
+        "date": "2025-05-07",
+        "people": ["person:voidash", "person:prajwolrg", "person:cyphersnake"],
+        "area": "Glock fixture ordering",
+        "surface": "zkaleido",
+        "wrong_read": "looked like a small naming cleanup",
+        "actual_shape": "a private Signal thread caught a transcript-ordering bug",
+        "stale_doc": "Fixture matrix scratchpad",
+        "owner_confusion": "research thought protocol owned the fixtures; protocol thought research owned the adapter",
+    },
+    {
+        "id": "mosaic-provider-scoring-deferral",
+        "date": "2025-08-20",
+        "people": ["person:storopoli", "person:uncomputable", "person:barakshani"],
+        "area": "Mosaic provider scoring",
+        "surface": "mosaic",
+        "wrong_read": "the release notes made it look finished",
+        "actual_shape": "operator-visible scoring was deferred until the threat model was clearer",
+        "stale_doc": "Mosaic v0.3 operator scoring notes",
+        "owner_confusion": "availability metrics and product wording drifted apart",
+    },
+    {
+        "id": "offboarding-context-hole",
+        "date": "2026-01-13",
+        "people": ["person:Rajil1213", "person:ProofOfKeags", "person:alexhui01"],
+        "area": "bitcoind reconnect ownership",
+        "surface": "bitcoind-async-client",
+        "wrong_read": "tickets implied the work was merely slow",
+        "actual_shape": "the old owner had context in local notes that were never linked",
+        "stale_doc": "Reconnect supervisor checklist",
+        "owner_confusion": "handover packet said done, but the cancellation path was tribal knowledge",
+    },
+]
+
+AMBIGUOUS_LINES = [
+    "i talked to {other} after lunch and we should take the smaller path for {area}",
+    "leaving this here before i forget: {actual_shape}",
+    "the ticket name is misleading. {wrong_read}, but that is not what is happening",
+    "can someone rename the thing before future-us learns the wrong lesson",
+    "i am pretty sure the doc is stale, but i do not know which one is canonical",
+    "this started in a hallway chat, sorry. writing the minimum context now",
+    "the PR is fine, the reason for the PR is the part nobody will see",
+    "{owner_confusion}. let's not make the reviewer infer that from commit order",
+]
+
+CONFLICTING_READ_LINES = [
+    "i read this as {wrong_read}. is that still true?",
+    "not quite. current read is: {actual_shape}",
+    "both are half true, which is why the Jira thread is confusing",
+    "can we stop saying blocker until we know whether this is ownership or code",
+]
+
+STALE_DOC_UPDATES = [
+    "probably stale after the hallway decision",
+    "needs reconciliation with Slack thread",
+    "do not treat this as source of truth until owner confirms",
+    "kept for history; decision moved elsewhere",
+]
+
+
+def messy_reality_events(facts: dict, start: str, end: str) -> Iterator[dict]:
+    """Add real-company mess without changing canonical company state.
+
+    These are observed traces only: private channels, stale docs, conflicting
+    reads, misnamed tickets, and quiet decisions that later explain work. They
+    deliberately avoid org/person/funding/project state changes.
+    """
+    d0 = datetime.fromisoformat(start).replace(tzinfo=timezone.utc)
+    d1 = datetime.fromisoformat(end).replace(tzinfo=timezone.utc)
+
+    channel_created = False
+    for case in MESSY_CASES:
+        when = _truth_dt(case["date"], hour=14)
+        if not _in_range(when, d0, d1):
+            continue
+        people = [p for p in case["people"] if _has_started(p, when, facts)]
+        if len(people) < 2:
+            continue
+        actor = people[0]
+        slug = _slug(case["id"])
+
+        if not channel_created:
+            yield {
+                "t": _iso(_truth_dt(case["date"], hour=10)),
+                "provider": "slack",
+                "kind": "channel.create",
+                "actor": actor,
+                "payload": {
+                    "id": MESSY_CHANNEL,
+                    "name": "loose-threads",
+                    "is_private": True,
+                    "participants": sorted({p for c in MESSY_CASES for p in c["people"]}),
+                },
+            }
+            channel_created = True
+
+        mpim_id = _mpim_id(f"messy-{slug}")
+        yield {
+            "t": _iso(when - timedelta(minutes=15)),
+            "provider": "slack",
+            "kind": "channel.create",
+            "actor": actor,
+            "payload": {
+                "id": mpim_id,
+                "name": mpim_id,
+                "is_mpim": True,
+                "is_private": True,
+                "participants": people,
+            },
+        }
+
+        for i, template in enumerate(AMBIGUOUS_LINES[:5]):
+            speaker = people[i % len(people)]
+            other = _resolve_handle(people[(i + 1) % len(people)], facts)
+            text = template.format(other=other, **case)
+            yield {
+                "t": _iso(_skew_to_peak(when + timedelta(minutes=7 * i), speaker)),
+                "provider": "slack",
+                "kind": "message",
+                "actor": speaker,
+                "payload": {
+                    "channel": mpim_id if i < 3 else MESSY_CHANNEL,
+                    "text": text,
+                    "category": "messy:ambiguous_cause",
+                    "case": case["id"],
+                },
+            }
+
+        stale_doc_id = f"notion:messy:{slug}:stale"
+        yield {
+            "t": _iso(when + timedelta(hours=2)),
+            "provider": "notion",
+            "kind": "page.create",
+            "actor": actor,
+            "payload": {
+                "id": stale_doc_id,
+                "title": case["stale_doc"],
+                "kind": "scratch_note",
+                "body_md": _truth_body(case["stale_doc"], [
+                    f"Area: {case['area']}",
+                    f"Current guess: {case['wrong_read']}",
+                    "Status: not reviewed after the hallway sync",
+                ]),
+                "is_private": True,
+                "audience": people,
+            },
+        }
+        for i, summary in enumerate(STALE_DOC_UPDATES[:2]):
+            yield {
+                "t": _iso(when + timedelta(days=3 + i * 5)),
+                "provider": "notion",
+                "kind": "page.update",
+                "actor": people[(i + 1) % len(people)],
+                "payload": {"id": stale_doc_id, "summary": summary},
+            }
+
+        key = f"STR-{70000 + _hash_int(case['id'], n=8999)}"
+        yield {
+            "t": _iso(when + timedelta(days=1)),
+            "provider": "jira",
+            "kind": "issue.create",
+            "actor": actor,
+            "payload": {
+                "key": key,
+                "project": "STR",
+                "type": "Task",
+                "summary": f"Clarify ownership: {case['area']}"[:200],
+                "reporter": actor,
+                "assignee": people[1],
+                "story_points": 2,
+                "labels": ["messy-reality", "ownership", slug],
+                "linked_note": stale_doc_id,
+            },
+        }
+        yield {
+            "t": _iso(when + timedelta(days=4)),
+            "provider": "jira",
+            "kind": "issue.assign",
+            "actor": people[1],
+            "payload": {
+                "key": key,
+                "from_assignee": people[1],
+                "to_assignee": people[-1],
+            },
+        }
+        # Leave some tickets unresolved on purpose; real companies have these
+        # hanging around as explanatory residue.
+        if _det01(case["id"], "resolve") > 0.45:
+            yield {
+                "t": _iso(when + timedelta(days=11)),
+                "provider": "jira",
+                "kind": "issue.transition",
+                "actor": people[-1],
+                "payload": {"key": key, "from_status": "To Do", "to_status": "In Progress"},
+            }
+        else:
+            yield {
+                "t": _iso(when + timedelta(days=11)),
+                "provider": "slack",
+                "kind": "message",
+                "actor": people[-1],
+                "payload": {
+                    "channel": MESSY_CHANNEL,
+                    "text": f"i don't think {key} is actually blocked. we just never wrote down the decision.",
+                    "category": "messy:unresolved_ask",
+                    "case": case["id"],
+                },
+            }
+
+        for i, template in enumerate(CONFLICTING_READ_LINES):
+            speaker = people[(i + 1) % len(people)]
+            yield {
+                "t": _iso(_skew_to_peak(when + timedelta(days=2, minutes=i * 13), speaker)),
+                "provider": "slack",
+                "kind": "message",
+                "actor": speaker,
+                "payload": {
+                    "channel": MESSY_CHANNEL,
+                    "text": template.format(**case),
+                    "category": "messy:conflicting_read",
+                    "case": case["id"],
+                    "related_issue": key,
+                },
+            }
+
+        yield {
+            "t": _iso(when + timedelta(days=6)),
+            "provider": "drive",
+            "kind": "file.create",
+            "actor": actor,
+            "payload": {
+                "id": f"drive:messy:{slug}:breadcrumbs",
+                "name": f"Breadcrumbs - {case['area']}",
+                "mime_type": _GDOC,
+                "body": (
+                    f"This is not a decision memo.\n"
+                    f"Observed wrong read: {case['wrong_read']}\n"
+                    f"Likely actual shape: {case['actual_shape']}\n"
+                    f"Ownership confusion: {case['owner_confusion']}\n"
+                ),
+                "category": "messy-breadcrumb",
+            },
+        }
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--include-mirror", action="store_true",
@@ -3703,6 +4169,8 @@ def main() -> None:
     ap.add_argument("--include-dms", action="store_true",
                     help="include DM + MPIM streams (cofounder backchannel, "
                          "manager↔report pings, friend-pair social chatter)")
+    ap.add_argument("--include-messy-reality", action="store_true",
+                    help="include ambiguous/stale/noncanonical company traces")
     ap.add_argument("--include-all", action="store_true",
                     help="shortcut: turn on every --include-*")
     ap.add_argument("--end", default="2026-05-29",
@@ -3771,6 +4239,8 @@ def main() -> None:
             facts, finance, facts["company"]["founded"], args.end))
     if args.include_dms or args.include_all:
         events.extend(dm_events(facts, facts["company"]["founded"], args.end))
+    if args.include_messy_reality or args.include_all:
+        events.extend(messy_reality_events(facts, facts["company"]["founded"], args.end))
 
     # Stable sort by timestamp.
     events.sort(key=lambda e: e["t"])

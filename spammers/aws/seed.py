@@ -94,6 +94,17 @@ _ALARMS = [
     ("nlb-unhealthy-hosts", "UnHealthyHostCount", "AWS/NetworkELB", "LoadBalancer"),
     ("lambda-error-rate-high", "Errors", "AWS/Lambda", "FunctionName"),
 ]
+_CHANGE_INTENTS = [
+    ("testnet hardening", "prague-testnet-readiness"),
+    ("audit follow-up", "audit-response-batch"),
+    ("weekly staging rollout", "staging-release-train"),
+    ("incident remediation", "postmortem-action-items"),
+    ("cost cleanup", "infra-cost-review"),
+    ("access review", "quarterly-access-review"),
+    ("dashboard tuning", "observability-follow-up"),
+    ("operator onboarding", "operator-runbook-update"),
+]
+_ENVIRONMENTS = ["dev", "staging", "testnet", "prod", "internal"]
 
 
 def _ms(dt: datetime) -> int:
@@ -115,6 +126,34 @@ def _ip(rng: random.Random) -> str:
 def _stable_id(prefix: str, handle: str, n: int = 17) -> str:
     h = hashlib.blake2b(handle.encode(), digest_size=12).hexdigest().upper()
     return prefix + h[:n]
+
+
+def _change_context(rng: random.Random, *, event_name: str, service: str,
+                    handle: str, when: datetime) -> dict[str, str]:
+    """CloudTrail rows repeat by design; this gives each repeated API shape a
+    stable company reason that a model can aggregate into cadence/baselines."""
+    intent, thread = rng.choice(_CHANGE_INTENTS)
+    env = _ENVIRONMENTS[
+        int(hashlib.blake2b((service + event_name).encode(), digest_size=2).hexdigest(), 16)
+        % len(_ENVIRONMENTS)
+    ]
+    if event_name.startswith(("CreateAccessKey", "AttachUserPolicy", "CreateUser", "CreateRole")):
+        intent, thread = "access review", "quarterly-access-review"
+    elif event_name.startswith(("SetAlarm", "PutRule", "CreateLogGroup")):
+        intent, thread = "dashboard tuning", "observability-follow-up"
+    elif event_name.startswith(("RunInstances", "UpdateFunction", "CreateStack")):
+        intent, thread = "weekly staging rollout", "staging-release-train"
+    elif event_name.startswith(("Terminate", "Delete")):
+        intent, thread = "cost cleanup", "infra-cost-review"
+    weekday = when.strftime("%A")
+    return {
+        "environment": env,
+        "changeIntent": intent,
+        "changeThread": thread,
+        "owner": handle,
+        "changeSummary": f"{intent} for {service} on {weekday}",
+        "runbookHint": f"{service}/{env}/{thread}",
+    }
 
 
 async def _service_names(pool: asyncpg.Pool, run_id: UUID) -> list[str]:
@@ -145,7 +184,7 @@ def _principal(account: str, handle: str) -> dict:
 
 
 def _mgmt_record(rng, *, account, region, principal, name, source, read_only,
-                 res_type, res_prefix, service, when) -> tuple[dict, list]:
+                 res_type, res_prefix, service, when, change_context) -> tuple[dict, list]:
     res_name = (res_prefix + service if res_prefix.startswith("/") or "-" in res_prefix
                 else res_prefix + hashlib.blake2b(
                     (name + service + str(_ms(when))).encode(), digest_size=6).hexdigest())
@@ -161,7 +200,15 @@ def _mgmt_record(rng, *, account, region, principal, name, source, read_only,
         "awsRegion": region,
         "sourceIPAddress": _ip(rng),
         "userAgent": rng.choice(_USER_AGENTS),
-        "requestParameters": {"resourceName": res_name, "service": service},
+        "requestParameters": {
+            "resourceName": res_name,
+            "service": service,
+            "environment": change_context["environment"],
+            "changeIntent": change_context["changeIntent"],
+            "changeThread": change_context["changeThread"],
+            "reason": change_context["changeSummary"],
+            "lookupPurpose": ("baseline check" if read_only else "planned change"),
+        },
         "responseElements": None if read_only else {"requestId": _guid(rng), "_result": "ok"},
         "requestID": _guid(rng),
         "eventID": _guid(rng),
@@ -170,6 +217,16 @@ def _mgmt_record(rng, *, account, region, principal, name, source, read_only,
         "managementEvent": True,
         "recipientAccountId": account,
         "eventCategory": "Management",
+        "additionalEventData": {
+            "runbookHint": change_context["runbookHint"],
+            "owner": change_context["owner"],
+            "reviewSurface": "github-pr" if not read_only else "ops-dashboard",
+        },
+        "tags": {
+            "service": service,
+            "environment": change_context["environment"],
+            "change_intent": change_context["changeIntent"],
+        },
         "tlsDetails": {
             "tlsVersion": "TLSv1.3",
             "cipherSuite": "TLS_AES_128_GCM_SHA256",
@@ -211,6 +268,12 @@ def _alarm_record(rng, *, account, region, alarm, new_state, prev_state, when,
         "serviceEventDetails": {
             "metricNamespace": namespace, "metricName": metric,
             "dimensions": {dim: service}, "newState": new_state, "previousState": prev_state,
+        },
+        "incidentContext": {
+            "service": service,
+            "responseThread": "incident-response" if new_state == "ALARM" else "post-incident-follow-up",
+            "expectedOwner": "infra-oncall",
+            "runbookHint": f"{service}/alarms/{name}",
         },
     }
 
@@ -271,10 +334,13 @@ async def seed_aws(
                                    seconds=rng.randint(0, 59))
             if when >= now:
                 continue
+            change_context = _change_context(
+                rng, event_name=name, service=service, handle=handle, when=when)
             record, resources = _mgmt_record(
                 rng, account=ACCOUNT_ID, region=REGION, principal=principal,
                 name=name, source=source, read_only=read_only, res_type=res_type,
-                res_prefix=res_prefix, service=service, when=when)
+                res_prefix=res_prefix, service=service, when=when,
+                change_context=change_context)
             rows.append((record["eventID"], _ms(when), name, source, REGION,
                          handle, principal["accessKeyId"], read_only,
                          json.dumps(resources), json.dumps(record), False))
